@@ -25,7 +25,7 @@ function createManagementSheet() {
   }
 
   writeManagementHeader_(sheet);
-  applyManagementFormat_(sheet);
+  // applyManagementFormat_(sheet); // 書式処理は applyManagementRowStyle_ に統一
   redrawManagementSheet_(sheet);
   var shipFromRange = sheet.getRange(2, 15, Math.max(sheet.getMaxRows() - 1, 1), 1);
   var shipFromValues = shipFromRange.getValues().map(function(row) {
