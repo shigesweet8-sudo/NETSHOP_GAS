@@ -26,6 +26,7 @@ function createManagementSheet() {
 
   writeManagementHeader_(sheet);
   applyManagementFormat_(sheet);
+  redrawManagementSheet_(sheet);
   var shipFromRange = sheet.getRange(2, 15, Math.max(sheet.getMaxRows() - 1, 1), 1);
   var shipFromValues = shipFromRange.getValues().map(function(row) {
     var value = row[0];
@@ -56,11 +57,12 @@ function applyManagementFormat_(sheet) {
   var col         = CONFIG.COLS;
   var maxCol      = CONFIG.HEADERS.length;
   var maxDataRows = sheet.getMaxRows() - 1;
+  var colors      = CONFIG.COLORS;
 
   // ヘッダー行
   sheet.getRange(1, 1, 1, maxCol)
-    .setBackground('#1a73e8')
-    .setFontColor('#ffffff')
+    .setBackground(colors.HEADER_BG)
+    .setFontColor(colors.HEADER_FG)
     .setFontWeight('bold')
     .setHorizontalAlignment('center');
 
@@ -81,6 +83,68 @@ function applyManagementFormat_(sheet) {
  * 管理シートに1行追記する
  * @param {Object} record - {date, shop, itemName, priceFinal, fee, shipping, cost, status, memo, orderId, qty}
  *                          ※ 旧キー salePrice/note/platform も互換で受け付ける
+ * @returns {number} 書き込んだ行番号
+ */
+function redrawManagementSheet_(sheet) {
+  var lastRow = getManagementDataLastRow_(sheet);
+  if (lastRow <= 1) return;
+
+  for (var row = 2; row <= lastRow; row++) {
+    applyManagementRowStyle_(sheet, row);
+  }
+}
+
+function applyManagementRowStyle_(sheet, row) {
+  applyManagementRowBaseStyle_(sheet, row);
+  applyManagementRowHighlight_(sheet, row);
+}
+
+function applyManagementRowBaseStyle_(sheet, row) {
+  var colors = CONFIG.COLORS;
+  var white  = colors.BASE_ROW_WHITE || '#ffffff';
+  var alt    = colors.ALT_ROW || white;
+  var bg     = row % 2 === 0 ? white : alt;
+
+  sheet.getRange(row, 1, 1, CONFIG.HEADERS.length).setBackground(bg);
+}
+
+function applyManagementRowHighlight_(sheet, row) {
+  var col    = CONFIG.COLS;
+  var status = sheet.getRange(row, col.STATUS).getValue();
+  var rule   = getManagementHighlightRule_(status);
+  if (!rule) return;
+
+  rule.columns.forEach(function(column) {
+    sheet.getRange(row, column).setBackground(rule.background);
+  });
+}
+
+function getManagementHighlightRule_(status) {
+  var col = CONFIG.COLS;
+
+  if (status !== '商品登録') return null;
+
+  return {
+    background: CONFIG.COLORS.PRODUCT_REG_HIGHLIGHT || '#fff2cc',
+    columns: [
+      col.ID,
+      col.STAFF,
+      col.PRODUCT_REG_DATE,
+      col.SHOP,
+      col.ITEM_NAME,
+      col.STORAGE,
+      col.QTY
+    ]
+  };
+}
+
+function getManagementDataLastRow_(sheet) {
+  return sheet.getLastRow();
+}
+
+/**
+ * 管理シートに1行追加する
+ * @param {Object} record - {date, shop, itemName, priceFinal, fee, shipping, cost, status, memo, orderId, qty}
  * @returns {number} 書き込んだ行番号
  */
 function appendManagementRow_(record) {
@@ -118,6 +182,7 @@ function appendManagementRow_(record) {
   rowData[col.MEMO        - 1] = record.memo || record.note || '';
 
   sheet.getRange(nextRow, 1, 1, CONFIG.HEADERS.length).setValues([rowData]);
+  applyManagementRowStyle_(sheet, nextRow);
 
   return nextRow;
 }
