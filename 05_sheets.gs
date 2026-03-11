@@ -169,6 +169,22 @@ function getManagementHighlightRule_(status) {
     };
   }
 
+  if (status === '📦発送準備中') {
+    return {
+      background: '#e4dfec',
+      columns: [
+        col.SHIP_FROM,
+        col.CUSTOMER,
+        col.CARRIER,
+        col.ZIP,
+        col.PREF,
+        col.ADDR2,
+        col.ADDR3,
+        col.PHONE
+      ]
+    };
+  }
+
   return null;
 }
 
