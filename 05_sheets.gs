@@ -185,17 +185,6 @@ function getManagementHighlightRule_(status) {
     };
   }
 
-  if (status === '🚚発送完了') {
-    return {
-      background: '#f2f2f2',
-      columns: [
-        col.SHIP_FROM,
-        col.CARRIER,
-        col.TRACKING
-      ]
-    };
-  }
-
   return null;
 }
 
