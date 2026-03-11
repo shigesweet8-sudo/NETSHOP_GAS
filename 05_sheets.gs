@@ -140,21 +140,36 @@ function applyManagementRowHighlight_(sheet, row) {
 
 function getManagementHighlightRule_(status) {
   var col = CONFIG.COLS;
+  var highlightColor = CONFIG.COLORS.PRODUCT_REG_HIGHLIGHT || '#fff2cc';
 
-  if (status !== '📝商品登録') return null;
+  if (status === '📝商品登録') {
+    return {
+      background: highlightColor,
+      columns: [
+        col.ID,
+        col.STAFF,
+        col.PRODUCT_REG_DATE,
+        col.SHOP,
+        col.ITEM_NAME,
+        col.STORAGE,
+        col.QTY
+      ]
+    };
+  }
 
-  return {
-    background: CONFIG.COLORS.PRODUCT_REG_HIGHLIGHT || '#fff2cc',
-    columns: [
-      col.ID,
-      col.STAFF,
-      col.PRODUCT_REG_DATE,
-      col.SHOP,
-      col.ITEM_NAME,
-      col.STORAGE,
-      col.QTY
-    ]
-  };
+  if (status === '💰決済完了') {
+    return {
+      background: highlightColor,
+      columns: [
+        col.COST,
+        col.PRICE_FINAL,
+        col.FEE,
+        col.SHIPPING
+      ]
+    };
+  }
+
+  return null;
 }
 
 function getManagementDataLastRow_(sheet) {
