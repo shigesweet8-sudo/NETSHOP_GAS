@@ -21,12 +21,20 @@ function generateId_(shopValue) {
   var shopText = String(shopValue || '');
   var prefix = '';
 
-  if (shopText.indexOf('ヤフオク(Cappa)') !== -1) {
-    prefix = 'CA-Y';
+  if (shopText.indexOf('メルカリ(Cappa)') !== -1) {
+    prefix = 'CP-A';
   } else if (shopText.indexOf('メルカリ(どすこい)') !== -1) {
     prefix = 'DN-A';
-  } else if (shopText.indexOf('メルカリ(Cappa)') !== -1) {
-    prefix = 'CP-A';
+  } else if (shopText.indexOf('メルカリShops') !== -1) {
+    prefix = 'SH-A';
+  } else if (shopText.indexOf('ヤフオク(Cappa)') !== -1) {
+    prefix = 'CA-Y';
+  } else if (shopText.indexOf('ヤフオク(海坊主)') !== -1) {
+    prefix = 'HB-Y';
+  } else if (shopText.indexOf('Yahoo!Shop') !== -1) {
+    prefix = 'YS-Y';
+  } else if (shopText.indexOf('Amazon') !== -1) {
+    prefix = 'AM-Z';
   }
   if (!prefix) return '';
 
