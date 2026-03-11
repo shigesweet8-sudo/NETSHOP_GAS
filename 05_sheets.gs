@@ -159,7 +159,7 @@ function getManagementHighlightRule_(status) {
 
   if (status === '💰決済完了') {
     return {
-      background: highlightColor,
+      background: '#e2efda',
       columns: [
         col.COST,
         col.PRICE_FINAL,
