@@ -11,12 +11,6 @@ function onOpen() {
     .addItem('📊 ダッシュボードを更新', 'updateDashboard')
     .addSeparator()
     .addSubMenu(
-      ui.createMenu('📥 データ取込')
-        .addItem('メルカリ CSV 取込', 'importMercariData')
-        .addItem('ヤフオク CSV 取込', 'importYahooData')
-    )
-    .addSeparator()
-    .addSubMenu(
       ui.createMenu('🔢 計算')
         .addItem('全件 再計算', 'recalculateAll')
         .addItem('選択行 再計算', 'recalculateSelected')
