@@ -105,13 +105,11 @@ function redrawManagementSheet_(sheet) {
 
     if (rule) {
       rule.columns.forEach(function(column) {
-        rowBackgrounds[column - 1] = rule.background;
+        rowBackgrounds[column - 1] = isManagementBlankValue_(rowValues[column - 1])
+          ? rule.background
+          : '#ffffff';
       });
     }
-
-    getManagementRequiredWarningColumns_(rowValues).forEach(function(column) {
-      rowBackgrounds[column - 1] = colors.PRODUCT_REG_HIGHLIGHT || '#fff2cc';
-    });
     backgrounds.push(rowBackgrounds);
   }
 
@@ -140,13 +138,11 @@ function applyManagementRowHighlight_(sheet, row) {
   var rule   = getManagementHighlightRule_(status);
   if (rule) {
     rule.columns.forEach(function(column) {
-      sheet.getRange(row, column).setBackground(rule.background);
+      sheet.getRange(row, column).setBackground(
+        isManagementBlankValue_(rowValues[column - 1]) ? rule.background : '#ffffff'
+      );
     });
   }
-
-  getManagementRequiredWarningColumns_(rowValues).forEach(function(column) {
-    sheet.getRange(row, column).setBackground(CONFIG.COLORS.PRODUCT_REG_HIGHLIGHT || '#fff2cc');
-  });
 }
 
 function getManagementHighlightRule_(status) {
@@ -238,7 +234,7 @@ function appendManagementRow_(record) {
 
   var col     = CONFIG.COLS;
   var nextRow = Math.max(sheet.getLastRow() + 1, 2);
-  var id      = generateId_();
+  var id      = generateId_(record.shop || record.platform || '');
 
   var salePrice  = parseFloat(record.priceFinal || record.salePrice) || 0;
   var fee        = parseFloat(record.fee)        || 0;
