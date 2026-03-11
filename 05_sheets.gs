@@ -131,18 +131,29 @@ function applyManagementRowBaseStyle_(sheet, row) {
 }
 
 function applyManagementRowHighlight_(sheet, row) {
-  var col    = CONFIG.COLS;
-  applyManagementRowBaseStyle_(sheet, row);
+  var col = CONFIG.COLS;
+  var colors = CONFIG.COLORS;
+
+  var white = colors.BASE_ROW_WHITE || '#ffffff';
+  var alt   = colors.ALT_ROW || white;
+  var bg    = row % 2 === 0 ? white : alt;
+
   var status = sheet.getRange(row, col.STATUS).getValue();
   var rowValues = sheet.getRange(row, 1, 1, CONFIG.HEADERS.length).getValues()[0];
-  var rule   = getManagementHighlightRule_(status);
+
+  var rowBackgrounds = new Array(CONFIG.HEADERS.length).fill(bg);
+
+  var rule = getManagementHighlightRule_(status);
+
   if (rule) {
     rule.columns.forEach(function(column) {
-      sheet.getRange(row, column).setBackground(
-        isManagementBlankValue_(rowValues[column - 1]) ? rule.background : '#ffffff'
-      );
+      if (isManagementBlankValue_(rowValues[column - 1])) {
+        rowBackgrounds[column - 1] = rule.background;
+      }
     });
   }
+
+  sheet.getRange(row, 1, 1, CONFIG.HEADERS.length).setBackgrounds([rowBackgrounds]);
 }
 
 function getManagementHighlightRule_(status) {
