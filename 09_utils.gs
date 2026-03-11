@@ -15,12 +15,38 @@ function formatPercent_(ratio, digits) {
   return (ratio * 100).toFixed(d) + '%';
 }
 
-function generateId_() {
-  var now    = new Date();
-  var prefix = 'M';
-  var date   = Utilities.formatDate(now, 'Asia/Tokyo', 'yyyyMMdd');
-  var time   = Utilities.formatDate(now, 'Asia/Tokyo', 'HHmmssSSS');
-  return prefix + '-' + date + '-' + time;
+function generateId_(shopValue) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  var shopText = String(shopValue || '');
+  var prefix = '';
+
+  if (shopText.indexOf('ヤフオク(Cappa)') !== -1) {
+    prefix = 'CA-Y';
+  } else if (shopText.indexOf('メルカリ(どすこい)') !== -1) {
+    prefix = 'DN-A';
+  } else if (shopText.indexOf('メルカリ(Cappa)') !== -1) {
+    prefix = 'CP-A';
+  }
+  if (!prefix) return '';
+
+  var lastRow = sheet.getLastRow();
+  var maxNumber = 0;
+  if (lastRow > 1) {
+    var ids = sheet.getRange(2, CONFIG.COLS.ID, lastRow - 1, 1).getValues();
+    var pattern = new RegExp('^' + prefix + '(\\d{4})$');
+
+    ids.forEach(function(rowValue) {
+      var value = String(rowValue[0] || '').trim();
+      var match = value.match(pattern);
+      if (!match) return;
+
+      var number = parseInt(match[1], 10);
+      if (number > maxNumber) maxNumber = number;
+    });
+  }
+
+  return prefix + ('0000' + (maxNumber + 1)).slice(-4);
 }
 
 function formatDate_(d) {
@@ -148,4 +174,3 @@ function columnToLetter_(column) {
   }
   return letter;
 }
-
