@@ -45,6 +45,12 @@ function onEdit(e) {
   if (range.getNumRows() > 1 || range.getNumColumns() > 1) return; // 複数セル無視
 
   var col_ = CONFIG.COLS;
+  if (
+    range.getColumn() === col_.SHOP &&
+    !sheet.getRange(row, col_.ID).getValue()
+  ) {
+    sheet.getRange(row, col_.ID).setValue(generateId_());
+  }
   var watchCols = [col_.COST, col_.PRICE_FINAL, col_.FEE, col_.SHIPPING, col_.STATUS];
   if (watchCols.indexOf(range.getColumn()) === -1) return;
 
