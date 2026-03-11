@@ -254,7 +254,9 @@ function appendManagementRow_(record) {
   rowData[col.DATE        - 1] = record.date     || new Date();
   rowData[col.STATUS      - 1] = record.status   || CONFIG.STATUS.LISTING;
   rowData[col.SHOP        - 1] = record.shop || record.platform || '';
-  rowData[col.ORDER_ID    - 1] = record.orderId  || '';
+  if (col.ORDER_ID !== col.ID) {
+    rowData[col.ORDER_ID  - 1] = record.orderId  || '';
+  }
   rowData[col.ITEM_NAME   - 1] = record.itemName || '';
   rowData[col.QTY         - 1] = record.qty      || 1;
   rowData[col.COST        - 1] = cost;
