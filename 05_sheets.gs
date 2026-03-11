@@ -88,10 +88,29 @@ function applyManagementFormat_(sheet) {
 function redrawManagementSheet_(sheet) {
   var lastRow = getManagementDataLastRow_(sheet);
   if (lastRow <= 1) return;
+  var colCount      = CONFIG.HEADERS.length;
+  var rowCount      = lastRow - 1;
+  var colors        = CONFIG.COLORS;
+  var white         = colors.BASE_ROW_WHITE || '#ffffff';
+  var alt           = colors.ALT_ROW || white;
+  var statusCol     = CONFIG.COLS.STATUS;
+  var statusValues  = sheet.getRange(2, statusCol, rowCount, 1).getValues();
+  var backgrounds   = [];
 
   for (var row = 2; row <= lastRow; row++) {
-    applyManagementRowStyle_(sheet, row);
+    var bg = row % 2 === 0 ? white : alt;
+    var rowBackgrounds = new Array(colCount).fill(bg);
+    var rule = getManagementHighlightRule_(statusValues[row - 2][0]);
+
+    if (rule) {
+      rule.columns.forEach(function(column) {
+        rowBackgrounds[column - 1] = rule.background;
+      });
+    }
+    backgrounds.push(rowBackgrounds);
   }
+
+  sheet.getRange(2, 1, rowCount, colCount).setBackgrounds(backgrounds);
 }
 
 function applyManagementRowStyle_(sheet, row) {
