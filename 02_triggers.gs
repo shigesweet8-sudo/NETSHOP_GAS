@@ -49,12 +49,13 @@ function onEdit(e) {
     range.getColumn() === col_.SHOP &&
     !sheet.getRange(row, col_.ID).getValue()
   ) {
-    sheet.getRange(row, col_.ID).setValue(generateId_());
+    sheet.getRange(row, col_.ID).setValue(generateId_(range.getValue()));
   }
   var watchCols = [col_.COST, col_.PRICE_FINAL, col_.FEE, col_.SHIPPING, col_.STATUS];
   if (watchCols.indexOf(range.getColumn()) === -1) return;
 
   recalculateRow_(sheet, row);
+  applyManagementRowHighlight_(sheet, row);
 }
 
 // ==================== 自動トリガー設定 ====================
