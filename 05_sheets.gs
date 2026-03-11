@@ -141,7 +141,7 @@ function applyManagementRowHighlight_(sheet, row) {
 function getManagementHighlightRule_(status) {
   var col = CONFIG.COLS;
 
-  if (status !== '商品登録') return null;
+  if (status !== '📝商品登録') return null;
 
   return {
     background: CONFIG.COLORS.PRODUCT_REG_HIGHLIGHT || '#fff2cc',
