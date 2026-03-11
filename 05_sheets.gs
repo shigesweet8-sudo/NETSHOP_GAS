@@ -93,20 +93,25 @@ function redrawManagementSheet_(sheet) {
   var colors        = CONFIG.COLORS;
   var white         = colors.BASE_ROW_WHITE || '#ffffff';
   var alt           = colors.ALT_ROW || white;
-  var statusCol     = CONFIG.COLS.STATUS;
-  var statusValues  = sheet.getRange(2, statusCol, rowCount, 1).getValues();
+  var dataValues    = sheet.getRange(2, 1, rowCount, colCount).getValues();
   var backgrounds   = [];
 
   for (var row = 2; row <= lastRow; row++) {
+    var rowValues = dataValues[row - 2];
+    var status = rowValues[CONFIG.COLS.STATUS - 1];
     var bg = row % 2 === 0 ? white : alt;
     var rowBackgrounds = new Array(colCount).fill(bg);
-    var rule = getManagementHighlightRule_(statusValues[row - 2][0]);
+    var rule = getManagementHighlightRule_(status);
 
     if (rule) {
       rule.columns.forEach(function(column) {
         rowBackgrounds[column - 1] = rule.background;
       });
     }
+
+    getManagementRequiredWarningColumns_(rowValues).forEach(function(column) {
+      rowBackgrounds[column - 1] = colors.PRODUCT_REG_HIGHLIGHT || '#fff2cc';
+    });
     backgrounds.push(rowBackgrounds);
   }
 
@@ -129,12 +134,18 @@ function applyManagementRowBaseStyle_(sheet, row) {
 
 function applyManagementRowHighlight_(sheet, row) {
   var col    = CONFIG.COLS;
+  applyManagementRowBaseStyle_(sheet, row);
   var status = sheet.getRange(row, col.STATUS).getValue();
+  var rowValues = sheet.getRange(row, 1, 1, CONFIG.HEADERS.length).getValues()[0];
   var rule   = getManagementHighlightRule_(status);
-  if (!rule) return;
+  if (rule) {
+    rule.columns.forEach(function(column) {
+      sheet.getRange(row, column).setBackground(rule.background);
+    });
+  }
 
-  rule.columns.forEach(function(column) {
-    sheet.getRange(row, column).setBackground(rule.background);
+  getManagementRequiredWarningColumns_(rowValues).forEach(function(column) {
+    sheet.getRange(row, column).setBackground(CONFIG.COLORS.PRODUCT_REG_HIGHLIGHT || '#fff2cc');
   });
 }
 
@@ -190,6 +201,29 @@ function getManagementHighlightRule_(status) {
 
 function getManagementDataLastRow_(sheet) {
   return sheet.getLastRow();
+}
+
+function getManagementRequiredWarningColumns_(rowValues) {
+  var col = CONFIG.COLS;
+  var requiredColumns = [
+    col.ID,
+    col.STAFF,
+    col.PRODUCT_REG_DATE,
+    col.SHOP,
+    col.ITEM_NAME,
+    col.STORAGE,
+    col.QTY
+  ];
+
+  return requiredColumns.filter(function(column) {
+    return isManagementBlankValue_(rowValues[column - 1]);
+  });
+}
+
+function isManagementBlankValue_(value) {
+  if (value === null || value === '') return true;
+  if (typeof value === 'string' && value.trim() === '') return true;
+  return false;
 }
 
 /**
