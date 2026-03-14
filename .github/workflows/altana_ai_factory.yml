@@ -1,0 +1,33 @@
+name: ALTANA AI FACTORY
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  ai-dev:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract Issue Content
+        run: |
+          echo "${{ github.event.issue.body }}" > issue.txt
+
+      - name: Send Issue to GPT
+        run: |
+          echo "Processing Issue for AI development"
+
+      - name: Codex Implementation
+        run: |
+          echo "Codex would implement code here"
+
+      - name: Create Pull Request
+        run: |
+          echo "PR would be created here"
+
+      - name: Notify Slack
+        run: |
+          echo "Slack notification"
