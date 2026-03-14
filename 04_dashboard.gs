@@ -1,3 +1,4 @@
+// feature/issue-2-test ブランチ確認
 // GitHub Issue #1 テスト修正
 /**
  * 04_dashboard.gs
