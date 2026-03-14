@@ -12,22 +12,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract Issue Content
+      - name: Show Issue metadata
         run: |
-          echo "${{ github.event.issue.body }}" > issue.txt
+          echo "Issue Number: ${{ github.event.issue.number }}"
+          echo "Issue Title: ${{ github.event.issue.title }}"
+          echo "Issue User: ${{ github.event.issue.user.login }}"
 
-      - name: Send Issue to GPT
+      - name: Save Issue body to file
         run: |
-          echo "Processing Issue for AI development"
+          cat <<'EOF' > issue_body.md
+          ${{ github.event.issue.body }}
+          EOF
 
-      - name: Codex Implementation
+      - name: Print Issue body
         run: |
-          echo "Codex would implement code here"
+          echo "===== ISSUE BODY START ====="
+          cat issue_body.md
+          echo "===== ISSUE BODY END ====="
 
-      - name: Create Pull Request
-        run: |
-          echo "PR would be created here"
-
-      - name: Notify Slack
-        run: |
-          echo "Slack notification"
+      - name: Upload Issue body artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-body
+          path: issue_body.md
