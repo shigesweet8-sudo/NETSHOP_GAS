@@ -34,13 +34,41 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          curl https://api.openai.com/v1/chat/completions \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer $OPENAI_API_KEY" \
-          -d '{
-            "model": "gpt-4o-mini",
-            "messages": [
-              {"role": "system", "content": "You are a senior software engineer."},
-              {"role": "user", "content": "'"$(cat issue_body.md)"'"}
-            ]
-          }'
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import urllib.request
+
+          issue_body = pathlib.Path("issue_body.md").read_text(encoding="utf-8")
+          api_key = os.environ["OPENAI_API_KEY"]
+
+          payload = {
+              "model": "gpt-4o-mini",
+              "messages": [
+                  {"role": "system", "content": "You are a senior software engineer."},
+                  {"role": "user", "content": issue_body}
+              ]
+          }
+
+          req = urllib.request.Request(
+              "https://api.openai.com/v1/chat/completions",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {api_key}",
+              },
+              method="POST",
+          )
+
+          with urllib.request.urlopen(req) as res:
+              body = res.read().decode("utf-8")
+              pathlib.Path("openai_response.json").write_text(body, encoding="utf-8")
+              print(body)
+          PY
+
+      - name: Upload OpenAI response artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openai-response
+          path: openai_response.json
