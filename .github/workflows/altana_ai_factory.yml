@@ -1,3 +1,35 @@
+name: ALTANA AI FACTORY
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  ai-dev:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Show Issue metadata
+        run: |
+          echo "Issue Number: ${{ github.event.issue.number }}"
+          echo "Issue Title: ${{ github.event.issue.title }}"
+          echo "Issue User: ${{ github.event.issue.user.login }}"
+
+      - name: Save Issue body to file
+        run: |
+          cat <<'EOF' > issue_body.md
+          ${{ github.event.issue.body }}
+          EOF
+
+      - name: Print Issue body
+        run: |
+          echo "===== ISSUE BODY START ====="
+          cat issue_body.md
+          echo "===== ISSUE BODY END ====="
+
       - name: Send Issue to OpenAI
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
