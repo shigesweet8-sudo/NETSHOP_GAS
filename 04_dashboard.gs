@@ -1,3 +1,4 @@
+// GitHub Issue #1 テスト修正
 /**
  * 04_dashboard.gs
  * ダッシュボードシートの生成・更新
