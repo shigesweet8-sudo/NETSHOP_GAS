@@ -35,6 +35,14 @@ function onOpen() {
 // ==================== onEdit ====================
 
 function onEdit(e) {
+  handleManagementSheetEdit_(e, false);
+}
+
+function onEditInstallable(e) {
+  handleManagementSheetEdit_(e, true);
+}
+
+function handleManagementSheetEdit_(e, enableZipAutofill) {
   var range = e.range;
   var sheet = range.getSheet();
   if (sheet.getName() !== CONFIG.SHEET_NAME) return;
@@ -51,11 +59,62 @@ function onEdit(e) {
   ) {
     sheet.getRange(row, col_.ID).setValue(generateId_(range.getValue()));
   }
+  if (enableZipAutofill && range.getColumn() === col_.ZIP) {
+    autofillAddressFromZip_(sheet, row, range.getDisplayValue());
+  }
   var watchCols = [col_.COST, col_.PRICE_FINAL, col_.FEE, col_.SHIPPING, col_.STATUS];
   if (watchCols.indexOf(range.getColumn()) === -1) return;
 
+  if (range.getColumn() === col_.STATUS) {
+    var now = new Date();
+    sheet.getRange(row, col_.DATE).setValue(now);
+    if (
+      range.getValue() === CONFIG.STATUS.LISTING &&
+      !sheet.getRange(row, col_.PRODUCT_REG_DATE).getValue()
+    ) {
+      sheet.getRange(row, col_.PRODUCT_REG_DATE).setValue(now);
+    }
+  }
+
   recalculateRow_(sheet, row);
   applyManagementRowHighlight_(sheet, row);
+}
+
+function autofillAddressFromZip_(sheet, row, zipValue) {
+  var normalizedZip = normalizeZipCode_(zipValue);
+  if (!normalizedZip) return;
+  if (sheet.getRange(row, CONFIG.COLS.PREF).getValue() || sheet.getRange(row, CONFIG.COLS.ADDR2).getValue()) return;
+
+  var address = fetchAddressByZip_(normalizedZip);
+  if (!address) return;
+
+  sheet.getRange(row, CONFIG.COLS.PREF).setValue(address.prefecture);
+  sheet.getRange(row, CONFIG.COLS.ADDR2).setValue(address.address2);
+}
+
+function normalizeZipCode_(zipValue) {
+  var normalized = String(zipValue || '').replace(/[^0-9]/g, '');
+  return /^\d{7}$/.test(normalized) ? normalized : '';
+}
+
+function fetchAddressByZip_(zipCode) {
+  try {
+    var response = UrlFetchApp.fetch('https://zipcloud.ibsnet.co.jp/api/search?zipcode=' + encodeURIComponent(zipCode), {
+      muteHttpExceptions: true
+    });
+    if (response.getResponseCode() !== 200) return null;
+
+    var payload = JSON.parse(response.getContentText());
+    if (!payload || payload.status !== 200 || !payload.results || !payload.results.length) return null;
+
+    var result = payload.results[0];
+    return {
+      prefecture: result.address1 || '',
+      address2: (result.address2 || '') + (result.address3 || '')
+    };
+  } catch (err) {
+    return null;
+  }
 }
 
 // ==================== 自動トリガー設定 ====================

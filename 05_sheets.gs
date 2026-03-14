@@ -12,6 +12,7 @@ function createManagementSheet() {
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var ui    = SpreadsheetApp.getUi();
   var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  var col   = CONFIG.COLS;
 
   if (sheet) {
     var res = ui.alert(
@@ -27,7 +28,26 @@ function createManagementSheet() {
   writeManagementHeader_(sheet);
   // applyManagementFormat_(sheet); // 書式処理は applyManagementRowStyle_ に統一
   redrawManagementSheet_(sheet);
-  var shipFromRange = sheet.getRange(2, 15, Math.max(sheet.getMaxRows() - 1, 1), 1);
+  var maxDataRows = Math.max(sheet.getMaxRows() - 1, 1);
+  sheet.getRange(2, col.STATUS, maxDataRows, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(['商品登録', '出品中', '値段交渉中', '決済完了', '発送準備中', '発送完了', '取引完了', 'キャンセル'], true)
+      .setAllowInvalid(true)
+      .build()
+  );
+  sheet.getRange(2, col.STAFF, maxDataRows, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(['長谷川', '小園', '堀田', '柏原', '本田', '伊藤', '宮廻', '体験者'], true)
+      .setAllowInvalid(true)
+      .build()
+  );
+  sheet.getRange(2, col.SHOP, maxDataRows, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(['メルカリ(Cappa)', 'メルカリ(どすこい)', 'メルカリShops', 'ヤフオク(Cappa)', 'ヤフオク(海坊主)', 'Yahoo!Shop', 'Amazon'], true)
+      .setAllowInvalid(true)
+      .build()
+  );
+  var shipFromRange = sheet.getRange(2, col.SHIP_FROM, maxDataRows, 1);
   var shipFromValues = shipFromRange.getValues().map(function(row) {
     var value = row[0];
     if (typeof value === 'number') return [''];
@@ -35,12 +55,19 @@ function createManagementSheet() {
     return [value];
   });
   shipFromRange.setValues(shipFromValues);
-  sheet.getRange('O:O').setNumberFormat('@');
-  shipFromRange.setDataValidation(
+  sheet.getRange(2, col.SHIP_FROM, maxDataRows, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
-      .requireValueInList(['自社', '外部依頼'], true)
+      .requireValueInList(['自社', '外部依頼', '手打ち'], true)
+      .setAllowInvalid(true)
       .build()
   );
+  sheet.getRange(2, col.CARRIER, maxDataRows, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation()
+      .requireValueInList(['ヤマト運輸', '佐川急便', '日本郵便'], true)
+      .setAllowInvalid(true)
+      .build()
+  );
+  sheet.getRange('P:P').setNumberFormat('@');
   ss.setActiveSheet(sheet);
   showAlert_('完了', '管理シートを初期化しました。');
 }
@@ -49,6 +76,81 @@ function createManagementSheet() {
 
 function writeManagementHeader_(sheet) {
   sheet.getRange(1, 1, 1, CONFIG.HEADERS.length).setValues([CONFIG.HEADERS.slice()]);
+}
+
+function migrateIconStatusesToPlainText() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) throw new Error('「' + CONFIG.SHEET_NAME + '」シートが見つかりません');
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    Logger.log('status migration: no data rows');
+    return;
+  }
+
+  var statusCol = CONFIG.COLS.STATUS;
+  var values = sheet.getRange(2, statusCol, lastRow - 1, 1).getValues();
+  var statusMap = {
+    '📝商品登録': '商品登録',
+    '📦出品中': '出品中',
+    '🌐出品中': '出品中',
+    '🤝値段交渉中': '値段交渉中',
+    '💬値段交渉中': '値段交渉中',
+    '💰決済完了': '決済完了',
+    '🚚発送準備中': '発送準備中',
+    '📦発送準備中': '発送準備中',
+    '✅発送完了': '発送完了',
+    '🚚発送完了': '発送完了',
+    '🎉取引完了': '取引完了',
+    '🧾取引完了': '取引完了',
+    '▩取引完了': '取引完了',
+    '❌キャンセル': 'キャンセル'
+  };
+  var currentStatuses = {
+    '商品登録': true,
+    '出品中': true,
+    '値段交渉中': true,
+    '決済完了': true,
+    '発送準備中': true,
+    '発送完了': true,
+    '取引完了': true,
+    'キャンセル': true
+  };
+  var changedCount = 0;
+  var unsupported = {};
+  var suffixStatusMap = {
+    '出品中': '出品中',
+    '値段交渉中': '値段交渉中',
+    '発送準備中': '発送準備中',
+    '発送完了': '発送完了',
+    '取引完了': '取引完了'
+  };
+
+  values.forEach(function(row, index) {
+    var value = row[0];
+    if (statusMap[value]) {
+      sheet.getRange(index + 2, statusCol).setValue(statusMap[value]);
+      changedCount += 1;
+      return;
+    }
+    var normalizedStatus = Object.keys(suffixStatusMap).find(function(suffix) {
+      return value && value !== suffix && String(value).slice(-suffix.length) === suffix;
+    });
+    if (normalizedStatus) {
+      sheet.getRange(index + 2, statusCol).setValue(suffixStatusMap[normalizedStatus]);
+      changedCount += 1;
+      return;
+    }
+    if (value && !currentStatuses[value]) {
+      unsupported[value] = (unsupported[value] || 0) + 1;
+    }
+  });
+
+  Logger.log('status migration: changed=%s', changedCount);
+  Object.keys(unsupported).sort().forEach(function(status) {
+    Logger.log('status migration: unsupported="%s" count=%s', status, unsupported[status]);
+  });
 }
 
 // ==================== フォーマット適用 ====================
@@ -70,7 +172,6 @@ function applyManagementFormat_(sheet) {
   [col.PRICE_FINAL, col.FEE, col.SHIPPING, col.COST, col.PROFIT].forEach(function(c) {
     sheet.getRange(2, c, maxDataRows, 1).setNumberFormat('#,##0');
   });
-  sheet.getRange(2, col.PROFIT_RATE, maxDataRows, 1).setNumberFormat('0.0%');
   sheet.getRange(2, col.DATE,        maxDataRows, 1).setNumberFormat('yyyy/MM/dd');
 
   // ヘッダー行を固定
@@ -104,11 +205,20 @@ function redrawManagementSheet_(sheet) {
     var rule = getManagementHighlightRule_(status);
 
     if (rule) {
-      rule.columns.forEach(function(column) {
-        rowBackgrounds[column - 1] = isManagementBlankValue_(rowValues[column - 1])
-          ? rule.background
-          : '#ffffff';
-      });
+      if (rule.fillWholeRow) {
+        rowBackgrounds = new Array(colCount).fill(rule.background);
+      } else {
+        (rule.previousColumns || []).forEach(function(column) {
+          if (isManagementBlankValue_(rowValues[column - 1])) {
+            rowBackgrounds[column - 1] = rule.errorBackground;
+          }
+        });
+        rule.columns.forEach(function(column) {
+          if (isManagementBlankValue_(rowValues[column - 1])) {
+            rowBackgrounds[column - 1] = rule.background;
+          }
+        });
+      }
     }
     backgrounds.push(rowBackgrounds);
   }
@@ -146,11 +256,20 @@ function applyManagementRowHighlight_(sheet, row) {
   var rule = getManagementHighlightRule_(status);
 
   if (rule) {
-    rule.columns.forEach(function(column) {
-      if (isManagementBlankValue_(rowValues[column - 1])) {
-        rowBackgrounds[column - 1] = rule.background;
-      }
-    });
+    if (rule.fillWholeRow) {
+      rowBackgrounds = new Array(CONFIG.HEADERS.length).fill(rule.background);
+    } else {
+      (rule.previousColumns || []).forEach(function(column) {
+        if (isManagementBlankValue_(rowValues[column - 1])) {
+          rowBackgrounds[column - 1] = rule.errorBackground;
+        }
+      });
+      rule.columns.forEach(function(column) {
+        if (isManagementBlankValue_(rowValues[column - 1])) {
+          rowBackgrounds[column - 1] = rule.background;
+        }
+      });
+    }
   }
 
   sheet.getRange(row, 1, 1, CONFIG.HEADERS.length).setBackgrounds([rowBackgrounds]);
@@ -158,11 +277,9 @@ function applyManagementRowHighlight_(sheet, row) {
 
 function getManagementHighlightRule_(status) {
   var col = CONFIG.COLS;
-  var highlightColor = CONFIG.COLORS.PRODUCT_REG_HIGHLIGHT || '#fff2cc';
 
-  if (status === '📝商品登録') {
+  if (status === CONFIG.STATUS.LISTING) {
     return {
-      background: highlightColor,
       columns: [
         col.ID,
         col.STAFF,
@@ -171,35 +288,130 @@ function getManagementHighlightRule_(status) {
         col.ITEM_NAME,
         col.STORAGE,
         col.QTY
-      ]
+      ],
+      background: '#FFF2CC',
+      previousColumns: [],
+      errorBackground: '#F4CCCC'
     };
   }
 
-  if (status === '💰決済完了') {
+  if (status === CONFIG.STATUS.ON_SALE) {
     return {
-      background: '#e2efda',
+      previousColumns: [
+        col.ID,
+        col.STAFF,
+        col.PRODUCT_REG_DATE,
+        col.SHOP,
+        col.ITEM_NAME,
+        col.STORAGE,
+        col.QTY
+      ],
       columns: [
         col.COST,
+        col.LIST_PRICE
+      ],
+      background: '#FFF2CC',
+      errorBackground: '#F4CCCC'
+    };
+  }
+
+  if (status === CONFIG.STATUS.NEGOTIATING) {
+    return {
+      previousColumns: [
+        col.ID,
+        col.STAFF,
+        col.PRODUCT_REG_DATE,
+        col.SHOP,
+        col.ITEM_NAME,
+        col.STORAGE,
+        col.QTY,
+        col.COST,
+        col.LIST_PRICE
+      ],
+      columns: [col.NEGOTIATED_PRICE],
+      background: '#FFF2CC',
+      errorBackground: '#F4CCCC'
+    };
+  }
+
+  if (status === CONFIG.STATUS.PAID) {
+    return {
+      previousColumns: [
+        col.ID,
+        col.STAFF,
+        col.PRODUCT_REG_DATE,
+        col.SHOP,
+        col.ITEM_NAME,
+        col.STORAGE,
+        col.QTY,
+        col.COST,
+        col.LIST_PRICE,
+        col.NEGOTIATED_PRICE
+      ],
+      columns: [
         col.PRICE_FINAL,
         col.FEE,
         col.SHIPPING
-      ]
+      ],
+      background: '#FFF2CC',
+      errorBackground: '#F4CCCC'
     };
   }
 
-  if (status === '📦発送準備中') {
+  if (status === CONFIG.STATUS.PREPARING) {
     return {
-      background: '#e4dfec',
+      previousColumns: [
+        col.ID,
+        col.STAFF,
+        col.PRODUCT_REG_DATE,
+        col.SHOP,
+        col.ITEM_NAME,
+        col.STORAGE,
+        col.QTY,
+        col.COST,
+        col.LIST_PRICE,
+        col.NEGOTIATED_PRICE,
+        col.PRICE_FINAL,
+        col.FEE,
+        col.SHIPPING
+      ],
       columns: [
         col.SHIP_FROM,
         col.CUSTOMER,
         col.CARRIER,
+        col.TRACKING,
         col.ZIP,
         col.PREF,
         col.ADDR2,
         col.ADDR3,
         col.PHONE
-      ]
+      ],
+      background: '#FFF2CC',
+      errorBackground: '#F4CCCC'
+    };
+  }
+
+  if (status === CONFIG.STATUS.SHIPPED) {
+    return {
+      columns: [],
+      background: '#E8F0FE',
+      fillWholeRow: true
+    };
+  }
+
+  if (status === CONFIG.STATUS.COMPLETED) {
+    return {
+      columns: [],
+      background: '#E6F4EA',
+      fillWholeRow: true
+    };
+  }
+
+  if (status === CONFIG.STATUS.CANCEL) {
+    return {
+      columns: [],
+      background: '#EAD1F2',
+      fillWholeRow: true
     };
   }
 
@@ -271,7 +483,6 @@ function appendManagementRow_(record) {
   rowData[col.FEE         - 1] = fee;
   rowData[col.SHIPPING    - 1] = shipping;
   rowData[col.PROFIT      - 1] = profit;
-  rowData[col.PROFIT_RATE - 1] = profitRate;
   rowData[col.MEMO        - 1] = record.memo || record.note || '';
 
   sheet.getRange(nextRow, 1, 1, CONFIG.HEADERS.length).setValues([rowData]);

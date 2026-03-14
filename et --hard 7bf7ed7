@@ -1,0 +1,20 @@
+[33meaeeffd[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m HEAD@{Thu Mar 12 12:55:57 2026}: commit: fix: 05_sheets.gs 文字化けコメント修正
+[33mb087faa[m HEAD@{Thu Mar 12 08:59:57 2026}: commit: fix: 粗利計算を GAS ロジックへ統一 (Q = M - H - N - O)
+[33m7bf7ed7[m HEAD@{Wed Mar 11 19:18:07 2026}: commit: fix: stop applyManagementFormat_ to prevent double highlight
+[33mdc7de96[m HEAD@{Wed Mar 11 18:36:58 2026}: commit: fix: highlight row rendering
+[33m7db39af[m HEAD@{Wed Mar 11 17:54:11 2026}: commit: fix: trigger highlight refresh after status edit
+[33mc9c5fdb[m HEAD@{Wed Mar 11 17:23:42 2026}: commit: fix: highlight only blank required cells by status
+[33mdd1551f[m HEAD@{Wed Mar 11 17:03:20 2026}: commit: feat: add full shop prefix mapping for ID generation
+[33m2791bd3[m HEAD@{Wed Mar 11 16:41:51 2026}: commit: fix: restore shop-based ID generation
+[33ma1c4a99[m HEAD@{Wed Mar 11 15:53:54 2026}: commit: Restore id generation on shop edit
+[33m4afb7fa[m HEAD@{Wed Mar 11 15:50:58 2026}: commit: Remove csv import module
+[33m1490319[m HEAD@{Wed Mar 11 15:47:22 2026}: commit: Remove csv import menu
+[33m73de873[m HEAD@{Wed Mar 11 15:27:14 2026}: commit: Fix management id overwrite
+[33mcfdf405[m HEAD@{Wed Mar 11 15:16:44 2026}: commit: Fix row highlight reset before reapply
+[33m22649ae[m HEAD@{Wed Mar 11 15:04:40 2026}: revert: Revert "Change payment done highlight color"
+[33m40bfe6e[m HEAD@{Wed Mar 11 15:01:03 2026}: commit: Change payment done highlight color
+[33m3a17941[m HEAD@{Wed Mar 11 14:56:42 2026}: commit: Change payment done highlight color
+[33mefc75ba[m HEAD@{Wed Mar 11 14:52:41 2026}: commit: Change payment done highlight color
+[33m44805ff[m HEAD@{Wed Mar 11 14:47:42 2026}: commit: Fix highlight status value
+[33md7143df[m HEAD@{Wed Mar 11 14:33:40 2026}: commit: Fix highlight status value
+[33mec8f984[m HEAD@{Wed Mar 11 14:19:27 2026}: commit: Optimize redrawManagementSheet

@@ -119,6 +119,7 @@ function getMonthlySummary() {
     var dateVal = row[col.DATE - 1];
     if (!dateVal) return;
     var d   = new Date(dateVal);
+    if (isNaN(d.getTime())) return;
     var key = d.getFullYear() + '-' + zeroPad_(d.getMonth() + 1);
 
     if (!map[key]) {

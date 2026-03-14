@@ -44,7 +44,7 @@ function renderTotalSummary_(sheet, ss) {
     var rows = mgmt.getLastRow() - 1;
     var data = mgmt.getRange(2, 1, rows, col.MEMO).getValues();
     data.forEach(function(r) {
-      if (r[col.STATUS - 1] === CONFIG.STATUS.CANCEL) return;
+      if (CONFIG.CALC_TARGETS.indexOf(r[col.STATUS - 1]) === -1) return;
       totals.sales    += parseFloat(r[col.PRICE_FINAL - 1]) || 0;
       totals.fee      += parseFloat(r[col.FEE         - 1]) || 0;
       totals.shipping += parseFloat(r[col.SHIPPING   - 1]) || 0;
