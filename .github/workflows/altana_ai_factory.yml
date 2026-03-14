@@ -1,37 +1,14 @@
-name: ALTANA AI FACTORY
-
-on:
-  issues:
-    types: [opened]
-
-jobs:
-  ai-dev:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Show Issue metadata
+      - name: Send Issue to OpenAI
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          echo "Issue Number: ${{ github.event.issue.number }}"
-          echo "Issue Title: ${{ github.event.issue.title }}"
-          echo "Issue User: ${{ github.event.issue.user.login }}"
-
-      - name: Save Issue body to file
-        run: |
-          cat <<'EOF' > issue_body.md
-          ${{ github.event.issue.body }}
-          EOF
-
-      - name: Print Issue body
-        run: |
-          echo "===== ISSUE BODY START ====="
-          cat issue_body.md
-          echo "===== ISSUE BODY END ====="
-
-      - name: Upload Issue body artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: issue-body
-          path: issue_body.md
+          curl https://api.openai.com/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $OPENAI_API_KEY" \
+          -d '{
+            "model": "gpt-4o-mini",
+            "messages": [
+              {"role": "system", "content": "You are a senior software engineer."},
+              {"role": "user", "content": "'"$(cat issue_body.md)"'"}
+            ]
+          }'
