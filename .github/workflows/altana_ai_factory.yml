@@ -112,6 +112,14 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           codex exec --sandbox workspace-write "$(cat codex_instruction.md)"
 
+      - name: Generate implementation diff
+        id: implementation_diff
+        run: |
+          git add -A
+          diff_path="$RUNNER_TEMP/implementation.diff"
+          git diff --cached --binary --no-color > "$diff_path"
+          echo "diff_path=$diff_path" >> "$GITHUB_OUTPUT"
+
       - name: Commit and push AI changes
         run: |
           branch_name="feature/issue-${{ github.event.issue.number }}"
