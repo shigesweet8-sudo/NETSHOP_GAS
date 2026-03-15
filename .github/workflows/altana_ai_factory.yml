@@ -80,8 +80,10 @@ jobs:
           print("===== CODEX INSTRUCTION =====")
           print(content)
           PY
-      - name: Upload OpenAI response artifact
+      - name: Upload AI artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: openai-response
-          path: openai_response.json
+          name: ai-artifacts
+          path: |
+            openai_response.json
+            codex_instruction.md
