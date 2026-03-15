@@ -95,6 +95,22 @@ jobs:
           branch_name="feature/issue-${{ github.event.issue.number }}"
           git checkout -b "$branch_name"
           git push origin "$branch_name"
+      - name: Configure AI Git author
+        run: |
+          git config user.name "ALTANA-AI-BOT"
+          git config user.email "ai@altana.dev"
+      - name: Run Codex implementation
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          codex exec --sandbox workspace-write --approval never "$(cat codex_instruction.md)"
+      - name: Commit and push AI changes
+        run: |
+          branch_name="feature/issue-${{ github.event.issue.number }}"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "AI: implement issue #${{ github.event.issue.number }}"
+            git push origin "$branch_name"
+          fi
       - name: Upload AI artifacts
         uses: actions/upload-artifact@v4
         with:
