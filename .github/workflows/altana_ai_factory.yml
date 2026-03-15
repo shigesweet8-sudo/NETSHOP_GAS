@@ -120,6 +120,65 @@ jobs:
           git diff --cached --binary --no-color > "$diff_path"
           echo "diff_path=$diff_path" >> "$GITHUB_OUTPUT"
 
+      - name: Review implementation diff
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DIFF_PATH: ${{ steps.implementation_diff.outputs.diff_path }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import urllib.request
+
+          diff_text = pathlib.Path(os.environ["DIFF_PATH"]).read_text(encoding="utf-8")
+          api_key = os.environ["OPENAI_API_KEY"]
+
+          payload = {
+              "model": "gpt-4o-mini",
+              "messages": [
+                  {
+                      "role": "system",
+                      "content": "You are a code reviewer. Review the provided git diff and return concise findings."
+                  },
+                  {
+                      "role": "user",
+                      "content": diff_text
+                  }
+              ]
+          }
+
+          req = urllib.request.Request(
+              "https://api.openai.com/v1/chat/completions",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {api_key}",
+              },
+              method="POST",
+          )
+
+          with urllib.request.urlopen(req) as res:
+              body = res.read().decode("utf-8")
+              pathlib.Path("review_result.json").write_text(body, encoding="utf-8")
+              print(body)
+          PY
+
+      - name: Check review severity
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          data = json.loads(pathlib.Path("review_result.json").read_text(encoding="utf-8"))
+          content = data["choices"][0]["message"]["content"]
+          print(content)
+
+          if "重大" in content or "高" in content:
+              sys.exit(1)
+          PY
+
       - name: Commit and push AI changes
         run: |
           branch_name="feature/issue-${{ github.event.issue.number }}"
