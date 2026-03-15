@@ -46,7 +46,7 @@ jobs:
           payload = {
               "model": "gpt-4o-mini",
               "messages": [
-                  {"role": "system", "content": "You are a senior software engineer."},
+                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Your job is to read a GitHub Issue and convert it into precise implementation instructions for Codex. Analyze the Issue and produce structured instructions including: development objective, background, target files, implementation steps, completion criteria, and test procedure. The output must be clear and actionable so Codex can implement code changes. Do not answer casually. Always produce structured instructions."},
                   {"role": "user", "content": issue_body}
               ]
           }
