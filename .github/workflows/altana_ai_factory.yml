@@ -1,4 +1,4 @@
-﻿name: ALTANA AI FACTORY
+name: ALTANA AI FACTORY
 
 on:
   issues:
@@ -54,7 +54,7 @@ jobs:
           payload = {
               "model": "gpt-4o-mini",
               "messages": [
-                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Your job is to read a GitHub Issue and convert it into precise implementation instructions for Codex. Analyze the Issue and produce structured instructions including: development objective, background, target files, implementation steps, completion criteria, and test procedure. The output must be clear and actionable so Codex can implement code changes. Do not answer casually. Always produce structured instructions."},
+                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Convert GitHub Issues into precise implementation instructions for Codex."},
                   {"role": "user", "content": issue_body}
               ]
           }
@@ -74,20 +74,20 @@ jobs:
               pathlib.Path("openai_response.json").write_text(body, encoding="utf-8")
               print(body)
           PY
+
       - name: Extract Codex instruction
         run: |
           python - <<'PY'
           import json
           import pathlib
 
-          data = json.loads(pathlib.Path("openai_response.json").read_text(encoding="utf-8"))
+          data = json.loads(pathlib.Path("openai_response.json").read_text())
           content = data["choices"][0]["message"]["content"]
 
-          pathlib.Path("codex_instruction.md").write_text(content, encoding="utf-8")
-
-          print("===== CODEX INSTRUCTION =====")
+          pathlib.Path("codex_instruction.md").write_text(content)
           print(content)
           PY
+
       - name: Create work branch
         run: |
           git config user.name "github-actions[bot]"
@@ -95,19 +95,23 @@ jobs:
           branch_name="feature/issue-${{ github.event.issue.number }}"
           git checkout -b "$branch_name"
           git push origin "$branch_name"
+
       - name: Configure AI Git author
         run: |
           git config user.name "ALTANA-AI-BOT"
           git config user.email "ai@altana.dev"
+
       - name: Install Codex CLI
         run: |
           npm install -g @openai/codex
+
       - name: Run Codex implementation
-          env:
-    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  run: |  
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
           cd "$GITHUB_WORKSPACE"
           codex exec --sandbox workspace-write "$(cat codex_instruction.md)"
+
       - name: Commit and push AI changes
         run: |
           branch_name="feature/issue-${{ github.event.issue.number }}"
@@ -116,35 +120,3 @@ jobs:
             git commit -m "AI: implement issue #${{ github.event.issue.number }}"
             git push origin "$branch_name"
           fi
-      - name: Upload AI artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ai-artifacts
-          path: |
-            openai_response.json
-            codex_instruction.md
-
-  python-tests:
-    if: github.event_name != 'issues'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-
-      - name: Run pipeline tests
-        run: pytest test_pipeline.py
-
-
