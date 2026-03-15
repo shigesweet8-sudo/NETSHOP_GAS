@@ -105,7 +105,7 @@ jobs:
       - name: Run Codex implementation
           env:
     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
+  run: |  
           cd "$GITHUB_WORKSPACE"
           codex exec --sandbox workspace-write "$(cat codex_instruction.md)"
       - name: Commit and push AI changes
