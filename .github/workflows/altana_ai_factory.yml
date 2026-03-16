@@ -187,3 +187,23 @@ jobs:
             git commit -m "AI: implement issue #${{ github.event.issue.number }}"
             git push origin "$branch_name"
           fi
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install gh -y
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch_name="feature/issue-${{ github.event.issue.number }}"
+          if gh pr view "$branch_name" --json url >/dev/null 2>&1; then
+            echo "Pull request already exists for $branch_name"
+          else
+            gh pr create \
+              --base master \
+              --head "$branch_name" \
+              --title "AI: implement issue #${{ github.event.issue.number }}" \
+              --body "AI implementation for issue #${{ github.event.issue.number }}"
+          fi
