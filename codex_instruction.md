@@ -1,0 +1,1 @@
+Implement the API function `api_listItems()` in GAS to retrieve data from the specified spreadsheet. Ensure it retrieves the correct sheet and returns values without errors. Test the function using the Apps Script console to verify that an array of data is returned correctly.
