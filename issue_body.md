@@ -1,107 +1,127 @@
 ## 開発目的
 
-NETSHOP_GAS の統合売上データを  
-WAVE Web UI から取得できるようにする。
+api_listItems が現在
 
-最初の API として  
-商品一覧取得 API を実装する。
+10_webapp.gs
 
-WAVE構造
+に実装されているが、設計では
 
-HTML UI
-↓
-GAS API
-↓
-Spreadsheet
+20_api_netshop.gs
 
-この構造の最初の基礎API。
+に配置するAPIであるため、実装ファイルを整理する。
+
+APIの責務を分離し、今後のWAVE API拡張に備える。
 
 ---
 
 ## 背景
 
-NETSHOP_GAS は現在  
-Spreadsheet入力ベースで運用されている。
+WAVE-STEP01 api_listItems API作成の実装で  
+AIが既存ファイル
 
-次フェーズでは
+10_webapp.gs
 
-Sheet入力
-↓
-Web入力
+に api_listItems を追加した。
 
-へ移行する。
+しかしNETSHOP_GASの設計では
 
-そのため
+Webエントリ
+10_webapp.gs
 
-HTML → GAS API → Sheet
+API実装
+20_api_netshop.gs
 
-の通信構造を作る必要がある。
+の構造で管理する。
 
-その第一歩として  
-商品一覧取得APIを作成する。
+このままでは
+
+- API責務が混在
+- 将来APIが増えたとき管理困難
+- コード重複の可能性
+
+があるため修正する。
 
 ---
 
 ## 対象ファイル
 
-新規作成
-
-
+- 10_webapp.gs
+- 20_api_netshop.gs
 
 ---
 
 ## 実装内容
 
-GAS API
+1  
+10_webapp.gs から
 
 api_listItems()
 
-を実装する。
-
-処理
-
-1  
-CONFIG.SHEET_NAME のシート取得
+を削除する
 
 2  
-getDataRange() でデータ取得
+20_api_netshop.gs に
+
+api_listItems()
+
+を実装する
 
 3  
-values を return
+既存処理ロジックは変更せず  
+実装場所のみ整理する
 
-コード例
-
+4  
+APIロジックの重複を排除する
 
 ---
 
 ## 完了条件
 
-以下が満たされること
+- api_listItems() が  
+  20_api_netshop.gs に存在する
 
-- api_listItems() が存在する
-- エラーなく実行できる
-- values が返却される
+- 10_webapp.gs に  
+  api_listItems() が存在しない
+
+- 既存機能に影響がない
+
+- GASで api_listItems() 実行可能
 
 ---
 
 ## テスト方法
 
-Apps Script console でを実行
+1  
+Apps Scriptで
 
-配列データが返ればOK
+api_listItems()
+
+を実行
+
+2  
+統合売上データシートのデータが  
+配列として取得できること
+
+3  
+エラーが発生しないこと
 
 ---
 
 ## 補足
 
-HTMLはまだ作らない
+NETSHOP_GAS の設計構造
 
-最初は
+Webエントリ
+10_webapp.gs
 
-GAS API単体
+API群
+20_api_netshop.gs
 
-のみ実装する
+今後追加されるAPI
 
-## 補足
-必要に応じて追加説明
+- api_createItem
+- api_updateItem
+- api_getDashboard
 
+も同様に  
+20_api_netshop.gs に実装する。
