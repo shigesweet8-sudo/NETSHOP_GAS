@@ -55,7 +55,7 @@ jobs:
           payload = {
               "model": "gpt-4o-mini",
               "messages": [
-                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Convert GitHub Issues into precise implementation instructions for Codex."},
+                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Analyze the GitHub Issue and respond in plain text using exactly this structure.\n\nFor a simple issue, do not over-decompose it:\nMODE: DIRECT\n\nCODEX_INSTRUCTION:\n<implementation instruction>\n\nFor a complex issue, decompose it into only the minimum necessary tasks:\nMODE: PLAN\n\nTASKS:\n1. ...\n2. ...\n3. ...\n\nCODEX_INSTRUCTION:\n<organized implementation instruction>\n\nAlways include CODEX_INSTRUCTION. Keep TASKS only for complex issues."},
                   {"role": "user", "content": issue_body}
               ]
           }
@@ -81,11 +81,19 @@ jobs:
           python - <<'PY'
           import json
           import pathlib
+          import re
 
           data = json.loads(pathlib.Path("openai_response.json").read_text(encoding="utf-8"))
-          content = data["choices"][0]["message"]["content"]
+          content = data["choices"][0]["message"]["content"].strip()
 
-          pathlib.Path("codex_instruction.md").write_text(content, encoding="utf-8")
+          tasks_match = re.search(r"(?s)TASKS:\s*(.*?)\n\s*CODEX_INSTRUCTION:", content)
+          if tasks_match:
+              pathlib.Path("issue_tasks.md").write_text(tasks_match.group(1).strip() + "\n", encoding="utf-8")
+
+          instruction_match = re.search(r"(?s)CODEX_INSTRUCTION:\s*(.*)$", content)
+          instruction = instruction_match.group(1).strip() if instruction_match else content
+
+          pathlib.Path("codex_instruction.md").write_text(instruction + "\n", encoding="utf-8")
           print(content)
           PY
 
