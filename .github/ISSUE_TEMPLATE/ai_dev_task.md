@@ -1,3 +1,16 @@
+---
+name: ALTANA AI FACTORY ISSUE
+about: ALTANA AI開発工場タスク
+title: "[FACTORY] "
+labels: factory
+assignees: ""
+---
+
+# ALTANA AI FACTORY ISSUE
+
+---
+## MODE
+DIRECT / PLAN
 # ALTANA AI FACTORY ISSUE
 
 ---
