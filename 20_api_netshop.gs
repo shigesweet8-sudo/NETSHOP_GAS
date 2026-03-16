@@ -1,3 +1,4 @@
+// ALTANA FACTORY TEST 3
 /**
  * 商品一覧をシートから取得して返却する。
  * @returns {Array<Array<*>>}

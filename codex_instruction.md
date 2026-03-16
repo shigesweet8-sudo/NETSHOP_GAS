@@ -1,1 +1,4 @@
-Remove the redundant `api_listItems()` function from `10_webapp.gs` while keeping the original function in `20_api_netshop.gs`. Ensure that no other functions or processes are modified and maintain minimal changes.
+1. Open the file `20_api_netshop.gs`.
+2. Add the comment `// ALTANA FACTORY TEST 3` to the file.
+3. Save the changes.
+4. Run the necessary tests to confirm that the Slack review notification for the Japanese summary is functioning correctly.

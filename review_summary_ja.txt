@@ -1,0 +1,13 @@
+🤖 ALTANA AI FACTORY REVIEW
+
+Issue
+TEST3: ALTANA FACTORY Slackレビュー通知再テスト
+
+変更ファイル
+20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json, review_summary_ja.txt
+
+危険度
+安全
+
+判定
+Merge OK
