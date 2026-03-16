@@ -1,4 +1,4 @@
-1. Create a new GAS API function named `api_listItems()`.
-2. Implement functionality to retrieve the specified sheet using `CONFIG.SHEET_NAME`.
-3. Use `getDataRange()` to fetch the data from the sheet.
-4. Return the values obtained from the sheet.
+1. Remove the function `api_listItems()` from `10_webapp.gs`.
+2. Implement the function `api_listItems()` in `20_api_netshop.gs`.
+3. Ensure that the existing processing logic remains unchanged while moving the implementation.
+4. Eliminate any duplication of API logic.
