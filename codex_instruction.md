@@ -1,1 +1,1 @@
-Refactor the code by removing `api_listItems()` from `10_webapp.gs` and adding it to `20_api_netshop.gs`, ensuring that the function's logic remains the same, and check that there is no duplication of logic across the APIs. Verify that the function can still be executed without errors and that it retrieves the correct data.
+Remove the redundant `api_listItems()` function from `10_webapp.gs` while keeping the original function in `20_api_netshop.gs`. Ensure that no other functions or processes are modified and maintain minimal changes.

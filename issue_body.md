@@ -1,127 +1,104 @@
-## 開発目的
-
-api_listItems が現在
-
-10_webapp.gs
-
-に実装されているが、設計では
-
-20_api_netshop.gs
-
-に配置するAPIであるため、実装ファイルを整理する。
-
-APIの責務を分離し、今後のWAVE API拡張に備える。
+# ALTANA AI FACTORY ISSUE
 
 ---
 
-## 背景
+## MODE
 
-WAVE-STEP01 api_listItems API作成の実装で  
-AIが既存ファイル
+DIRECT
 
-10_webapp.gs
+### DIRECT 条件
+・変更ファイル 1つ  
+・TASK 3以下  
+・軽微修正  
+・単一関数追加/修正/削除  
 
-に api_listItems を追加した。
-
-しかしNETSHOP_GASの設計では
-
-Webエントリ
-10_webapp.gs
-
-API実装
-20_api_netshop.gs
-
-の構造で管理する。
-
-このままでは
-
-- API責務が混在
-- 将来APIが増えたとき管理困難
-- コード重複の可能性
-
-があるため修正する。
+### PLAN 条件
+・変更ファイル 複数  
+・TASK 4以上  
+・機能追加  
+・構造変更  
+・API追加  
+・削除 + 追加 + 移動 を含む  
 
 ---
 
-## 対象ファイル
+## GOAL
 
-- 10_webapp.gs
-- 20_api_netshop.gs
-
----
-
-## 実装内容
-
-1  
-10_webapp.gs から
-
-api_listItems()
-
-を削除する
-
-2  
-20_api_netshop.gs に
-
-api_listItems()
-
-を実装する
-
-3  
-既存処理ロジックは変更せず  
-実装場所のみ整理する
-
-4  
-APIロジックの重複を排除する
+`10_webapp.gs` に残っている不要な `api_listItems()` を削除し、
+APIの重複を解消する。
 
 ---
 
-## 完了条件
+## CHANGE TYPE
 
-- api_listItems() が  
-  20_api_netshop.gs に存在する
-
-- 10_webapp.gs に  
-  api_listItems() が存在しない
-
-- 既存機能に影響がない
-
-- GASで api_listItems() 実行可能
+削除  
 
 ---
 
-## テスト方法
+## PROJECT
 
-1  
-Apps Scriptで
-
-api_listItems()
-
-を実行
-
-2  
-統合売上データシートのデータが  
-配列として取得できること
-
-3  
-エラーが発生しないこと
+NETSHOP_GAS
 
 ---
 
-## 補足
+## MODULE
 
-NETSHOP_GAS の設計構造
+UI  
 
-Webエントリ
-10_webapp.gs
+---
 
-API群
-20_api_netshop.gs
+## TARGET FILE
 
-今後追加されるAPI
+10_webapp.gs  
 
-- api_createItem
-- api_updateItem
-- api_getDashboard
+---
 
-も同様に  
-20_api_netshop.gs に実装する。
+## TASK
+
+TASK1  
+10_webapp.gs  
+api_listItems 削除  
+
+---
+
+## SPEC
+
+`20_api_netshop.gs` 側の `api_listItems()` は残す。  
+今回の修正では `10_webapp.gs` にある重複した `api_listItems()` のみ削除する。  
+
+他の関数・処理は変更しないこと。  
+最小差分で対応すること。  
+
+---
+
+## EXPECT RESULT
+
+`api_listItems()` は  
+`20_api_netshop.gs` のみに存在する。  
+
+`10_webapp.gs` からは削除されている。  
+
+---
+
+## REVIEW CHECK
+
+AIレビュー確認項目
+
+・関数重複  
+・削除タスク確認  
+・20_api_netshop.gs 側が維持されているか  
+・不要な他変更が入っていないか  
+
+---
+
+## NOTE
+
+重要ルール
+
+HTMLはシートを直接操作しない
+
+HTML  
+↓  
+GAS API  
+↓  
+Spreadsheet
