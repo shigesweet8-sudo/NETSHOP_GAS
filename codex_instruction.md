@@ -1,1 +1,3 @@
-Refactor the code by removing `api_listItems()` from `10_webapp.gs` and adding it to `20_api_netshop.gs`, ensuring that the function's logic remains the same, and check that there is no duplication of logic across the APIs. Verify that the function can still be executed without errors and that it retrieves the correct data.
+1. 10_webapp.gs から api_listItems を削除する。
+2. 20_api_netshop.gs に api_listItems が正しく存在することを確認し、維持する。
+3. 確認事項として、関数の重複を確認し、削除タスクを実行したことを確認し、API呼び出しに影響が出ていないことを確認する。

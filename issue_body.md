@@ -1,127 +1,86 @@
-## 開発目的
+## MODE
+DIRECT
 
-api_listItems が現在
+---
 
-10_webapp.gs
+## GOAL
 
-に実装されているが、設計では
+api_listItems を  
+20_api_netshop.gs に一本化する
 
+---
+
+## CHANGE TYPE
+
+削除  
+修正
+
+---
+
+## PROJECT
+
+NETSHOP_GAS
+
+---
+
+## MODULE
+
+API
+
+---
+
+## TARGET FILE
+
+10_webapp.gs  
 20_api_netshop.gs
 
-に配置するAPIであるため、実装ファイルを整理する。
+---
 
-APIの責務を分離し、今後のWAVE API拡張に備える。
+## TASK
+
+TASK1  
+10_webapp.gs  
+api_listItems 削除  
+
+TASK2  
+20_api_netshop.gs  
+api_listItems を正として維持確認  
 
 ---
 
-## 背景
+## SPEC
 
-WAVE-STEP01 api_listItems API作成の実装で  
-AIが既存ファイル
+api_listItems は  
+API専用ファイルにのみ存在させる  
 
-10_webapp.gs
-
-に api_listItems を追加した。
-
-しかしNETSHOP_GASの設計では
-
-Webエントリ
-10_webapp.gs
-
-API実装
-20_api_netshop.gs
-
-の構造で管理する。
-
-このままでは
-
-- API責務が混在
-- 将来APIが増えたとき管理困難
-- コード重複の可能性
-
-があるため修正する。
+10_webapp.gs 側の  
+重複定義を削除する  
 
 ---
 
-## 対象ファイル
+## EXPECT RESULT
 
-- 10_webapp.gs
-- 20_api_netshop.gs
+api_listItems は  
 
----
-
-## 実装内容
-
-1  
-10_webapp.gs から
-
-api_listItems()
-
-を削除する
-
-2  
-20_api_netshop.gs に
-
-api_listItems()
-
-を実装する
-
-3  
-既存処理ロジックは変更せず  
-実装場所のみ整理する
-
-4  
-APIロジックの重複を排除する
+20_api_netshop.gs  
+のみ存在  
 
 ---
 
-## 完了条件
+## REVIEW CHECK
 
-- api_listItems() が  
-  20_api_netshop.gs に存在する
-
-- 10_webapp.gs に  
-  api_listItems() が存在しない
-
-- 既存機能に影響がない
-
-- GASで api_listItems() 実行可能
+・関数重複  
+・削除タスク確認  
+・API呼び出し影響確認  
 
 ---
 
-## テスト方法
+## NOTE
 
-1  
-Apps Scriptで
+HTMLはシートを直接操作しない  
 
-api_listItems()
-
-を実行
-
-2  
-統合売上データシートのデータが  
-配列として取得できること
-
-3  
-エラーが発生しないこと
-
----
-
-## 補足
-
-NETSHOP_GAS の設計構造
-
-Webエントリ
-10_webapp.gs
-
-API群
-20_api_netshop.gs
-
-今後追加されるAPI
-
-- api_createItem
-- api_updateItem
-- api_getDashboard
-
-も同様に  
-20_api_netshop.gs に実装する。
+HTML  
+↓  
+GAS API  
+↓  
+Spreadsheet
