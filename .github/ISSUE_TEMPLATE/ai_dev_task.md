@@ -1,32 +1,107 @@
----
-name: AI_DEV_TASK
-about: ALTANA FACTORY AI開発タスク用テンプレート
-title: ''
-labels: ''
-assignees: ''
+# ALTANA AI開発工場 Issue
+
+## MODE
+DIRECT / PLAN
+
+DIRECT  
+単純タスク
+
+PLAN  
+AIがタスク分解
 
 ---
 
-## 開発目的
-何を作るのかを簡潔に記述
+## GOAL
+このIssueの目的
 
-## 背景
-なぜこの機能・修正が必要なのか
+---
 
-## 対象ファイル
+## CHANGE TYPE
+追加
+修正
+削除
+移動
+
+---
+
+## PROJECT
 例
-- webapp.gs
-- router.gs
-- gas_api.gs
+NETSHOP_GAS
 
-## 実装内容
-実装する処理の内容を具体的に記述
+---
 
-## 完了条件
-この状態になれば完成とする
+## MODULE
+例
+API
+UI
+DATABASE
 
-## テスト方法
-動作確認方法
+---
 
-## 補足
-必要に応じて追加説明
+## TARGET FILE
+例
+
+20_api_netshop.gs  
+10_webapp.gs
+
+---
+
+## TASK
+
+TASK1
+
+TASK2
+
+TASK3
+
+例
+
+TASK1  
+10_webapp.gs  
+api_listItems 削除
+
+TASK2  
+20_api_netshop.gs  
+api_listItems 追加
+
+---
+
+## SPEC
+
+API仕様
+
+例
+
+api_listItems(filter)
+
+管理シートを取得  
+商品一覧を返す
+
+---
+
+## EXPECT RESULT
+
+例
+
+api_listItems は  
+20_api_netshop.gs のみ存在
+
+---
+
+## REVIEW CHECK
+
+関数重複  
+削除タスク確認  
+追加タスク確認
+
+---
+
+## NOTE
+
+HTMLは直接Sheetを触らない
+
+HTML  
+↓  
+GAS API  
+↓  
+Spreadsheet
