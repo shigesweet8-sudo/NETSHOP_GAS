@@ -1,0 +1,3 @@
+# Test File for AI Factory
+
+This is a placeholder test file for the AI Factory project.
