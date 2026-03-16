@@ -6,32 +6,27 @@
 
 DIRECT
 
-### DIRECT 条件
-・変更ファイル 1つ  
-・TASK 3以下  
-・軽微修正  
-・単一関数追加/修正/削除  
-
-### PLAN 条件
-・変更ファイル 複数  
-・TASK 4以上  
-・機能追加  
-・構造変更  
-・API追加  
-・削除 + 追加 + 移動 を含む  
-
 ---
 
 ## GOAL
 
-`10_webapp.gs` に残っている不要な `api_listItems()` を削除し、
-APIの重複を解消する。
+ALTANA FACTORY の Slackレビュー通知機能の動作確認を行う。
+
+確認対象
+
+review_result.json
+↓
+日本語レビュー要約生成
+↓
+Slack通知
+
+この一連の処理が正常に動作するか確認する。
 
 ---
 
 ## CHANGE TYPE
 
-削除  
+修正
 
 ---
 
@@ -43,62 +38,56 @@ NETSHOP_GAS
 
 ## MODULE
 
-UI  
+API
 
 ---
 
 ## TARGET FILE
 
-10_webapp.gs  
+20_api_netshop.gs
 
 ---
 
 ## TASK
 
-TASK1  
-10_webapp.gs  
-api_listItems 削除  
+テスト用の軽微修正を行う。
+
+対象ファイル
+
+20_api_netshop.gs
+
+内容
+
+軽微なコメントを1行追加する。
+
+例
+
+// ALTANA FACTORY TEST 3
+
+機能変更は行わない。
 
 ---
 
-## SPEC
+## NOTES
 
-`20_api_netshop.gs` 側の `api_listItems()` は残す。  
-今回の修正では `10_webapp.gs` にある重複した `api_listItems()` のみ削除する。  
+これは ALTANA FACTORY の Slackレビュー通知テスト用 Issue。
 
-他の関数・処理は変更しないこと。  
-最小差分で対応すること。  
+期待する結果
 
----
+Slackに日本語レビュー要約が届くこと。
 
-## EXPECT RESULT
+通常レビュー形式
 
-`api_listItems()` は  
-`20_api_netshop.gs` のみに存在する。  
+🤖 ALTANA AI FACTORY REVIEW
 
-`10_webapp.gs` からは削除されている。  
+Issue  
+TEST3: ALTANA FACTORY Slackレビュー通知再テスト
 
----
+変更ファイル  
+20_api_netshop.gs
 
-## REVIEW CHECK
+危険度  
+安全
 
-AIレビュー確認項目
-
-・関数重複  
-・削除タスク確認  
-・20_api_netshop.gs 側が維持されているか  
-・不要な他変更が入っていないか  
-
----
-
-## NOTE
-
-重要ルール
-
-HTMLはシートを直接操作しない
-
-HTML  
-↓  
-GAS API  
-↓  
-Spreadsheet
+判定  
+Merge OK
