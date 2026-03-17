@@ -1,4 +1,4 @@
-﻿name: ALTANA AI FACTORY
+name: ALTANA AI FACTORY
 
 on:
   issues:
@@ -195,114 +195,44 @@ jobs:
                   path = line[6:].strip()
                   if path != "/dev/null" and path not in changed_files:
                       changed_files.append(path)
-          changed_files_text = ", ".join(changed_files[:5]) if changed_files else "縺ｪ縺・
+
+          changed_files_text = ", ".join(changed_files[:5]) if changed_files else "(none)"
           if len(changed_files) > 5:
-              changed_files_text += f" 縺ｻ縺宮len(changed_files) - 5}莉ｶ"
+              changed_files_text += f" (+{len(changed_files) - 5} more)"
 
-          def extract_first(patterns, default=""):
-              for pattern in patterns:
-                  match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
-                  if match:
-                      value = match.group(1).strip()
-                      if value:
-                          return value
-              return default
+          review_upper = content.upper()
 
-          risk_level = extract_first([
-              r"蜊ｱ髯ｺ蠎ｦ\s*[:・咯\s*(螳牙・|菴旨荳ｭ|鬮・蜊ｱ髯ｺ|驥榊､ｧ)",
-              r"繝ｪ繧ｹ繧ｯ\s*[:・咯\s*(螳牙・|菴旨荳ｭ|鬮・蜊ｱ髯ｺ|驥榊､ｧ)",
-              r"severity\s*[:・咯\s*(safe|low|medium|high|critical)",
-          ])
-
-          risk_map = {
-              "safe": "螳牙・",
-              "low": "菴・,
-              "medium": "荳ｭ",
-              "high": "鬮・,
-              "critical": "驥榊､ｧ",
-          }
-          risk_level = risk_map.get(risk_level.lower(), risk_level) if risk_level else ""
-          if not risk_level:
-              if re.search(r"驥榊､ｧ|critical", content, re.IGNORECASE):
-                  risk_level = "驥榊､ｧ"
-              elif re.search(r"蜊ｱ髯ｺ", content, re.IGNORECASE):
-                  risk_level = "蜊ｱ髯ｺ"
-              elif re.search(r"\bhigh\b|鬮・, content, re.IGNORECASE):
-                  risk_level = "鬮・
-              elif re.search(r"\bmedium\b|荳ｭ", content, re.IGNORECASE):
-                  risk_level = "荳ｭ"
-              elif re.search(r"\blow\b|菴・, content, re.IGNORECASE):
-                  risk_level = "菴・
-              else:
-                  risk_level = "螳牙・"
-
-          is_danger = risk_level in {"鬮・, "蜊ｱ髯ｺ", "驥榊､ｧ"}
-          final_action = "MERGE STOP" if is_danger else ("隕∫｢ｺ隱・ if risk_level == "荳ｭ" else "Merge OK")
-
-          issue_line = extract_first([
-              r"Issue\s*[:・咯\s*(.+)",
-              r"issue title\s*[:・咯\s*(.+)",
-              r"繧ｿ繧､繝医Ν\s*[:・咯\s*(.+)",
-          ], issue_title) or issue_title
-
-          problem = extract_first([
-              r"蝠城｡圭s*[:・咯\s*(.+)",
-              r"finding\s*[:・咯\s*(.+)",
-              r"summary\s*[:・咯\s*(.+)",
-          ], "隕∽ｿｮ豁｣縺ｮ蜿ｯ閭ｽ諤ｧ縺後≠繧翫∪縺・)
-          location = extract_first([
-              r"蝠城｡檎ｮ・園\s*[:・咯\s*(.+)",
-              r"location\s*[:・咯\s*(.+)",
-              r"file\s*[:・咯\s*(.+)",
-          ], changed_files[0] if changed_files else "荳肴・")
-          fix_direction = extract_first([
-              r"菫ｮ豁｣譁ｹ蜷曾s*[:・咯\s*(.+)",
-              r"recommendation\s*[:・咯\s*(.+)",
-              r"action\s*[:・咯\s*(.+)",
-          ], "繝ｬ繝薙Η繝ｼ謖・遭邂・園繧剃ｿｮ豁｣縺励※縺上□縺輔＞")
-
-          if is_danger:
-              summary = "\n".join([
-                  "圷 ALTANA AI FACTORY REVIEW",
-                  "",
-                  "Issue",
-                  issue_line,
-                  "",
-                  "螟画峩繝輔ぃ繧､繝ｫ",
-                  changed_files_text,
-                  "",
-                  "蜊ｱ髯ｺ蠎ｦ",
-                  risk_level,
-                  "",
-                  "蛻､螳・,
-                  final_action,
-                  "",
-                  "蝠城｡・,
-                  problem,
-                  "",
-                  "蝠城｡檎ｮ・園",
-                  location,
-                  "",
-                  "菫ｮ豁｣譁ｹ蜷・,
-                  fix_direction,
-              ])
+          if "CRITICAL" in review_upper:
+              risk_level = "CRITICAL"
+          elif re.search(r"\bHIGH\b", review_upper):
+              risk_level = "HIGH"
+          elif re.search(r"\bMEDIUM\b", review_upper):
+              risk_level = "MEDIUM"
+          elif re.search(r"\bLOW\b", review_upper):
+              risk_level = "LOW"
           else:
-              summary = "\n".join([
-                  "､・ALTANA AI FACTORY REVIEW",
-                  "",
-                  "Issue",
-                  issue_line,
-                  "",
-                  "螟画峩繝輔ぃ繧､繝ｫ",
-                  changed_files_text,
-                  "",
-                  "蜊ｱ髯ｺ蠎ｦ",
-                  risk_level,
-                  "",
-                  "蛻､螳・,
-                  final_action,
-              ])
+              risk_level = "SAFE"
 
+          is_danger = risk_level in {"HIGH", "CRITICAL"}
+          final_action = "MERGE STOP" if is_danger else ("REVIEW NEEDED" if risk_level == "MEDIUM" else "MERGE OK")
+
+          lines = [
+              "ALTANA AI FACTORY REVIEW",
+              "",
+              "Issue",
+              issue_title or "(no title)",
+              "",
+              "Changed Files",
+              changed_files_text,
+              "",
+              "Risk",
+              risk_level,
+              "",
+              "Action",
+              final_action,
+          ]
+
+          summary = "\n".join(lines)
           pathlib.Path("review_summary_ja.txt").write_text(summary + "\n", encoding="utf-8")
           print(summary)
           PY
@@ -312,16 +242,17 @@ jobs:
           python - <<'PY'
           import json
           import pathlib
+          import re
           import sys
 
           data = json.loads(pathlib.Path("review_result.json").read_text(encoding="utf-8"))
           content = data["choices"][0]["message"]["content"]
           print(content)
 
-          if "驥榊､ｧ" in content or "鬮・ in content:
+          review_upper = content.upper()
+          if "CRITICAL" in review_upper or re.search(r"\bHIGH\b", review_upper):
               sys.exit(1)
           PY
-
       - name: Send review summary to Slack
         if: ${{ always() }}
         env:
