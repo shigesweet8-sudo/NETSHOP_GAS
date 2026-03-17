@@ -1,1 +1,1 @@
-Codex CLI呼び出しの引数をダブルクォートで囲み、または`--`を使用して不具合を修正し、テストを行って正常動作を確認する。
+Output the entire content of wave_dashboard.html with the specified modifications, ensuring the existing HTML structure is maintained without any omissions.
