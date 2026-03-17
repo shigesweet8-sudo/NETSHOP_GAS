@@ -55,22 +55,7 @@ jobs:
           payload = {
               "model": "gpt-4o-mini",
               "messages": [
-                  {
-                      "role": "system", 
-                      "content": (
-                          "You are a Senior Lead Developer. Your output is a direct instruction for a file-writing tool.\n\n"
-                          "1. Analyze the Issue and decide MODE: DIRECT or PLAN.\n"
-                          "2. In 'CODEX_INSTRUCTION', you MUST provide the COMPLETE source code of the target file with all changes applied.\n"
-                          "3. NEVER output partial code, snippets, or explanations. NEVER use '...'.\n"
-                          "4. You MUST output the entire file from the first line to the last line.\n\n"
-                          "FORMAT:\n"
-                          "File: <path>\n"
-                          "```\n"
-                          "<the entire file content>\n"
-                          "```\n"
-                          "No summary. No prose. Just the full file content."
-                      )
-                  },
+                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Analyze the GitHub Issue and respond in plain text using exactly this structure.\n\nFor a simple issue, do not over-decompose it:\nMODE: DIRECT\n\nCODEX_INSTRUCTION:\n<implementation instruction>\n\nFor a complex issue, decompose it into only the minimum necessary tasks:\nMODE: PLAN\n\nTASKS:\n1. ...\n2. ...\n3. ...\n\nCODEX_INSTRUCTION:\n<organized implementation instruction>\n\nAlways include CODEX_INSTRUCTION. Keep TASKS only for complex issues."},
                   {"role": "user", "content": issue_body}
               ]
           }
