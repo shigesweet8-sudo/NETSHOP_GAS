@@ -286,6 +286,7 @@ jobs:
         run: |
           branch_name="feature/issue-${{ github.event.issue.number }}"
           git add -A
+          git restore --staged .github/workflows/altana_ai_factory.yml 2>/dev/null || true
           if ! git diff --cached --quiet; then
             git commit -m "AI: implement issue #${{ github.event.issue.number }}"
             git push origin "$branch_name"
@@ -310,5 +311,4 @@ jobs:
               --title "AI: implement issue #${{ github.event.issue.number }}" \
               --body "AI implementation for issue #${{ github.event.issue.number }}"
           fi
-
 
