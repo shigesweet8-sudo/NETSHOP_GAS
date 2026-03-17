@@ -1,7 +1,7 @@
 🤖 ALTANA AI FACTORY REVIEW
 
 Issue
-FIX: シート名不一致エラー(Sheet not found)の解消と堅牢化
+[FIX] FACTORY-PIPELINE: Codex CLIの引数エラーおよびエスケープ処理の修正
 
 変更ファイル
 codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json

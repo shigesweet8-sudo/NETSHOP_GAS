@@ -1,5 +1,3 @@
-1. Modify `20_api_netshop.gs` to add a debug log before retrieving the sheet by name.
-2. Implement error handling that returns `null` when the sheet is not found.
-3. Validate `CONFIG.SHEET_NAME` in `01_config.gs` to ensure it matches the actual tab name, including trimming spaces.
-4. Explore implementing a smarter logic for retrieving the sheet, either by ID or by using a partial match across all sheets.
-5. Update the front-end to display a user-friendly error message when the sheet name does not match.
+1. 確認: `.github/workflows/` 内のCodex呼び出し部分を特定し、コマンド引数を適切に修正する。
+2. 修正: 特殊文字が引数として誤認されないよう、コマンド引数をダブルクォートで囲むか、`--` を追加する。
+3. テスト: 修正後、`wave_dashboard.html` の読み取りが正常に行えるかをデバッグ実行して確認する。
