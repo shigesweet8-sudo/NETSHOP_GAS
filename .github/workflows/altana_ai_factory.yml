@@ -282,7 +282,7 @@ jobs:
               print(res.read().decode("utf-8"))
           PY
 
-       - name: Commit and push AI changes
+      - name: Commit and push AI changes
         run: |
           branch_name="feature/issue-${{ github.event.issue.number }}"
           git add -A
