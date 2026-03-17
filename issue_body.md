@@ -1,16 +1,54 @@
-## 障害内容
-GitHub Actions実行中に以下のエラーが発生し、Codexが停止した。
-`error: unexpected argument '-' found`
+# ALTANA AI FACTORY ISSUE
 
-## 原因分析
-ActionsからCodex CLIを呼び出す際、Issueの内容に含まれるハイフン `-` や特殊文字が、CLIのオプション引数として誤認されている可能性がある。
+---
 
-## 修復タスク
-1.  **ワークフロー設定の確認**:
-    - `.github/workflows/` 内のCodex呼び出し箇所を確認せよ。
-    - コマンド引数をダブルクォートで囲む、または `--` (ダブルハイフン) を使用して、それ以降がオプションではないことを明示する修正を行え。
-2.  **実行テスト**:
-    - 修正後、テストとして `wave_dashboard.html` の読み取りが正常に行えるか、デバッグ実行せよ。
+## MODE
 
-## ゴール
-Codexがハイフンを含む指示を正しく解釈し、ファイルの書き換え（workspace-write）をエラーなく実行できる状態に復旧すること。
+DIRECT
+
+---
+
+## GOAL
+
+Check review severity の誤判定修正後の動作確認
+
+---
+
+## CHANGE TYPE
+
+確認
+
+---
+
+## PROJECT
+
+NETSHOP_GAS
+
+---
+
+## MODULE
+
+WORKFLOW
+
+---
+
+## TARGET FILE
+
+.github/workflows/altana_ai_factory.yml
+
+---
+
+## TASK
+
+Check review severity がレビュー本文中の単語（critical等）で誤判定せず、
+実際のリスク判定に基づいて動作するか確認する
+
+---
+
+## ACCEPTANCE
+
+- workflow が最後までエラーなしで完走する
+- 不要な exit code 1 が発生しない
+- Slack に review summary が正常送信される
+
+---

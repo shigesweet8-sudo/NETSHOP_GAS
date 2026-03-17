@@ -1,1 +1,1 @@
-Codex CLI呼び出しの引数をダブルクォートで囲み、または`--`を使用して不具合を修正し、テストを行って正常動作を確認する。
+Check the implementation of the review severity function in the .github/workflows/altana_ai_factory.yml file to ensure it no longer misjudges based on certain keywords in the review text. Run the workflow and verify that it completes successfully without errors, does not output an unnecessary exit code 1, and that a review summary is sent to Slack as expected.
