@@ -1,7 +1,7 @@
 🤖 ALTANA AI FACTORY REVIEW
 
 Issue
-[FACTORY] WAVE-PHASE-1.1: Webアプリ・ルーティングの実装とBootstrapダッシュボードの構築
+FIX: シート名不一致エラー(Sheet not found)の解消と堅牢化
 
 変更ファイル
 codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
