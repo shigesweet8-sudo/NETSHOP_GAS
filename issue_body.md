@@ -1,16 +1,14 @@
 ## 障害内容
-GitHub Actions実行中に以下のエラーが発生し、Codexが停止した。
-`error: unexpected argument '-' found`
+GitHub Actions 上で Codex を実行する際、`bwrap: loopback: Failed...` というエラーが発生し、物理ファイルの書き換えが阻害されている。
 
-## 原因分析
-ActionsからCodex CLIを呼び出す際、Issueの内容に含まれるハイフン `-` や特殊文字が、CLIのオプション引数として誤認されている可能性がある。
+## 修復指示 (Codexへの命令)
+`.github/workflows/altana_ai_factory.yml` を開き、Codex 実行部分（112行目付近）を以下のように修正せよ。
 
-## 修復タスク
-1.  **ワークフロー設定の確認**:
-    - `.github/workflows/` 内のCodex呼び出し箇所を確認せよ。
-    - コマンド引数をダブルクォートで囲む、または `--` (ダブルハイフン) を使用して、それ以降がオプションではないことを明示する修正を行え。
-2.  **実行テスト**:
-    - 修正後、テストとして `wave_dashboard.html` の読み取りが正常に行えるか、デバッグ実行せよ。
+### 修正前
+codex exec --sandbox workspace-write "$(cat codex_instruction.md)"
 
-## ゴール
-Codexがハイフンを含む指示を正しく解釈し、ファイルの書き換え（workspace-write）をエラーなく実行できる状態に復旧すること。
+### 修正後
+codex exec --no-sandbox --sandbox workspace-write "$(cat codex_instruction.md)"
+
+## 補足
+`--no-sandbox` フラグを付与することで、GitHub Actions の制限に干渉せず、物理ファイルへのアクセスを許可させる。
