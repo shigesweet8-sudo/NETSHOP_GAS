@@ -1,1 +1,1 @@
-Remove the redundant `api_listItems()` function from `10_webapp.gs` while keeping the original function in `20_api_netshop.gs`. Ensure that no other functions or processes are modified and maintain minimal changes.
+Build the frontend framework for the WAVE system by completing the implementation of routing, frontend, and API as specified, ensuring proper data interactions and formatting.
