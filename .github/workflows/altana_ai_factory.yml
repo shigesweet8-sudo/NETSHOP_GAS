@@ -55,7 +55,21 @@ jobs:
           payload = {
               "model": "gpt-4o-mini",
               "messages": [
-                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Analyze the GitHub Issue and respond in plain text using exactly this structure.\n\nFor a simple issue, do not over-decompose it:\nMODE: DIRECT\n\nCODEX_INSTRUCTION:\n<implementation instruction>\n\nFor a complex issue, decompose it into only the minimum necessary tasks:\nMODE: PLAN\n\nTASKS:\n1. ...\n2. ...\n3. ...\n\nCODEX_INSTRUCTION:\n<organized implementation instruction>\n\nAlways include CODEX_INSTRUCTION. Keep TASKS only for complex issues."},
+                  {
+                      "role": "system", 
+                      "content": (
+                          "You are a Senior Lead Developer. Your output is DIRECTLY executed by a CLI tool.\n\n"
+                          "1. Analyze the Issue.\n"
+                          "2. Decide MODE: DIRECT (simple) or PLAN (complex).\n"
+                          "3. In 'CODEX_INSTRUCTION', NEVER write sentences, explanations, or 'Please update...'.\n"
+                          "4. ONLY output raw code blocks with file paths. FORMAT:\n"
+                          "File: <path>\n"
+                          "```\n"
+                          "<full code or specific diff for the tool to apply>\n"
+                          "```\n"
+                          "No prose. No summary. No 'Here is the code'. Just the raw instructions."
+                      )
+                  },
                   {"role": "user", "content": issue_body}
               ]
           }
