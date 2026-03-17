@@ -282,15 +282,15 @@ jobs:
               print(res.read().decode("utf-8"))
           PY
 
-      - name: Commit and push AI changes
+       - name: Commit and push AI changes
         run: |
           branch_name="feature/issue-${{ github.event.issue.number }}"
           git add -A
+          git restore --staged .github/workflows/altana_ai_factory.yml 2>/dev/null || true
           if ! git diff --cached --quiet; then
             git commit -m "AI: implement issue #${{ github.event.issue.number }}"
             git push origin "$branch_name"
           fi
-
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
