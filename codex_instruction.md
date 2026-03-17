@@ -1,1 +1,7 @@
-Codex CLI呼び出しの引数をダブルクォートで囲み、または`--`を使用して不具合を修正し、テストを行って正常動作を確認する。
+Open the `.github/workflows/altana_ai_factory.yml` file and modify the Codex execution section around line 112 as follows:
+
+### Before
+codex exec --sandbox workspace-write "$(cat codex_instruction.md)"
+
+### After
+codex exec --no-sandbox --sandbox workspace-write "$(cat codex_instruction.md)"
