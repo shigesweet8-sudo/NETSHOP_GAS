@@ -21,115 +21,76 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Show Issue metadata
-        run: |
-          echo "Issue Number: ${{ github.event.issue.number }}"
-          echo "Issue Title: ${{ github.event.issue.title }}"
-          echo "Issue User: ${{ github.event.issue.user.login }}"
+      - name: Save Issue body
+        run: echo "${{ github.event.issue.body }}" > issue_body.md
 
-      - name: Save Issue body to file
-        run: |
-          cat <<'EOF' > issue_body.md
-          ${{ github.event.issue.body }}
-          EOF
-
-      - name: Send Issue to OpenAI (GPT Architect Layer)
+      - name: GPT Architect Layer
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python - <<'PY'
-          import json, os, pathlib, urllib.request
-          issue_body = pathlib.Path("issue_body.md").read_text(encoding="utf-8")
+          import json, os, pathlib, urllib.request, re
           api_key = os.environ["OPENAI_API_KEY"]
+          body = pathlib.Path("issue_body.md").read_text(encoding="utf-8")
           payload = {
               "model": "gpt-4o-mini",
               "messages": [
-                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Analyze the GitHub Issue and respond in plain text using exactly this structure.\n\nMODE: DIRECT\n\nCODEX_INSTRUCTION:\n<implementation instruction>"},
-                  {"role": "user", "content": issue_body}
+                  {"role": "system", "content": "You are an AI architect. Respond ONLY with the instruction for Codex after 'CODEX_INSTRUCTION:' tag."},
+                  {"role": "user", "content": body}
               ]
           }
           req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}, method="POST")
           with urllib.request.urlopen(req) as res:
-              pathlib.Path("openai_response.json").write_text(res.read().decode("utf-8"), encoding="utf-8")
+              content = json.loads(res.read())["choices"][0]["message"]["content"]
+              inst = re.search(r"(?s)CODEX_INSTRUCTION:\s*(.*)$", content)
+              pathlib.Path("codex_instruction.md").write_text(inst.group(1) if inst else content)
           PY
 
-      - name: Extract Codex instruction
-        run: |
-          python - <<'PY'
-          import json, pathlib, re
-          data = json.loads(pathlib.Path("openai_response.json").read_text(encoding="utf-8"))
-          content = data["choices"][0]["message"]["content"].strip()
-          instruction_match = re.search(r"(?s)CODEX_INSTRUCTION:\s*(.*)$", content)
-          instruction = instruction_match.group(1).strip() if instruction_match else content
-          pathlib.Path("codex_instruction.md").write_text(instruction + "\n", encoding="utf-8")
-          PY
-
-      - name: Install Codex CLI
-        run: npm install -g @openai/codex
-
-      - name: Run Codex implementation (Codex Engineer Layer)
+      - name: Codex Engineer Layer
         env:
           CODEX_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          cd "$GITHUB_WORKSPACE"
-          # 司令官、この1行だけ、物理的なエラー（OSの文字数制限）を避けるために
-          # cat展開ではなく「ファイル指定読み込み」に変更しました。
-          codex workspace-write --prompt-file codex_instruction.md
+          npm install -g @openai/codex
+          # 修正：存在しない--prompt-fileを廃止し、正しい標準入力形式に変更
+          cat codex_instruction.md | codex exec workspace-write
 
-      - name: Generate implementation diff
-        id: implementation_diff
-        run: |
-          git add -A
-          diff_path="$RUNNER_TEMP/implementation.diff"
-          git diff --cached --binary --no-color > "$diff_path"
-          echo "diff_path=$diff_path" >> "$GITHUB_OUTPUT"
-
-      - name: Review implementation diff (AI Review Layer)
+      - name: AI Review Layer (日本語強制)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DIFF_PATH: ${{ steps.implementation_diff.outputs.diff_path }}
         run: |
+          git add -A
+          git diff --cached > diff.txt
           python - <<'PY'
           import json, os, pathlib, urllib.request
-          diff_text = pathlib.Path(os.environ["DIFF_PATH"]).read_text(encoding="utf-8")
           api_key = os.environ["OPENAI_API_KEY"]
-          payload = {"model": "gpt-4o-mini", "messages": [{"role": "system", "content": "You are a code reviewer. Review the provided git diff and return findings in Japanese."}, {"role": "user", "content": diff_text}]}
+          diff = pathlib.Path("diff.txt").read_text(encoding="utf-8")
+          payload = {"model": "gpt-4o-mini", "messages": [{"role": "system", "content": "必ず日本語でレビューしてください。"}, {"role": "user", "content": diff}]}
           req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}, method="POST")
           with urllib.request.urlopen(req) as res:
-              pathlib.Path("review_result.json").write_text(res.read().decode("utf-8"), encoding="utf-8")
+              pathlib.Path("rv.md").write_text(json.loads(res.read())["choices"][0]["message"]["content"])
           PY
 
-      - name: Send review summary to Slack
+      - name: Pipeline & PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "AI-BOT"
+          git config user.email "ai@altana.dev"
+          branch="feat-${{ github.event.issue.number }}"
+          git checkout -b "$branch"
+          git commit -m "AI implementation"
+          git push origin "$branch"
+          gh pr create --title "AI: Implement #${{ github.event.issue.number }}" --body-file rv.md --head "$branch" --base master || echo "PR exists"
+
+      - name: Slack Notification
         if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           python - <<'PY'
           import json, os, pathlib, urllib.request
-          webhook = os.environ.get("SLACK_WEBHOOK_URL")
-          if webhook and pathlib.Path("review_result.json").exists():
-              res = json.loads(pathlib.Path("review_result.json").read_text(encoding="utf-8"))
-              text = res["choices"][0]["message"]["content"]
-              payload = json.dumps({"text": f"🤖 ALTANA FACTORY REVIEW:\n{text}"}).encode("utf-8")
-              req = urllib.request.Request(webhook, data=payload, headers={"Content-Type": "application/json"}, method="POST")
-              urllib.request.urlopen(req)
+          wh = os.environ.get("SLACK_WEBHOOK_URL")
+          if wh and pathlib.Path("rv.md").exists():
+            txt = pathlib.Path("rv.md").read_text()
+            urllib.request.urlopen(urllib.request.Request(wh, data=json.dumps({"text":f"レビュー結果:\n{txt}"}).encode(), headers={"Content-Type":"application/json"}, method="POST"))
           PY
-
-      - name: Commit and push AI changes (GitHub Actions Pipeline)
-        run: |
-          git config user.name "ALTANA-AI-BOT"
-          git config user.email "ai@altana.dev"
-          branch_name="feature/issue-${{ github.event.issue.number }}"
-          git checkout -b "$branch_name"
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m "AI: implement issue #${{ github.event.issue.number }}"
-            git push origin "$branch_name"
-          fi
-
-      - name: Create Pull Request
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          branch_name="feature/issue-${{ github.event.issue.number }}"
-          gh pr create --title "AI: implement issue #${{ github.event.issue.number }}" --body "AI implementation result based on original factory specifications." --head "$branch_name" --base master || echo "PR exists"
