@@ -1,16 +1,13 @@
-## 障害内容
-GitHub Actions実行中に以下のエラーが発生し、Codexが停止した。
-`error: unexpected argument '-' found`
+# ALTANA AI FACTORY ISSUE
 
-## 原因分析
-ActionsからCodex CLIを呼び出す際、Issueの内容に含まれるハイフン `-` や特殊文字が、CLIのオプション引数として誤認されている可能性がある。
+## GOAL
+`wave_dashboard.html` の `<title>` タグの中身を 「WAVE Dashboard (v2)」 に書き換える。
 
-## 修復タスク
-1.  **ワークフロー設定の確認**:
-    - `.github/workflows/` 内のCodex呼び出し箇所を確認せよ。
-    - コマンド引数をダブルクォートで囲む、または `--` (ダブルハイフン) を使用して、それ以降がオプションではないことを明示する修正を行え。
-2.  **実行テスト**:
-    - 修正後、テストとして `wave_dashboard.html` の読み取りが正常に行えるか、デバッグ実行せよ。
+## TARGET FILE
+* `wave_dashboard.html`
 
-## ゴール
-Codexがハイフンを含む指示を正しく解釈し、ファイルの書き換え（workspace-write）をエラーなく実行できる状態に復旧すること。
+## TASK
+TASK1: タイトルタグのテキスト変更。
+
+## EXPECT RESULT
+ブラウザのタブに表示される名前が (v2) 付きになること。

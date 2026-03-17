@@ -1,1 +1,1 @@
-Codex CLI呼び出しの引数をダブルクォートで囲み、または`--`を使用して不具合を修正し、テストを行って正常動作を確認する。
+Update the `<title>` tag in the `wave_dashboard.html` file to "WAVE Dashboard (v2)". Ensure the change is saved and reflected in the browser's tab.
