@@ -1,7 +1,7 @@
 🤖 ALTANA AI FACTORY REVIEW
 
 Issue
-[FIX] FACTORY-PIPELINE: Codex CLIの引数エラーおよびエスケープ処理の修正
+[UI検証] テストボタン追加（最小差分確認）
 
 変更ファイル
 codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json

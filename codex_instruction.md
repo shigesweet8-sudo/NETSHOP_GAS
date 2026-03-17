@@ -1,1 +1,4 @@
-Codex CLI呼び出しの引数をダブルクォートで囲み、または`--`を使用して不具合を修正し、テストを行って正常動作を確認する。
+1. Define the `api_listItems(filter)` function in `20_api_netshop.gs` to handle GET requests for the product list.
+2. Retrieve product data from the management sheet and apply any filters provided in the request.
+3. Return the product list as a JSON response with appropriate HTTP status codes.
+4. Update the frontend code in `10_webapp.gs` to fetch and display the products dynamically from the new endpoint.

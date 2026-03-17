@@ -1,3 +1,4 @@
-1. 確認: `.github/workflows/` 内のCodex呼び出し部分を特定し、コマンド引数を適切に修正する。
-2. 修正: 特殊文字が引数として誤認されないよう、コマンド引数をダブルクォートで囲むか、`--` を追加する。
-3. テスト: 修正後、`wave_dashboard.html` の読み取りが正常に行えるかをデバッグ実行して確認する。
+1. Create a new API endpoint `api_listItems` in `20_api_netshop.gs`.
+2. Implement the functionality to retrieve product list data in the new API.
+3. Update `10_webapp.gs` to call the new API for displaying products.
+4. Ensure proper error handling and response formatting in the API.
