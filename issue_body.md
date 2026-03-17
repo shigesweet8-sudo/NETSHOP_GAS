@@ -1,16 +1,66 @@
-## 障害内容
-GitHub Actions実行中に以下のエラーが発生し、Codexが停止した。
-`error: unexpected argument '-' found`
+# ALTANA AI FACTORY ISSUE
 
-## 原因分析
-ActionsからCodex CLIを呼び出す際、Issueの内容に含まれるハイフン `-` や特殊文字が、CLIのオプション引数として誤認されている可能性がある。
+---
 
-## 修復タスク
-1.  **ワークフロー設定の確認**:
-    - `.github/workflows/` 内のCodex呼び出し箇所を確認せよ。
-    - コマンド引数をダブルクォートで囲む、または `--` (ダブルハイフン) を使用して、それ以降がオプションではないことを明示する修正を行え。
-2.  **実行テスト**:
-    - 修正後、テストとして `wave_dashboard.html` の読み取りが正常に行えるか、デバッグ実行せよ。
+## MODE
+DIRECT
 
-## ゴール
-Codexがハイフンを含む指示を正しく解釈し、ファイルの書き換え（workspace-write）をエラーなく実行できる状態に復旧すること。
+### DIRECT 条件
+・変更ファイル 1つ  
+・TASK 1  
+・軽微修正  
+
+---
+
+## GOAL
+ダッシュボードの表示名称を物理的に最新版へ更新する
+
+---
+
+## CHANGE TYPE
+修正  
+
+---
+
+## PROJECT
+ALTANA_FACTORY
+
+---
+
+## MODULE
+UI
+
+---
+
+## TARGET FILE
+wave_dashboard.html
+
+---
+
+## TASK
+TASK1  
+wave_dashboard.html  
+`<title>`タグと`<h1>`タグのテキストを物理的に書き換える
+
+---
+
+## SPEC
+1. `<title>`タグの内容を `ALTANA FACTORY v2.1` に変更。
+2. `<body>`内の最初の`<h1>`タグの内容を `ALTANA AI SYSTEM ONLINE` に変更。
+
+---
+
+## EXPECT RESULT
+ブラウザのタブ名と、画面上の見出しが指定の文字列に変更されていること。
+
+---
+
+## REVIEW CHECK
+・物理的な書き換えが行われているか確認
+・自然言語の解説が含まれていないか確認
+
+---
+
+## NOTE
+・ポエム（解説文）は一切不要。
+・Codexがそのまま適用できる物理コードブロックのみを出力すること。

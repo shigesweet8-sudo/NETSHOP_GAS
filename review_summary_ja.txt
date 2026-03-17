@@ -1,10 +1,10 @@
 🤖 ALTANA AI FACTORY REVIEW
 
 Issue
-[FIX] FACTORY-PIPELINE: Codex CLIの引数エラーおよびエスケープ処理の修正
+FIX: wave_dashboard.html の物理名称更新 (v2.1)
 
 変更ファイル
-codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
+codex_instruction.md, issue_body.md, openai_response.json
 
 危険度
 安全
