@@ -119,7 +119,7 @@ jobs:
           CODEX_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           cd "$GITHUB_WORKSPACE"
-          codex exec --sandbox workspace-write "$(cat codex_instruction.md)"
+          codex exec --no-sandbox --sandbox workspace-write "$(cat codex_instruction.md)"
 
       - name: Generate implementation diff
         id: implementation_diff
