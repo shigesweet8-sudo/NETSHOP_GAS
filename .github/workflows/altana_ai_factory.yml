@@ -58,16 +58,17 @@ jobs:
                   {
                       "role": "system", 
                       "content": (
-                          "You are a Senior Lead Developer. Your output is DIRECTLY executed by a CLI tool.\n\n"
-                          "1. Analyze the Issue.\n"
-                          "2. Decide MODE: DIRECT (simple) or PLAN (complex).\n"
-                          "3. In 'CODEX_INSTRUCTION', NEVER write sentences, explanations, or 'Please update...'.\n"
-                          "4. ONLY output raw code blocks with file paths. FORMAT:\n"
+                          "You are a Senior Lead Developer. Your output is a direct instruction for a file-writing tool.\n\n"
+                          "1. Analyze the Issue and decide MODE: DIRECT or PLAN.\n"
+                          "2. In 'CODEX_INSTRUCTION', you MUST provide the COMPLETE source code of the target file with all changes applied.\n"
+                          "3. NEVER output partial code, snippets, or explanations. NEVER use '...'.\n"
+                          "4. You MUST output the entire file from the first line to the last line.\n\n"
+                          "FORMAT:\n"
                           "File: <path>\n"
                           "```\n"
-                          "<full code or specific diff for the tool to apply>\n"
+                          "<the entire file content>\n"
                           "```\n"
-                          "No prose. No summary. No 'Here is the code'. Just the raw instructions."
+                          "No summary. No prose. Just the full file content."
                       )
                   },
                   {"role": "user", "content": issue_body}
