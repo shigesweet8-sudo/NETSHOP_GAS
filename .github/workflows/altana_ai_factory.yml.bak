@@ -1,0 +1,383 @@
+﻿name: ALTANA AI FACTORY
+
+on:
+  issues:
+    types: [opened]
+  push:
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ai-dev:
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show Issue metadata
+        run: |
+          echo "Issue Number: ${{ github.event.issue.number }}"
+          echo "Issue Title: ${{ github.event.issue.title }}"
+          echo "Issue User: ${{ github.event.issue.user.login }}"
+
+      - name: Save Issue body to file
+        run: |
+          cat <<'EOF' > issue_body.md
+          ${{ github.event.issue.body }}
+          EOF
+
+      - name: Print Issue body
+        run: |
+          echo "===== ISSUE BODY START ====="
+          cat issue_body.md
+          echo "===== ISSUE BODY END ====="
+
+      - name: Send Issue to OpenAI
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import urllib.request
+
+          issue_body = pathlib.Path("issue_body.md").read_text(encoding="utf-8")
+          api_key = os.environ["OPENAI_API_KEY"]
+
+          payload = {
+              "model": "gpt-4o-mini",
+              "messages": [
+                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Analyze the GitHub Issue and respond in plain text using exactly this structure.\n\nFor a simple issue, do not over-decompose it:\nMODE: DIRECT\n\nCODEX_INSTRUCTION:\n<implementation instruction>\n\nFor a complex issue, decompose it into only the minimum necessary tasks:\nMODE: PLAN\n\nTASKS:\n1. ...\n2. ...\n3. ...\n\nCODEX_INSTRUCTION:\n<organized implementation instruction>\n\nAlways include CODEX_INSTRUCTION. Keep TASKS only for complex issues.\n\nSTRICT RULES:\n- Follow the Issue content exactly.\n- Do NOT introduce new features.\n- Do NOT change files not listed in TARGET FILE.\n- Do NOT infer or expand beyond the described TASK.\n- If information is missing, do NOT guess.\n- Only generate instructions strictly based on the given Issue."},
+                  {"role": "user", "content": issue_body}
+              ]
+          }
+
+          req = urllib.request.Request(
+              "https://api.openai.com/v1/chat/completions",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {api_key}",
+              },
+              method="POST",
+          )
+
+          with urllib.request.urlopen(req) as res:
+              body = res.read().decode("utf-8")
+              pathlib.Path("openai_response.json").write_text(body, encoding="utf-8")
+              print(body)
+          PY
+
+      - name: Extract Codex instruction
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import re
+
+          data = json.loads(pathlib.Path("openai_response.json").read_text(encoding="utf-8"))
+          content = data["choices"][0]["message"]["content"].strip()
+
+          tasks_match = re.search(r"(?s)TASKS:\s*(.*?)\n\s*CODEX_INSTRUCTION:", content)
+          if tasks_match:
+              pathlib.Path("issue_tasks.md").write_text(tasks_match.group(1).strip() + "\n", encoding="utf-8")
+
+          instruction_match = re.search(r"(?s)CODEX_INSTRUCTION:\s*(.*)$", content)
+          instruction = instruction_match.group(1).strip() if instruction_match else content
+
+          pathlib.Path("codex_instruction.md").write_text(instruction + "\n", encoding="utf-8")
+          print(content)
+          PY
+
+      - name: Create work branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          branch_name="feature/issue-${{ github.event.issue.number }}"
+          git checkout -b "$branch_name"
+          git push origin "$branch_name"
+
+      - name: Configure AI Git author
+        run: |
+          git config user.name "ALTANA-AI-BOT"
+          git config user.email "ai@altana.dev"
+
+      - name: Install Codex CLI
+        run: |
+          npm install -g @openai/codex
+
+      - name: Run Codex implementation
+        env:
+          CODEX_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          codex exec --sandbox danger-full-access "$(cat codex_instruction.md)"
+
+      - name: Generate implementation diff
+        id: implementation_diff
+        run: |
+          git add -A
+          diff_path="$RUNNER_TEMP/implementation.diff"
+          git diff --cached --binary --no-color > "$diff_path"
+          echo "diff_path=$diff_path" >> "$GITHUB_OUTPUT"
+
+      - name: Review implementation diff
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DIFF_PATH: ${{ steps.implementation_diff.outputs.diff_path }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import urllib.request
+
+          diff_text = pathlib.Path(os.environ["DIFF_PATH"]).read_text(encoding="utf-8")
+          api_key = os.environ["OPENAI_API_KEY"]
+
+          payload = {
+              "model": "gpt-4o-mini",
+              "messages": [
+                  {
+                      "role": "system",
+                      "content": "You are a code reviewer. Review the provided git diff and return concise findings."
+                  },
+                  {
+                      "role": "user",
+                      "content": diff_text
+                  }
+              ]
+          }
+
+          req = urllib.request.Request(
+              "https://api.openai.com/v1/chat/completions",
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {api_key}",
+              },
+              method="POST",
+          )
+
+          with urllib.request.urlopen(req) as res:
+              body = res.read().decode("utf-8")
+              pathlib.Path("review_result.json").write_text(body, encoding="utf-8")
+              print(body)
+          PY
+
+      - name: Create Japanese review summary
+        env:
+          DIFF_PATH: ${{ steps.implementation_diff.outputs.diff_path }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+
+          review_data = json.loads(pathlib.Path("review_result.json").read_text(encoding="utf-8"))
+          content = review_data["choices"][0]["message"]["content"].strip()
+          diff_text = pathlib.Path(os.environ["DIFF_PATH"]).read_text(encoding="utf-8")
+          issue_title = os.environ["ISSUE_TITLE"].strip()
+
+          changed_files = []
+          for line in diff_text.splitlines():
+              if line.startswith("+++ b/"):
+                  path = line[6:].strip()
+                  if path != "/dev/null" and path not in changed_files:
+                      changed_files.append(path)
+          changed_files_text = ", ".join(changed_files[:5]) if changed_files else "縺ｪ縺・
+          if len(changed_files) > 5:
+              changed_files_text += f" 縺ｻ縺宮len(changed_files) - 5}莉ｶ"
+
+          def extract_first(patterns, default=""):
+              for pattern in patterns:
+                  match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
+                  if match:
+                      value = match.group(1).strip()
+                      if value:
+                          return value
+              return default
+
+          risk_level = extract_first([
+              r"蜊ｱ髯ｺ蠎ｦ\s*[:・咯\s*(螳牙・|菴旨荳ｭ|鬮・蜊ｱ髯ｺ|驥榊､ｧ)",
+              r"繝ｪ繧ｹ繧ｯ\s*[:・咯\s*(螳牙・|菴旨荳ｭ|鬮・蜊ｱ髯ｺ|驥榊､ｧ)",
+              r"severity\s*[:・咯\s*(safe|low|medium|high|critical)",
+          ])
+
+          risk_map = {
+              "safe": "螳牙・",
+              "low": "菴・,
+              "medium": "荳ｭ",
+              "high": "鬮・,
+              "critical": "驥榊､ｧ",
+          }
+          risk_level = risk_map.get(risk_level.lower(), risk_level) if risk_level else ""
+          if not risk_level:
+              if re.search(r"驥榊､ｧ|critical", content, re.IGNORECASE):
+                  risk_level = "驥榊､ｧ"
+              elif re.search(r"蜊ｱ髯ｺ", content, re.IGNORECASE):
+                  risk_level = "蜊ｱ髯ｺ"
+              elif re.search(r"\bhigh\b|鬮・, content, re.IGNORECASE):
+                  risk_level = "鬮・
+              elif re.search(r"\bmedium\b|荳ｭ", content, re.IGNORECASE):
+                  risk_level = "荳ｭ"
+              elif re.search(r"\blow\b|菴・, content, re.IGNORECASE):
+                  risk_level = "菴・
+              else:
+                  risk_level = "螳牙・"
+
+          is_danger = risk_level in {"鬮・, "蜊ｱ髯ｺ", "驥榊､ｧ"}
+          final_action = "MERGE STOP" if is_danger else ("隕∫｢ｺ隱・ if risk_level == "荳ｭ" else "Merge OK")
+
+          issue_line = extract_first([
+              r"Issue\s*[:・咯\s*(.+)",
+              r"issue title\s*[:・咯\s*(.+)",
+              r"繧ｿ繧､繝医Ν\s*[:・咯\s*(.+)",
+          ], issue_title) or issue_title
+
+          problem = extract_first([
+              r"蝠城｡圭s*[:・咯\s*(.+)",
+              r"finding\s*[:・咯\s*(.+)",
+              r"summary\s*[:・咯\s*(.+)",
+          ], "隕∽ｿｮ豁｣縺ｮ蜿ｯ閭ｽ諤ｧ縺後≠繧翫∪縺・)
+          location = extract_first([
+              r"蝠城｡檎ｮ・園\s*[:・咯\s*(.+)",
+              r"location\s*[:・咯\s*(.+)",
+              r"file\s*[:・咯\s*(.+)",
+          ], changed_files[0] if changed_files else "荳肴・")
+          fix_direction = extract_first([
+              r"菫ｮ豁｣譁ｹ蜷曾s*[:・咯\s*(.+)",
+              r"recommendation\s*[:・咯\s*(.+)",
+              r"action\s*[:・咯\s*(.+)",
+          ], "繝ｬ繝薙Η繝ｼ謖・遭邂・園繧剃ｿｮ豁｣縺励※縺上□縺輔＞")
+
+          if is_danger:
+              summary = "\n".join([
+                  "圷 ALTANA AI FACTORY REVIEW",
+                  "",
+                  "Issue",
+                  issue_line,
+                  "",
+                  "螟画峩繝輔ぃ繧､繝ｫ",
+                  changed_files_text,
+                  "",
+                  "蜊ｱ髯ｺ蠎ｦ",
+                  risk_level,
+                  "",
+                  "蛻､螳・,
+                  final_action,
+                  "",
+                  "蝠城｡・,
+                  problem,
+                  "",
+                  "蝠城｡檎ｮ・園",
+                  location,
+                  "",
+                  "菫ｮ豁｣譁ｹ蜷・,
+                  fix_direction,
+              ])
+          else:
+              summary = "\n".join([
+                  "､・ALTANA AI FACTORY REVIEW",
+                  "",
+                  "Issue",
+                  issue_line,
+                  "",
+                  "螟画峩繝輔ぃ繧､繝ｫ",
+                  changed_files_text,
+                  "",
+                  "蜊ｱ髯ｺ蠎ｦ",
+                  risk_level,
+                  "",
+                  "蛻､螳・,
+                  final_action,
+              ])
+
+          pathlib.Path("review_summary_ja.txt").write_text(summary + "\n", encoding="utf-8")
+          print(summary)
+          PY
+
+      - name: Check review severity
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          data = json.loads(pathlib.Path("review_result.json").read_text(encoding="utf-8"))
+          content = data["choices"][0]["message"]["content"]
+          print(content)
+
+          if "驥榊､ｧ" in content or "鬮・ in content:
+              sys.exit(1)
+          PY
+
+      - name: Send review summary to Slack
+        if: ${{ always() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import urllib.request
+
+          if not os.environ.get("SLACK_WEBHOOK_URL"):
+              print("SLACK_WEBHOOK_URL is empty. Skip Slack notification.")
+              raise SystemExit(0)
+
+          text = pathlib.Path("review_summary_ja.txt").read_text(encoding="utf-8").strip()
+          payload = json.dumps({"text": text}).encode("utf-8")
+
+          req = urllib.request.Request(
+              os.environ["SLACK_WEBHOOK_URL"],
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+
+          with urllib.request.urlopen(req) as res:
+              print(res.read().decode("utf-8"))
+          PY
+
+      - name: Commit and push AI changes
+        run: |
+          branch_name="feature/issue-${{ github.event.issue.number }}"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "AI: implement issue #${{ github.event.issue.number }}"
+            git push origin "$branch_name"
+          fi
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install gh -y
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          branch_name="feature/issue-${{ github.event.issue.number }}"
+          if gh pr view "$branch_name" --json url >/dev/null 2>&1; then
+            echo "Pull request already exists for $branch_name"
+          else
+            gh pr create \
+              --base master \
+              --head "$branch_name" \
+              --title "AI: implement issue #${{ github.event.issue.number }}" \
+              --body "AI implementation for issue #${{ github.event.issue.number }}"
+          fi
+
+
