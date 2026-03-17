@@ -1,16 +1,23 @@
-## 障害内容
-GitHub Actions実行中に以下のエラーが発生し、Codexが停止した。
-`error: unexpected argument '-' found`
+## MODE
+DIRECT
 
-## 原因分析
-ActionsからCodex CLIを呼び出す際、Issueの内容に含まれるハイフン `-` や特殊文字が、CLIのオプション引数として誤認されている可能性がある。
+## GOAL
+デプロイURLでWAVE画面を開いたときに「スクリプト関数が見つかりません: doGet」となる問題を解消し、WAVE画面を表示できる状態に戻す
 
-## 修復タスク
-1.  **ワークフロー設定の確認**:
-    - `.github/workflows/` 内のCodex呼び出し箇所を確認せよ。
-    - コマンド引数をダブルクォートで囲む、または `--` (ダブルハイフン) を使用して、それ以降がオプションではないことを明示する修正を行え。
-2.  **実行テスト**:
-    - 修正後、テストとして `wave_dashboard.html` の読み取りが正常に行えるか、デバッグ実行せよ。
+## CHANGE TYPE
+修正
 
-## ゴール
-Codexがハイフンを含む指示を正しく解釈し、ファイルの書き換え（workspace-write）をエラーなく実行できる状態に復旧すること。
+## PROJECT
+NETSHOP_GAS
+
+## MODULE
+WEBAPP
+
+## TARGET FILE
+10_webapp.gs
+
+## TASK
+1. doGet(e) を実装または復旧する
+2. デプロイURLアクセス時にWAVE画面が表示されるようにする
+3. 既存のAPI経由設計を維持する
+4. 既存の関数名や公開URL前提を壊さない

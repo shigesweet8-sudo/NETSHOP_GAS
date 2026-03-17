@@ -1,13 +1,13 @@
-🤖 ALTANA AI FACTORY REVIEW
+ALTANA AI FACTORY REVIEW
 
 Issue
-[FIX] FACTORY-PIPELINE: Codex CLIの引数エラーおよびエスケープ処理の修正
+WAVE画面 doGet復旧対応
 
-変更ファイル
-codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
+Changed Files
+10_webapp.gs, codex_instruction.md, index.html, issue_body.md, issue_tasks.md (+1 more)
 
-危険度
-安全
+Risk
+SAFE
 
-判定
-Merge OK
+Action
+MERGE OK

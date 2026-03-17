@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WAVE</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Noto Sans JP", sans-serif;
+        background: #f7f9fc;
+        color: #1f2937;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+      h1 {
+        margin: 0 0 16px;
+        font-size: 28px;
+      }
+      .card {
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .status {
+        margin-bottom: 12px;
+        font-size: 14px;
+        color: #4b5563;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid #e5e7eb;
+        padding: 8px;
+        font-size: 13px;
+        text-align: left;
+      }
+      th {
+        background: #f3f4f6;
+        font-weight: 700;
+      }
+      tbody tr:nth-child(even) {
+        background: #fafafa;
+      }
+      .muted {
+        color: #6b7280;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>WAVE</h1>
+      <div class="card">
+        <div id="status" class="status">読み込み中...</div>
+        <div id="content" class="muted">データを取得しています。</div>
+      </div>
+    </div>
+
+    <script>
+      function escapeHtml(value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function renderTable(rows) {
+        if (!rows || !rows.length) {
+          document.getElementById("status").textContent = "データなし";
+          document.getElementById("content").innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+          return;
+        }
+
+        var html = "<table><thead><tr>";
+        rows[0].forEach(function(cell) {
+          html += "<th>" + escapeHtml(cell) + "</th>";
+        });
+        html += "</tr></thead><tbody>";
+
+        for (var i = 1; i < rows.length; i++) {
+          html += "<tr>";
+          rows[i].forEach(function(cell) {
+            html += "<td>" + escapeHtml(cell) + "</td>";
+          });
+          html += "</tr>";
+        }
+        html += "</tbody></table>";
+
+        document.getElementById("status").textContent = "読み込み完了";
+        document.getElementById("content").innerHTML = html;
+      }
+
+      function showError(message) {
+        document.getElementById("status").textContent = "エラー";
+        document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(message) + "</span>";
+      }
+
+      google.script.run
+        .withSuccessHandler(renderTable)
+        .withFailureHandler(function(err) {
+          showError((err && err.message) ? err.message : "データ取得に失敗しました。");
+        })
+        .api_listItems();
+    </script>
+  </body>
+</html>
