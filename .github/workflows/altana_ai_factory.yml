@@ -14,32 +14,28 @@ jobs:
   ai-dev:
     if: github.event_name == 'issues'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Save Issue body to file
-        run: |
-          cat <<'EOF' > issue_body.md
-          ${{ github.event.issue.body }}
-          EOF
+      - name: Save Issue body
+        run: echo "${{ github.event.issue.body }}" > issue_body.md
 
-      - name: Send Issue to OpenAI
+      - name: GPT Architect Layer (Issue Analysis)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           python - <<'PY'
           import json, os, pathlib, urllib.request
-          issue_body = pathlib.Path("issue_body.md").read_text(encoding="utf-8")
           api_key = os.environ["OPENAI_API_KEY"]
+          body = pathlib.Path("issue_body.md").read_text(encoding="utf-8")
           payload = {
               "model": "gpt-4o-mini",
               "messages": [
-                  {"role": "system", "content": "You are an AI architect inside ALTANA FACTORY. Respond with CODEX_INSTRUCTION: <instruction>."},
-                  {"role": "user", "content": issue_body}
+                  {"role": "system", "content": "You are an AI architect. Analyze the issue and respond with CODEX_INSTRUCTION: <instruction>."},
+                  {"role": "user", "content": body}
               ]
           }
           req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}, method="POST")
@@ -47,7 +43,7 @@ jobs:
               pathlib.Path("openai_response.json").write_text(res.read().decode("utf-8"), encoding="utf-8")
           PY
 
-      - name: Extract Codex instruction
+      - name: Extract Instruction
         run: |
           python - <<'PY'
           import json, pathlib, re
@@ -57,24 +53,40 @@ jobs:
           pathlib.Path("codex_instruction.md").write_text((instruction.group(1) if instruction else content) + "\n", encoding="utf-8")
           PY
 
-      - name: Install Codex CLI
-        run: npm install -g @openai/codex
-
-      - name: Run Codex implementation
+      - name: Codex Engineer Layer (Implementation)
         env:
           CODEX_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
+          npm install -g @openai/codex
           cd "$GITHUB_WORKSPACE"
           codex exec workspace-write "$(cat codex_instruction.md)"
 
-      - name: Commit and push AI changes
+      - name: AI Review Layer (Diff Analysis)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          git add -A
+          git diff --cached > implementation.diff
+          python - <<'PY'
+          import json, os, pathlib, urllib.request
+          api_key = os.environ["OPENAI_API_KEY"]
+          diff = pathlib.Path("implementation.diff").read_text(encoding="utf-8")
+          payload = {"model": "gpt-4o-mini", "messages": [{"role": "system", "content": "Review this git diff in Japanese."}, {"role": "user", "content": diff}]}
+          req = urllib.request.Request("https://api.openai.com/v1/chat/completions", data=json.dumps(payload).encode("utf-8"), headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}, method="POST")
+          with urllib.request.urlopen(req) as res:
+              pathlib.Path("review_summary.txt").write_text(json.loads(res.read())["choices"][0]["message"]["content"], encoding="utf-8")
+          PY
+
+      - name: GitHub Actions Pipeline (Commit & PR)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "ALTANA-AI-BOT"
           git config user.email "ai@altana.dev"
-          branch_name="feature/issue-${{ github.event.issue.number }}"
-          git checkout -b "$branch_name"
-          git add -A
+          branch="feature/issue-${{ github.event.issue.number }}"
+          git checkout -b "$branch"
           if ! git diff --cached --quiet; then
             git commit -m "AI: implement issue #${{ github.event.issue.number }}"
-            git push origin "$branch_name"
+            git push origin "$branch"
+            gh pr create --title "AI: implement issue #${{ github.event.issue.number }}" --body-file review_summary.txt --head "$branch" --base master || echo "PR exists"
           fi
