@@ -1,7 +1,7 @@
 🤖 ALTANA AI FACTORY REVIEW
 
 Issue
-[FIX] FACTORY-PIPELINE: Codex CLIの引数エラーおよびエスケープ処理の修正
+[PLAN] WAVE-DASHBOARD: Bootstrap 5 & DataTables.js リッチUI実装
 
 変更ファイル
 codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
