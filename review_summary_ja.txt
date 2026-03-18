@@ -1,10 +1,10 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-# WAVE Web化 STEP1
+# WAVE Web化 STEP2
 
 Changed Files
-codex_instruction.md, index.html, issue_body.md, openai_response.json
+20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
 
 Risk
 SAFE

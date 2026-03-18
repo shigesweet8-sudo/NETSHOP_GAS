@@ -1,4 +1,5 @@
-1. Use `google.script.run` to call the `api_listItems` function.
-2. Console output the retrieved data for confirmation (not for display).
-3. Create a `render` function that takes an array as an argument and processes it in a loop.
-4. Display each item in HTML by outputting the data as a JSON string initially.
+1. Implement the function `api_createItem(payload)` in `20_api_netshop.gs`.
+2. Inside this function, use the `appendRow` method to add a new row of data based on the provided payload.
+3. Generate a simple ID for the new item (e.g., using a counter or timestamp).
+4. Set the initial status for the new item as specified.
+5. Ensure that CONFIG.COLS is used appropriately and that no HTML or other files are modified.
