@@ -1,73 +1,108 @@
-# ALTANA AI FACTORY ISSUE（実装専用）
+# ALTANA AI FACTORY ISSUE
 
 ## MODE
 DIRECT
 
 ## GOAL
-index.html から api_updateItem を呼び出せるようにする
+（1行で明確に）
+例：index.html から api_updateItem を呼び出す
 
-## CHANGE TYPE
-修正
+---
 
 ## PROJECT
 NETSHOP_GAS
 
 ## MODULE
-WEB UI
+UI / API / DATABASE（いずれか1つ）
+
+---
 
 ## TARGET FILE
+（必ず1ファイル）
+例：
 index.html
 
 ---
 
-## CHANGE DETAIL（実装内容）
-
-1. 更新ボタンを追加
-
-2. 更新処理関数を追加
-
-3. ボタンクリック時に api_updateItem を呼び出す
-
-4. id と payload は固定値で構築する
-（UI入力はまだ使用しない）
+## CHANGE TYPE
+追加 / 修正 / 削除（該当のみ）
 
 ---
 
-## CONSTRAINT（制約）
+## IMPLEMENTATION
 
-- API変更禁止
-- index.html 以外の変更禁止
-- UI入力取得は実装しない
-- id と payload は固定値で作成
-- google.script.run を使用する
-- 最小差分で実装
-- debugコード追加禁止
-- テスト用処理追加禁止
+（やることを具体的に列挙）
+
+1.
+（何を追加/変更するか）
+
+2.
+（どう動くようにするか）
+
+3.
+（必要なら処理の流れ）
 
 ---
 
-## DONE CONDITION（完了条件）
+## FIXED SPEC
 
-- ボタンクリックで api_updateItem が呼ばれる
-- エラーが発生しない
-- 既存の登録・一覧機能に影響がない
+（固定条件・ブレ防止）
+
+- 使用API：
+- 使用関数：
+- 引数：
+- 戻り値：
+- UI挙動：
+
+※ここを曖昧にしない
+
+---
+
+## SCOPE
+
+（触っていい範囲）
+
+- 対象ファイルのみ変更
+- 他ファイル変更禁止
+
+---
+
+## NON-SCOPE
+
+（絶対に触らない範囲）
+
+- GAS API変更禁止
+- Spreadsheet変更禁止
+- 既存ロジック変更禁止
+
+---
+
+## STRICT RULES
+
+- 最小差分
+- 既存構造を変更しない
+- create と同じ思想で実装
+- 単一ファイルのみ
+- 憶測禁止
+- 追加実装禁止
+- debugコード禁止
+- テストコード禁止
+
+---
+
+## ACCEPTANCE CRITERIA
+
+（完成判定を明確に）
+
+- ○○が存在する
+- ○○が実行される
+- ○○に影響がない
+- 変更ファイルが1つのみ
 
 ---
 
 ## OUTPUT FORMAT
 
-- 変更ファイル名
-- 差分要約
-- diff --git
-
----
-
-## NG
-
-- 調査指示
-- 確認指示
-- テスト指示
-- 必要に応じて修正
-- 推測・憶測で実装
-- APIファイル変更
-- 複数ファイル変更
+- diff --git 形式
+- 最小差分のみ
+- 説明文不要
