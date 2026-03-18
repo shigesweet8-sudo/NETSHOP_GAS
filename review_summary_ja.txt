@@ -1,7 +1,7 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-# ALTANA AI FACTORY ISSUE
+TITLE WAVE STEP1 HTML→API接続（api_listItems 呼び出し）
 
 Changed Files
 codex_instruction.md, index.html, issue_body.md, openai_response.json
