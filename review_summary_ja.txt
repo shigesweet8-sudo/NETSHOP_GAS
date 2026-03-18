@@ -4,7 +4,7 @@ Issue
 # ALTANA AI FACTORY ISSUE（実装専用）
 
 Changed Files
-codex_instruction.md, index.html, issue_body.md, openai_response.json
+codex_instruction.md, issue_body.md, openai_response.json
 
 Risk
 SAFE
