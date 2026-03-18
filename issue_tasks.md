@@ -1,4 +1,3 @@
-1. doGet(e) 関数を実装または復旧します。
-2. デプロイURLにアクセスした際にWAVE画面が正しく表示されるように確認します。
-3. 既存のAPI経由設計を維持します。
-4. 既存の関数名や公開URLが影響を受けないように注意して実装します。
+1. Implement new API for retrieving product list.
+2. Create necessary changes in both 20_api_netshop.gs and 10_webapp.gs.
+3. Ensure compliance with the management sheet for data retrieval.
