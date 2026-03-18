@@ -1,14 +1,14 @@
 {
-  "id": "chatcmpl-DKevMNu4JasVEFcrc98ZFPIgce4VZ",
+  "id": "chatcmpl-DKf8wCAdEeycvWwvq88NTcYocqZi2",
   "object": "chat.completion",
-  "created": 1773816244,
+  "created": 1773817086,
   "model": "gpt-4o-mini-2024-07-18",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "変更ファイル名: index.html  \n差分要約: 商品登録フォームとボタンの追加、API呼び出し処理の実装  \n```diff\ndiff --git a/index.html b/index.html\nindex 0000000..1111111 100644\n--- a/index.html\n+++ b/index.html\n@@ -0,0 +1,10 @@\n+<form id=\"itemForm\">\n+    <input type=\"text\" id=\"itemName\" placeholder=\"商品名\" required>\n+    <input type=\"number\" id=\"purchasePrice\" placeholder=\"仕入金額\" required>\n+    <input type=\"number\" id=\"salePrice\" placeholder=\"販売金額\" required>\n+    <input type=\"number\" id=\"quantity\" placeholder=\"数量\" required>\n+    <button type=\"button\" id=\"registerButton\">登録</button>\n+</form>\n+\n+<script>\n+document.getElementById('registerButton').onclick = function() {\n+    api_createItem({\n+        name: document.getElementById('itemName').value,\n+        purchasePrice: document.getElementById('purchasePrice').value,\n+        salePrice: document.getElementById('salePrice').value,\n+        quantity: document.getElementById('quantity').value\n+    }).then(() => api_listItems());\n+};\n+</script>\n```  \nCODEX_INSTRUCTION: index.htmlに商品登録用のフォームとボタンを追加し、ボタンがクリックされた際にapi_createItemを呼び出し、その後api_listItemsを再実行して商品一覧を更新する処理を実装する。",
+        "content": "変更ファイル名: 20_api_netshop.gs\n\n差分要約:\n新規関数 api_createItem(payload) を追加し、商品データを指定されたシートに追加する処理を実装。\n\n```diff\ndiff --git a/20_api_netshop.gs b/20_api_netshop.gs\nindex 0000000..1111111 100644\n--- a/20_api_netshop.gs\n+++ b/20_api_netshop.gs\n@@ -0,0 +1,45 @@\n+function api_createItem(payload) {\n+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SHEET_NAME);\n+  const newId = generateNewId(); // 新規ID生成関数は別途実装してください\n+  const initialStatus = 'NEW'; // 初期ステータス\n+  \n+  const rowData = [\n+    newId,\n+    initialStatus,\n+    payload[CONFIG.COLS.NAME],\n+    payload[CONFIG.COLS.DESCRIPTION],\n+    payload[CONFIG.COLS.PRICE],\n+    payload[CONFIG.COLS.QUANTITY],\n+  ];\n+  \n+  sheet.appendRow(rowData);\n+  \n+  return rowData; // 追加したデータを返す\n+}\n```\n\nCODEX_INSTRUCTION:\n新規関数 api_createItem(payload) を追加し、Spreadsheet の指定されたシートに新たな行が追加できるように実装してください。CONFIG.COLS を利用し、ハードコードされた列番号は禁止です。シート操作はこの関数内に留めてください。また、関数はシンタックスエラーがないこと、および他の既存関数に影響を与えないことを確認し、GASから呼び出し可能な global 関数であることを保証します。",
         "refusal": null,
         "annotations": []
       },
@@ -17,9 +17,9 @@
     }
   ],
   "usage": {
-    "prompt_tokens": 1003,
-    "completion_tokens": 350,
-    "total_tokens": 1353,
+    "prompt_tokens": 586,
+    "completion_tokens": 394,
+    "total_tokens": 980,
     "prompt_tokens_details": {
       "cached_tokens": 0,
       "audio_tokens": 0
