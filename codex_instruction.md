@@ -1,1 +1,4 @@
-デプロイURLでWAVE画面を開いたときに「スクリプト関数が見つかりません: doGet」というエラーを解消するため、doGet(e) 関数を実装または復旧してください。さらに、デプロイURLからWAVE画面が正しく表示されることを確認し、既存のAPI経由設計や関数名、公開URLを変更しないように注意して作業を進めてください。
+1. Use `google.script.run` to call the `api_listItems` function.
+2. Console output the retrieved data for confirmation (not for display).
+3. Create a `render` function that takes an array as an argument and processes it in a loop.
+4. Display each item in HTML by outputting the data as a JSON string initially.
