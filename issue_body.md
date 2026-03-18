@@ -1,38 +1,30 @@
-# WAVE Web化 STEP1
+# WAVE Web化 STEP2
 
 ## MODE
 DIRECT
 
 ## GOAL
-api_listItems のデータを
-HTMLで一覧表示できる状態にする
+商品登録API api_createItem を作成し
+データを追加できるようにする
 
 ## PROJECT
 NETSHOP_GAS
 
 ## TARGET
-HTML一覧画面
+20_api_netshop.gs
 
 ## RULE
-- HTMLはシートを直接触らない
-- 必ず GAS API 経由
+- CONFIG.COLS を使用
+- HTMLは触らない
+- append処理のみ
 - 最小差分
-- 既存APIは変更しない
-- デバッグUIは禁止
+- 既存ロジック破壊禁止
 
 ## TASK
-1. google.script.run で api_listItems を呼ぶ
-
-2. 取得データをコンソール出力する
-   （表示ではなく確認）
-
-3. render関数を作る
-   - 配列を受け取る
-   - ループ処理
-
-4. 1行ずつHTMLに表示する
-   - まずはJSON文字列でもOK
+1. api_createItem(payload) を作成
+2. appendRow で1行追加
+3. ID生成（簡易でOK）
+4. 初期ステータス設定
 
 ## DONE CONDITION
-- api_listItems の返却が取得できる
-- HTMLに1件以上表示される
+- データが1件追加される
