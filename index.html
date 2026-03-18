@@ -99,6 +99,7 @@
           <input id="sellingPrice" type="number" placeholder="出品価格" min="0">
           <button id="createBtn" type="button" class="btn">商品登録</button>
           <button id="registerButton" type="button" class="btn">登録</button>
+          <button id="updateButton" type="button" class="btn">更新</button>
         </div>
       </section>
 
@@ -229,8 +230,15 @@
           .api_createItem(payload);
       }
 
+      function updateItem() {
+        var id = "固定値のid";
+        var payload = { key: "固定値のpayload" };
+        google.script.run.api_updateItem(id, payload);
+      }
+
       document.getElementById("createBtn").addEventListener("click", createItem);
       document.getElementById("registerButton").addEventListener("click", registerItem);
+      document.getElementById("updateButton").addEventListener("click", updateItem);
       fetchItems();
     </script>
   </body>

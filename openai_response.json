@@ -1,14 +1,14 @@
 {
-  "id": "chatcmpl-DKfux3MJl0d3N7ZLed9kKDlhj7fOb",
+  "id": "chatcmpl-DKg2RfaPDc8u8EQZhsWNTh1prUTka",
   "object": "chat.completion",
-  "created": 1773820063,
+  "created": 1773820527,
   "model": "gpt-4o-mini-2024-07-18",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "変更ファイル名  \n20_api_netshop.gs\n\n差分要約  \n新規関数 api_updateItem(id, payload) を追加し、指定された ID に基づいて既存データを更新できるようにします。\n\n```diff\n--- 20_api_netshop.gs\n+++ 20_api_netshop.gs\n@@ -0,0 +1,25 @@\n+function api_updateItem(id, payload) {\n+  // Spreadsheet を取得\n+  var ss = SpreadsheetApp.getActiveSpreadsheet();\n+  // CONFIG.SHEET_NAME のシートを取得\n+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);\n+  \n+  // 全データを取得\n+  var data = sheet.getDataRange().getValues();\n+  \n+  // ID列から対象行を検索\n+  var idIndex = CONFIG.COLS.ID; // ID列のインデックスを取得\n+  var rowIndex = -1;\n+  \n+  for (var i = 1; i < data.length; i++) { // ヘッダーをスキップ\n+    if (data[i][idIndex] == id) {\n+      rowIndex = i;\n+      break;\n+    }\n+  }\n+  \n+  // 該当行に対して payload の値で上書き更新\n+  if (rowIndex !== -1) {\n+    for (var key in payload) {\n+      var colIndex = CONFIG.COLS[key];\n+      if (colIndex !== undefined) {\n+        data[rowIndex][colIndex] = payload[key];\n+      }\n+    }\n+    sheet.getRange(rowIndex + 1, 1, 1, data[rowIndex].length).setValues([data[rowIndex]]);\n+    return { status: '成功', updatedData: data[rowIndex] };\n+  } else {\n+    return { status: '失敗', message: 'IDが見つかりません' };\n+  }\n+}\n``` \n\nCODEX_INSTRUCTION: 新規関数 api_updateItem を追加し、指定IDに基づいてデータを更新する。CONFIG.COLS を使用し、列番号をハードコードしないでください。シート操作はこの関数内のみにして、既存の api_createItem / api_listItems に影響を与えないようにしてください。",
+        "content": "変更ファイル名: index.html\n\n差分要約: 更新ボタンを追加し、ボタンクリック時に固定値のidとpayloadを使ってapi_updateItemを呼び出す更新処理関数を実装。\n\n```diff\n--- index.html\n+++ index.html\n@@ -1,5 +1,20 @@\n <!DOCTYPE html>\n <html>\n <head>\n     <title>NetShop</title>\n </head>\n <body>\n     <h1>商品一覧</h1>\n \n+    <!-- 更新ボタンの追加 -->\n+    <button id=\"updateButton\">更新</button>\n+\n+    <script>\n+        // 更新処理関数の追加\n+        function updateItem() {\n+            const id = '固定値のid'; // 固定値のid\n+            const payload = { key: '固定値のpayload' }; // 固定値のpayload\n+            google.script.run.api_updateItem(id, payload); // api_updateItemの呼び出し\n+        }\n+\n+        // ボタンクリック時に更新処理関数を呼び出す\n+        document.getElementById('updateButton').addEventListener('click', updateItem);\n+    </script>\n+\n </body>\n </html>\n```",
         "refusal": null,
         "annotations": []
       },
@@ -17,9 +17,9 @@
     }
   ],
   "usage": {
-    "prompt_tokens": 549,
-    "completion_tokens": 506,
-    "total_tokens": 1055,
+    "prompt_tokens": 523,
+    "completion_tokens": 278,
+    "total_tokens": 801,
     "prompt_tokens_details": {
       "cached_tokens": 0,
       "audio_tokens": 0
@@ -32,5 +32,5 @@
     }
   },
   "service_tier": "default",
-  "system_fingerprint": "fp_05da4e7c80"
+  "system_fingerprint": "fp_ca3e7d71bf"
 }
