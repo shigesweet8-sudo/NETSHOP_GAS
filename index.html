@@ -72,27 +72,17 @@
           .replace(/'/g, "&#39;");
       }
 
-      function renderTable(rows) {
-        if (!rows || !rows.length) {
+      function render(items) {
+        if (!Array.isArray(items) || items.length === 0) {
           document.getElementById("status").textContent = "データなし";
           document.getElementById("content").innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
           return;
         }
 
-        var html = "<table><thead><tr>";
-        rows[0].forEach(function(cell) {
-          html += "<th>" + escapeHtml(cell) + "</th>";
-        });
-        html += "</tr></thead><tbody>";
-
-        for (var i = 1; i < rows.length; i++) {
-          html += "<tr>";
-          rows[i].forEach(function(cell) {
-            html += "<td>" + escapeHtml(cell) + "</td>";
-          });
-          html += "</tr>";
+        var html = "";
+        for (var i = 0; i < items.length; i++) {
+          html += "<pre>" + escapeHtml(JSON.stringify(items[i])) + "</pre>";
         }
-        html += "</tbody></table>";
 
         document.getElementById("status").textContent = "読み込み完了";
         document.getElementById("content").innerHTML = html;
@@ -103,12 +93,19 @@
         document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(message) + "</span>";
       }
 
-      google.script.run
-        .withSuccessHandler(renderTable)
-        .withFailureHandler(function(err) {
-          showError((err && err.message) ? err.message : "データ取得に失敗しました。");
-        })
-        .api_listItems();
+      function fetchItems() {
+        google.script.run
+          .withSuccessHandler(function(items) {
+            console.log("api_listItems result:", items);
+            render(items);
+          })
+          .withFailureHandler(function(err) {
+            showError((err && err.message) ? err.message : "データ取得に失敗しました。");
+          })
+          .api_listItems();
+      }
+
+      fetchItems();
     </script>
   </body>
 </html>

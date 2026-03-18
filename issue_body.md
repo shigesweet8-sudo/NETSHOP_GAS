@@ -1,23 +1,38 @@
+# WAVE Web化 STEP1
+
 ## MODE
 DIRECT
 
 ## GOAL
-デプロイURLでWAVE画面を開いたときに「スクリプト関数が見つかりません: doGet」となる問題を解消し、WAVE画面を表示できる状態に戻す
-
-## CHANGE TYPE
-修正
+api_listItems のデータを
+HTMLで一覧表示できる状態にする
 
 ## PROJECT
 NETSHOP_GAS
 
-## MODULE
-WEBAPP
+## TARGET
+HTML一覧画面
 
-## TARGET FILE
-10_webapp.gs
+## RULE
+- HTMLはシートを直接触らない
+- 必ず GAS API 経由
+- 最小差分
+- 既存APIは変更しない
+- デバッグUIは禁止
 
 ## TASK
-1. doGet(e) を実装または復旧する
-2. デプロイURLアクセス時にWAVE画面が表示されるようにする
-3. 既存のAPI経由設計を維持する
-4. 既存の関数名や公開URL前提を壊さない
+1. google.script.run で api_listItems を呼ぶ
+
+2. 取得データをコンソール出力する
+   （表示ではなく確認）
+
+3. render関数を作る
+   - 配列を受け取る
+   - ループ処理
+
+4. 1行ずつHTMLに表示する
+   - まずはJSON文字列でもOK
+
+## DONE CONDITION
+- api_listItems の返却が取得できる
+- HTMLに1件以上表示される
