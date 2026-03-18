@@ -1,7 +1,7 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-WAVE STEP2-3 登録後一覧更新（api_listItems 再取得）
+WAVE STEP2-4 UI入力連携（フォーム取得＋登録＋一覧更新
 
 Changed Files
 codex_instruction.md, index.html, issue_body.md, openai_response.json

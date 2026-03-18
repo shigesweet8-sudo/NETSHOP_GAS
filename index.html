@@ -83,10 +83,10 @@
       <h1>WAVE</h1>
       <div class="card">
         <div class="form-row">
-          <input id="itemName" type="text" placeholder="商品名" required>
-          <input id="cost" type="number" placeholder="仕入額" min="0">
-          <input id="qty" type="number" placeholder="数量" min="1" value="1">
-          <input id="listPrice" type="number" placeholder="出品価格" min="0">
+          <input id="productName" type="text" placeholder="商品名" required>
+          <input id="purchasePrice" type="number" placeholder="仕入額" min="0">
+          <input id="quantity" type="number" placeholder="数量" min="1" value="1">
+          <input id="sellingPrice" type="number" placeholder="出品価格" min="0">
           <button id="createBtn" type="button" class="btn">商品登録</button>
           <button id="registerButton" type="button" class="btn">登録</button>
         </div>
@@ -162,12 +162,12 @@
 
       function createItem() {
         var button = document.getElementById("createBtn");
-        var itemName = document.getElementById("itemName").value.trim();
-        var cost = document.getElementById("cost").value;
-        var qty = document.getElementById("qty").value;
-        var listPrice = document.getElementById("listPrice").value;
+        var productName = document.getElementById("productName").value.trim();
+        var purchasePrice = document.getElementById("purchasePrice").value;
+        var quantity = document.getElementById("quantity").value;
+        var sellingPrice = document.getElementById("sellingPrice").value;
 
-        if (!itemName) {
+        if (!productName) {
           showError("商品名を入力してください。");
           return;
         }
@@ -182,16 +182,26 @@
             showError((err && err.message) ? err.message : "商品登録に失敗しました。");
           })
           .api_createItem({
-            itemName: itemName,
-            cost: cost ? Number(cost) : "",
-            qty: qty ? Number(qty) : 1,
-            listPrice: listPrice ? Number(listPrice) : ""
+            productName: productName,
+            purchasePrice: purchasePrice ? Number(purchasePrice) : "",
+            quantity: quantity ? Number(quantity) : 1,
+            sellingPrice: sellingPrice ? Number(sellingPrice) : ""
           });
       }
 
       function registerItem() {
         var button = document.getElementById("registerButton");
-        var payload = { key: "固定値" };
+        var payload = {
+          productName: document.getElementById("productName").value.trim(),
+          purchasePrice: document.getElementById("purchasePrice").value,
+          sellingPrice: document.getElementById("sellingPrice").value,
+          quantity: document.getElementById("quantity").value
+        };
+
+        if (!payload.productName) {
+          showError("商品名を入力してください。");
+          return;
+        }
 
         button.disabled = true;
         document.getElementById("status").textContent = "登録中...";
