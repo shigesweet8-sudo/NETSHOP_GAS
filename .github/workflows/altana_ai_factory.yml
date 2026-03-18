@@ -46,36 +46,29 @@ jobs:
           python scripts/gpt/issue_to_instruction.py
 
       - name: Create work branch
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          branch_name="feature/issue-${{ github.event.issue.number }}"
-          git checkout -b "$branch_name"
-          git push origin "$branch_name"
+          pwsh -File scripts/codex/run_codex_implementation.ps1 -Step create-work-branch
 
       - name: Configure AI Git author
         run: |
-          git config user.name "ALTANA-AI-BOT"
-          git config user.email "ai@altana.dev"
+          pwsh -File scripts/codex/run_codex_implementation.ps1 -Step configure-ai-git-author
 
       - name: Install Codex CLI
         run: |
-          npm install -g @openai/codex
+          pwsh -File scripts/codex/run_codex_implementation.ps1 -Step install-codex-cli
 
       - name: Run Codex implementation
         env:
           CODEX_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          cd "$GITHUB_WORKSPACE"
-          codex exec --sandbox danger-full-access "$(cat codex_instruction.md)"
+          pwsh -File scripts/codex/run_codex_implementation.ps1 -Step run-codex-implementation
 
       - name: Generate implementation diff
         id: implementation_diff
         run: |
-          git add -A
-          diff_path="$RUNNER_TEMP/implementation.diff"
-          git diff --cached --binary --no-color > "$diff_path"
-          echo "diff_path=$diff_path" >> "$GITHUB_OUTPUT"
+          pwsh -File scripts/codex/run_codex_implementation.ps1 -Step generate-implementation-diff
 
       - name: Review implementation diff
         env:
