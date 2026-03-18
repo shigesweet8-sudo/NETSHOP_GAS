@@ -15,10 +15,9 @@
         max-width: 1080px;
         margin: 0 auto;
         padding: 24px 16px 40px;
-      }
-      h1 {
-        margin: 0 0 16px;
-        font-size: 28px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
       }
       .card {
         background: #fff;
@@ -26,11 +25,18 @@
         border-radius: 12px;
         padding: 16px;
       }
+      .page-header h1 {
+        margin: 0;
+        font-size: 28px;
+      }
+      .section-title {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
       .form-row {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
         gap: 8px;
-        margin-bottom: 12px;
       }
       .form-row input {
         padding: 8px;
@@ -80,8 +86,12 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>WAVE</h1>
-      <div class="card">
+      <header class="card page-header">
+        <h1>WAVE NETSHOP</h1>
+      </header>
+
+      <section class="card" aria-label="登録エリア">
+        <h2 class="section-title">登録</h2>
         <div class="form-row">
           <input id="productName" type="text" placeholder="商品名" required>
           <input id="purchasePrice" type="number" placeholder="仕入額" min="0">
@@ -90,9 +100,13 @@
           <button id="createBtn" type="button" class="btn">商品登録</button>
           <button id="registerButton" type="button" class="btn">登録</button>
         </div>
+      </section>
+
+      <section class="card" aria-label="一覧エリア">
+        <h2 class="section-title">一覧</h2>
         <div id="status" class="status">読み込み中...</div>
         <div id="content" class="muted">データを取得しています。</div>
-      </div>
+      </section>
     </div>
 
     <script>

@@ -1,10 +1,11 @@
+
 # ALTANA AI FACTORY ISSUE（実装専用）
 
 ## MODE
 DIRECT
 
 ## GOAL
-フォーム入力値を取得して api_createItem に渡し、登録後に一覧を更新する
+既存機能を配置し、WAVE画面として成立するレイアウトを作成する
 
 ## CHANGE TYPE
 修正
@@ -22,19 +23,19 @@ index.html
 
 ## CHANGE DETAIL（実装内容）
 
-1. 入力要素に id を付与
-- 商品名 input
-- 仕入金額 input
-- 販売金額 input
-- 数量 input
+1. ヘッダーエリアを追加
+- タイトル「WAVE NETSHOP」
 
-2. 登録処理で入力値を取得し payload を構築
-- 各 input の値を取得
-- payload オブジェクトを作成
+2. 登録エリアを作成
+- 既存の入力フォームと登録ボタンを配置
 
-3. 登録ボタンクリックで api_createItem を呼び出し
-- payload を渡す
-- successHandler で api_listItems を呼び出し一覧更新
+3. 一覧エリアを作成
+- 既存の一覧表示部分を配置
+
+4. 各エリアを縦構造で整理
+- ヘッダー
+- 登録
+- 一覧
 
 ---
 
@@ -42,9 +43,9 @@ index.html
 
 - API変更禁止
 - index.html のみ変更
-- 列番号の定義禁止（HTML側に持たせない）
-- google.script.run を使用
-- 既存の一覧描画処理を使用
+- 既存の登録処理・一覧処理は変更しない
+- 新規ロジック追加禁止
+- レイアウトのみ変更
 - 最小差分
 - debugコード禁止
 - テスト処理禁止
@@ -53,11 +54,10 @@ index.html
 
 ## DONE CONDITION（完了条件）
 
-- 入力値を取得できる
-- api_createItem に payload が渡る
-- 登録後に一覧が更新される
-- 「データなし」から変化する
-- 既存機能に影響なし
+- ヘッダーが表示される
+- 登録エリアが分離されて表示される
+- 一覧エリアが分離されて表示される
+- 既存の登録・一覧機能がそのまま動作する
 
 ---
 
