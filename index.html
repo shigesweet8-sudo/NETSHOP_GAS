@@ -26,6 +26,31 @@
         border-radius: 12px;
         padding: 16px;
       }
+      .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .form-row input {
+        padding: 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+      .btn {
+        border: 0;
+        border-radius: 8px;
+        background: #2563eb;
+        color: #fff;
+        padding: 8px 14px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
       .status {
         margin-bottom: 12px;
         font-size: 14px;
@@ -57,6 +82,13 @@
     <div class="wrap">
       <h1>WAVE</h1>
       <div class="card">
+        <div class="form-row">
+          <input id="itemName" type="text" placeholder="商品名" required>
+          <input id="cost" type="number" placeholder="仕入額" min="0">
+          <input id="qty" type="number" placeholder="数量" min="1" value="1">
+          <input id="listPrice" type="number" placeholder="出品価格" min="0">
+          <button id="createBtn" type="button" class="btn">商品登録</button>
+        </div>
         <div id="status" class="status">読み込み中...</div>
         <div id="content" class="muted">データを取得しています。</div>
       </div>
@@ -105,6 +137,43 @@
           .api_listItems();
       }
 
+      function createItem() {
+        var button = document.getElementById("createBtn");
+        var itemName = document.getElementById("itemName").value.trim();
+        var cost = document.getElementById("cost").value;
+        var qty = document.getElementById("qty").value;
+        var listPrice = document.getElementById("listPrice").value;
+
+        if (!itemName) {
+          showError("商品名を入力してください。");
+          return;
+        }
+
+        button.disabled = true;
+        document.getElementById("status").textContent = "登録中...";
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            button.disabled = false;
+            if (!result || !result.ok) {
+              showError((result && result.error) ? result.error : "商品登録に失敗しました。");
+              return;
+            }
+            fetchItems();
+          })
+          .withFailureHandler(function(err) {
+            button.disabled = false;
+            showError((err && err.message) ? err.message : "商品登録に失敗しました。");
+          })
+          .api_createItem({
+            itemName: itemName,
+            cost: cost ? Number(cost) : "",
+            qty: qty ? Number(qty) : 1,
+            listPrice: listPrice ? Number(listPrice) : ""
+          });
+      }
+
+      document.getElementById("createBtn").addEventListener("click", createItem);
       fetchItems();
     </script>
   </body>
