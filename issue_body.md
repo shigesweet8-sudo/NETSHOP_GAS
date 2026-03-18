@@ -8,12 +8,12 @@ DIRECT
 ---
 
 ## GOAL
-api_createItem を実装し、商品データをシートへ追加できるようにする
+index.html から api_createItem を呼び出せるようにする
 
 ---
 
 ## CHANGE TYPE
-追加
+修正
 
 ---
 
@@ -23,49 +23,46 @@ NETSHOP_GAS
 ---
 
 ## MODULE
-API
+WEB UI
 
 ---
 
 ## TARGET FILE
-20_api_netshop.gs
+index.html
 
 ---
 
 ## CHANGE DETAIL（実装内容）
 
-1. 新規関数 api_createItem(payload) を追加
+1. 登録ボタンを追加
 
-2. 処理内容
-- Spreadsheet を取得
-- CONFIG.SHEET_NAME のシートを取得
-- 新規IDを生成
-- 初期ステータスを設定
-- payload の値を使用して1行データを作成
-- appendRow でシートに追加
+2. 登録処理関数を追加
 
-3. 戻り値
-- 追加したデータ（またはID）
+3. ボタンクリック時に api_createItem を呼び出す
+
+4. payload を固定値で構築する
+（UI入力はまだ使用しない）
 
 ---
 
 ## CONSTRAINT（制約）
 
-- 既存関数の変更禁止
-- CONFIG.COLS を使用すること
-- 列番号のハードコード禁止
+- API変更禁止
+- index.html 以外の変更禁止
+- UI入力取得は実装しない
+- payloadは固定値で作成
+- google.script.run を使用する
 - 最小差分で実装
-- シート直接操作はこの関数内のみ許可
-- HTMLとの直接結合禁止
+- debugコード追加禁止
+- テスト用処理追加禁止
 
 ---
 
 ## DONE CONDITION（完了条件）
 
-- api_createItem が存在する
-- シンタックスエラーがない
-- GASから呼び出し可能な global 関数である
-- 既存の api_listItems に影響がない
+- ボタンクリックで api_createItem が呼ばれる
+- エラーが発生しない
+- api_listItems に影響がない
 
 ---
 
@@ -84,7 +81,7 @@ API
 - テストしてください
 - 必要に応じて修正
 - 推測・憶測で実装
-- 既存コードの変更
+- APIファイル変更
 - 複数ファイル変更
 
 ---
