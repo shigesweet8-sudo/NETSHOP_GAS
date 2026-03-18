@@ -1,7 +1,7 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-WAVE STEP2-4 UI入力連携（フォーム取得＋登録＋一覧更新
+WAVE STEP2-5 画面構成（ヘッダー＋登録エリア＋一覧エリア）
 
 Changed Files
 codex_instruction.md, index.html, issue_body.md, openai_response.json
