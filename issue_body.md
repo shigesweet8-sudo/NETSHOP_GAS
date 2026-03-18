@@ -4,55 +4,53 @@
 DIRECT
 
 ## GOAL
-api_updateItem を実装し、ID指定で既存データを更新できるようにする
+index.html から api_updateItem を呼び出せるようにする
 
 ## CHANGE TYPE
-追加
+修正
 
 ## PROJECT
 NETSHOP_GAS
 
 ## MODULE
-API
+WEB UI
 
 ## TARGET FILE
-20_api_netshop.gs
+index.html
 
 ---
 
 ## CHANGE DETAIL（実装内容）
 
-1. 新規関数 api_updateItem(id, payload) を追加
+1. 更新ボタンを追加
 
-2. 処理内容
-- Spreadsheet を取得
-- CONFIG.SHEET_NAME のシートを取得
-- 全データを取得
-- ID列から対象行を検索
-- 該当行に対して payload の値で上書き更新
+2. 更新処理関数を追加
 
-3. 戻り値
-- 更新結果（成功 / 失敗 または更新データ）
+3. ボタンクリック時に api_updateItem を呼び出す
+
+4. id と payload は固定値で構築する
+（UI入力はまだ使用しない）
 
 ---
 
 ## CONSTRAINT（制約）
 
-- 既存関数の変更禁止
-- CONFIG.COLS を使用すること
-- 列番号のハードコード禁止
+- API変更禁止
+- index.html 以外の変更禁止
+- UI入力取得は実装しない
+- id と payload は固定値で作成
+- google.script.run を使用する
 - 最小差分で実装
-- シート操作はこの関数内のみ
-- HTMLとの直接結合禁止
+- debugコード追加禁止
+- テスト用処理追加禁止
 
 ---
 
 ## DONE CONDITION（完了条件）
 
-- api_updateItem が存在する
-- 指定IDのデータが更新できる
-- シンタックスエラーがない
-- 既存の api_createItem / api_listItems に影響がない
+- ボタンクリックで api_updateItem が呼ばれる
+- エラーが発生しない
+- 既存の登録・一覧機能に影響がない
 
 ---
 
@@ -69,6 +67,7 @@ API
 - 調査指示
 - 確認指示
 - テスト指示
-- 推測実装
-- 既存関数変更
+- 必要に応じて修正
+- 推測・憶測で実装
+- APIファイル変更
 - 複数ファイル変更
