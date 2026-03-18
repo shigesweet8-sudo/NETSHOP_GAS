@@ -165,14 +165,10 @@ jobs:
           pwsh -File scripts/slack/send_slack_notification.ps1
 
       - name: Commit and push AI changes
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
-          branch_name="feature/issue-${{ github.event.issue.number }}"
-          git add -A
-          git restore --staged .github/workflows/altana_ai_factory.yml 2>/dev/null || true
-          if ! git diff --cached --quiet; then
-            git commit -m "AI: implement issue #${{ github.event.issue.number }}"
-            git push origin "$branch_name"
-          fi
+          pwsh -File scripts/git/run_git_commit_push.ps1
       - name: Install GitHub CLI
         run: |
           sudo apt-get update
