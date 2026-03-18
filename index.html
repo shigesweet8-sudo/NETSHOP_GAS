@@ -126,16 +126,38 @@
         document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(message) + "</span>";
       }
 
+      function renderItemList(items) {
+        render(items);
+      }
+
       function fetchItems() {
         google.script.run
           .withSuccessHandler(function(items) {
             console.log("api_listItems result:", items);
-            render(items);
+            renderItemList(items);
           })
           .withFailureHandler(function(err) {
             showError((err && err.message) ? err.message : "データ取得に失敗しました。");
           })
           .api_listItems();
+      }
+
+      function successHandler(button) {
+        return function(result) {
+          button.disabled = false;
+          if (!result || !result.ok) {
+            showError((result && result.error) ? result.error : "商品登録に失敗しました。");
+            return;
+          }
+          google.script.run
+            .withSuccessHandler(function(items) {
+              renderItemList(items);
+            })
+            .withFailureHandler(function(err) {
+              showError((err && err.message) ? err.message : "データ取得に失敗しました。");
+            })
+            .api_listItems();
+        };
       }
 
       function createItem() {
@@ -154,14 +176,7 @@
         document.getElementById("status").textContent = "登録中...";
 
         google.script.run
-          .withSuccessHandler(function(result) {
-            button.disabled = false;
-            if (!result || !result.ok) {
-              showError((result && result.error) ? result.error : "商品登録に失敗しました。");
-              return;
-            }
-            fetchItems();
-          })
+          .withSuccessHandler(successHandler(button))
           .withFailureHandler(function(err) {
             button.disabled = false;
             showError((err && err.message) ? err.message : "商品登録に失敗しました。");
@@ -182,14 +197,7 @@
         document.getElementById("status").textContent = "登録中...";
 
         google.script.run
-          .withSuccessHandler(function(result) {
-            button.disabled = false;
-            if (!result || !result.ok) {
-              showError((result && result.error) ? result.error : "商品登録に失敗しました。");
-              return;
-            }
-            fetchItems();
-          })
+          .withSuccessHandler(successHandler(button))
           .withFailureHandler(function(err) {
             button.disabled = false;
             showError((err && err.message) ? err.message : "商品登録に失敗しました。");

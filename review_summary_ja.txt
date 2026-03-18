@@ -1,7 +1,7 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-AVE STEP2-2 UI→API接続（api_createItem 呼び出し
+WAVE STEP2-3 登録後一覧更新（api_listItems 再取得）
 
 Changed Files
 codex_instruction.md, index.html, issue_body.md, openai_response.json
