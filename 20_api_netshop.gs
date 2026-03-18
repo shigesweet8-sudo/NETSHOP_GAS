@@ -1,8 +1,9 @@
 /**
  * 商品一覧をシートから取得して返却する。
+ * @param {Object=} filter
  * @returns {Array<Array<*>>}
  */
-function api_listItems() {
+function api_listItems(filter) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     if (!ss) return [];
@@ -14,7 +15,46 @@ function api_listItems() {
     var lastColumn = sheet.getLastColumn();
     if (lastRow === 0 || lastColumn === 0) return [];
 
-    return sheet.getDataRange().getValues();
+    var values = sheet.getDataRange().getValues();
+    var inputFilter = (filter && typeof filter === 'object') ? filter : {};
+    if (Object.keys(inputFilter).length === 0) return values;
+
+    var col = CONFIG.COLS;
+    var conditions = [
+      { key: 'status', colIndex: col.STATUS - 1 },
+      { key: 'id', colIndex: col.ID - 1 },
+      { key: 'staff', colIndex: col.STAFF - 1 },
+      { key: 'shop', colIndex: col.SHOP - 1 },
+      { key: 'itemName', colIndex: col.ITEM_NAME - 1 }
+    ];
+
+    var header = values[0];
+    var dataRows = values.slice(1);
+
+    var filtered = dataRows.filter(function(row) {
+      for (var i = 0; i < conditions.length; i++) {
+        var cond = conditions[i];
+        var filterValue = inputFilter[cond.key];
+        if (filterValue === undefined || filterValue === null || filterValue === '') continue;
+
+        var cellValue = row[cond.colIndex];
+        var normalizedCell = String(cellValue === undefined || cellValue === null ? '' : cellValue).toLowerCase();
+        var normalizedFilter = String(filterValue).toLowerCase();
+        if (normalizedCell.indexOf(normalizedFilter) === -1) return false;
+      }
+
+      if (inputFilter.keyword !== undefined && inputFilter.keyword !== null && inputFilter.keyword !== '') {
+        var keyword = String(inputFilter.keyword).toLowerCase();
+        var matched = row.some(function(value) {
+          return String(value === undefined || value === null ? '' : value).toLowerCase().indexOf(keyword) !== -1;
+        });
+        if (!matched) return false;
+      }
+
+      return true;
+    });
+
+    return [header].concat(filtered);
   } catch (error) {
     Logger.log('api_listItems error: ' + error);
     return [];

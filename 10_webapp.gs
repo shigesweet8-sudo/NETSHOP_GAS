@@ -10,3 +10,14 @@ function doGet(e) {
     .createHtmlOutputFromFile('index')
     .setTitle('WAVE');
 }
+
+/**
+ * Webアプリからの商品一覧取得エントリポイント。
+ * API層に委譲してシートデータを返却する。
+ *
+ * @param {Object=} filter
+ * @returns {Array<Array<*>>}
+ */
+function web_listItems(filter) {
+  return api_listItems(filter);
+}

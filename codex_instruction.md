@@ -1,1 +1,1 @@
-ヘッダー、登録エリア、および一覧エリアを追加して、WAVE画面のレイアウトを縦構造で整理してください。既存の機能は変更せず、そのまま動作するように配置してください。
+Create an API named api_listItems(filter) in 20_api_netshop.gs to fetch the product list based on the provided filter and modify 10_webapp.gs to call this API correctly. Ensure that the API does not perform direct operations on the HTML but interacts through the appropriate GAS API structure.

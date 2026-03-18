@@ -1,79 +1,152 @@
+# ALTANA AI FACTORY ISSUE
 
-# ALTANA AI FACTORY ISSUE（実装専用）
+---
+## MODE
+DIRECT / PLAN
+# ALTANA AI FACTORY ISSUE
+
+---
 
 ## MODE
-DIRECT
+
+DIRECT / PLAN
+
+### DIRECT 条件
+・変更ファイル 1つ  
+・TASK 3以下  
+・軽微修正  
+・単一関数追加/修正/削除  
+
+### PLAN 条件
+・変更ファイル 複数  
+・TASK 4以上  
+・機能追加  
+・構造変更  
+・API追加  
+・削除 + 追加 + 移動 を含む  
+
+---
 
 ## GOAL
-既存機能を配置し、WAVE画面として成立するレイアウトを作成する
+
+このIssueの目的
+
+例
+
+商品一覧取得APIを作成する
+
+---
 
 ## CHANGE TYPE
-修正
+
+追加  
+修正  
+削除  
+移動  
+
+※複数可
+
+---
 
 ## PROJECT
-NETSHOP_GAS
+
+例
+
+NETSHOP_GAS  
+ALTANA_GAS  
+
+---
 
 ## MODULE
-WEB UI
+
+例
+
+API  
+UI  
+DATABASE  
+
+---
 
 ## TARGET FILE
-index.html
+
+変更対象ファイル
+
+例
+
+20_api_netshop.gs  
+10_webapp.gs  
 
 ---
 
-## CHANGE DETAIL（実装内容）
+## TASK
 
-1. ヘッダーエリアを追加
-- タイトル「WAVE NETSHOP」
+TASK1
 
-2. 登録エリアを作成
-- 既存の入力フォームと登録ボタンを配置
+TASK2
 
-3. 一覧エリアを作成
-- 既存の一覧表示部分を配置
+TASK3
 
-4. 各エリアを縦構造で整理
-- ヘッダー
-- 登録
-- 一覧
+TASK4
 
----
+例
 
-## CONSTRAINT（制約）
+TASK1  
+10_webapp.gs  
+api_listItems 削除  
 
-- API変更禁止
-- index.html のみ変更
-- 既存の登録処理・一覧処理は変更しない
-- 新規ロジック追加禁止
-- レイアウトのみ変更
-- 最小差分
-- debugコード禁止
-- テスト処理禁止
+TASK2  
+20_api_netshop.gs  
+api_listItems 追加  
 
 ---
 
-## DONE CONDITION（完了条件）
+## SPEC
 
-- ヘッダーが表示される
-- 登録エリアが分離されて表示される
-- 一覧エリアが分離されて表示される
-- 既存の登録・一覧機能がそのまま動作する
+実装仕様
+
+例
+
+API名  
+api_listItems(filter)
+
+処理  
+
+管理シート取得  
+商品一覧返却  
 
 ---
 
-## OUTPUT FORMAT
+## EXPECT RESULT
 
-- 変更ファイル名
-- 差分要約
-- diff --git
+実装後の状態
+
+例
+
+api_listItems は  
+20_api_netshop.gs のみ存在  
 
 ---
 
-## NG
+## REVIEW CHECK
 
-- 調査指示
-- 確認指示
-- テスト指示
-- 推測実装
-- API変更
-- 複数ファイル変更
+AIレビュー確認項目
+
+・関数重複  
+・削除タスク確認  
+・追加タスク確認  
+・移動タスク確認  
+
+---
+
+## NOTE
+
+重要ルール
+
+HTMLはシートを直接操作しない
+
+HTML  
+↓  
+GAS API  
+↓  
+Spreadsheet
+

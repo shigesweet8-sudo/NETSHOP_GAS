@@ -1,10 +1,10 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-WAVE STEP2-5 画面構成（ヘッダー＋登録エリア＋一覧エリア）
+[FACTORY]
 
 Changed Files
-codex_instruction.md, index.html, issue_body.md, openai_response.json
+10_webapp.gs, 20_api_netshop.gs, codex_instruction.md, issue_body.md, issue_tasks.md (+1 more)
 
 Risk
 SAFE
