@@ -1,63 +1,58 @@
-
 # ALTANA AI FACTORY ISSUE（実装専用）
 
 ## MODE
 DIRECT
 
 ## GOAL
-既存機能を配置し、WAVE画面として成立するレイアウトを作成する
+api_updateItem を実装し、ID指定で既存データを更新できるようにする
 
 ## CHANGE TYPE
-修正
+追加
 
 ## PROJECT
 NETSHOP_GAS
 
 ## MODULE
-WEB UI
+API
 
 ## TARGET FILE
-index.html
+20_api_netshop.gs
 
 ---
 
 ## CHANGE DETAIL（実装内容）
 
-1. ヘッダーエリアを追加
-- タイトル「WAVE NETSHOP」
+1. 新規関数 api_updateItem(id, payload) を追加
 
-2. 登録エリアを作成
-- 既存の入力フォームと登録ボタンを配置
+2. 処理内容
+- Spreadsheet を取得
+- CONFIG.SHEET_NAME のシートを取得
+- 全データを取得
+- ID列から対象行を検索
+- 該当行に対して payload の値で上書き更新
 
-3. 一覧エリアを作成
-- 既存の一覧表示部分を配置
-
-4. 各エリアを縦構造で整理
-- ヘッダー
-- 登録
-- 一覧
+3. 戻り値
+- 更新結果（成功 / 失敗 または更新データ）
 
 ---
 
 ## CONSTRAINT（制約）
 
-- API変更禁止
-- index.html のみ変更
-- 既存の登録処理・一覧処理は変更しない
-- 新規ロジック追加禁止
-- レイアウトのみ変更
-- 最小差分
-- debugコード禁止
-- テスト処理禁止
+- 既存関数の変更禁止
+- CONFIG.COLS を使用すること
+- 列番号のハードコード禁止
+- 最小差分で実装
+- シート操作はこの関数内のみ
+- HTMLとの直接結合禁止
 
 ---
 
 ## DONE CONDITION（完了条件）
 
-- ヘッダーが表示される
-- 登録エリアが分離されて表示される
-- 一覧エリアが分離されて表示される
-- 既存の登録・一覧機能がそのまま動作する
+- api_updateItem が存在する
+- 指定IDのデータが更新できる
+- シンタックスエラーがない
+- 既存の api_createItem / api_listItems に影響がない
 
 ---
 
@@ -75,5 +70,5 @@ index.html
 - 確認指示
 - テスト指示
 - 推測実装
-- API変更
+- 既存関数変更
 - 複数ファイル変更

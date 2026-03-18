@@ -83,3 +83,90 @@ function api_createItem(payload) {
     };
   }
 }
+
+/**
+ * 指定IDの商品を更新する。
+ * @param {string} id
+ * @param {Object} payload
+ * @returns {{ok: boolean, id: string, row: number, updatedFields: Array<string>}|{ok: boolean, error: string}}
+ */
+function api_updateItem(id, payload) {
+  try {
+    if (!id) throw new Error('id is required');
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss) throw new Error('Spreadsheet not found');
+
+    var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+    if (!sheet) throw new Error('Sheet not found: ' + CONFIG.SHEET_NAME);
+
+    var col = CONFIG.COLS;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) throw new Error('No data rows found');
+
+    var idValues = sheet.getRange(2, col.ID, lastRow - 1, 1).getValues();
+    var targetRow = -1;
+    for (var i = 0; i < idValues.length; i++) {
+      if (String(idValues[i][0]) === String(id)) {
+        targetRow = i + 2;
+        break;
+      }
+    }
+    if (targetRow === -1) throw new Error('ID not found: ' + id);
+
+    var data = payload || {};
+    var updatableCols = {
+      status: col.STATUS,
+      staff: col.STAFF,
+      date: col.DATE,
+      productRegDate: col.PRODUCT_REG_DATE,
+      shop: col.SHOP,
+      itemName: col.ITEM_NAME,
+      cost: col.COST,
+      storage: col.STORAGE,
+      qty: col.QTY,
+      listPrice: col.LIST_PRICE,
+      negotiatedPrice: col.NEGOTIATED_PRICE,
+      priceFinal: col.PRICE_FINAL,
+      fee: col.FEE,
+      shipping: col.SHIPPING,
+      shipFrom: col.SHIP_FROM,
+      memo: col.MEMO,
+      customer: col.CUSTOMER,
+      carrier: col.CARRIER,
+      tracking: col.TRACKING,
+      zip: col.ZIP,
+      pref: col.PREF,
+      addr2: col.ADDR2,
+      addr3: col.ADDR3,
+      phone: col.PHONE
+    };
+
+    var rowValues = sheet.getRange(targetRow, 1, 1, CONFIG.HEADERS.length).getValues()[0];
+    var updatedFields = [];
+
+    Object.keys(updatableCols).forEach(function(key) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        rowValues[updatableCols[key] - 1] = data[key];
+        updatedFields.push(key);
+      }
+    });
+
+    if (updatedFields.length === 0) throw new Error('No updatable fields in payload');
+
+    sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+
+    return {
+      ok: true,
+      id: String(id),
+      row: targetRow,
+      updatedFields: updatedFields
+    };
+  } catch (error) {
+    Logger.log('api_updateItem error: ' + error);
+    return {
+      ok: false,
+      error: String(error)
+    };
+  }
+}
