@@ -1,7 +1,7 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-# ALTANA AI FACTORY ISSUE（実装専用）2
+AVE STEP2-2 UI→API接続（api_createItem 呼び出し
 
 Changed Files
 codex_instruction.md, index.html, issue_body.md, openai_response.json
