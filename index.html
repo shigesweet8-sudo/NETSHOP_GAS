@@ -88,7 +88,7 @@
           <input id="qty" type="number" placeholder="数量" min="1" value="1">
           <input id="listPrice" type="number" placeholder="出品価格" min="0">
           <button id="createBtn" type="button" class="btn">商品登録</button>
-          <button id="register-button" type="button" class="btn">登録</button>
+          <button id="registerButton" type="button" class="btn">登録</button>
         </div>
         <div id="status" class="status">読み込み中...</div>
         <div id="content" class="muted">データを取得しています。</div>
@@ -175,8 +175,8 @@
       }
 
       function registerItem() {
-        var button = document.getElementById("register-button");
-        var payload = { fixedValue: "sample" };
+        var button = document.getElementById("registerButton");
+        var payload = { key: "固定値" };
 
         button.disabled = true;
         document.getElementById("status").textContent = "登録中...";
@@ -198,7 +198,7 @@
       }
 
       document.getElementById("createBtn").addEventListener("click", createItem);
-      document.getElementById("register-button").addEventListener("click", registerItem);
+      document.getElementById("registerButton").addEventListener("click", registerItem);
       fetchItems();
     </script>
   </body>
