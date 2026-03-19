@@ -1,246 +1,41 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>WAVE</title>
-    <style>
-      body {
-        margin: 0;
-        font-family: "Noto Sans JP", sans-serif;
-        background: #f7f9fc;
-        color: #1f2937;
-      }
-      .wrap {
-        max-width: 1080px;
-        margin: 0 auto;
-        padding: 24px 16px 40px;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-      .card {
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        padding: 16px;
-      }
-      .page-header h1 {
-        margin: 0;
-        font-size: 28px;
-      }
-      .section-title {
-        margin: 0 0 12px;
-        font-size: 18px;
-      }
-      .form-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-        gap: 8px;
-      }
-      .form-row input {
-        padding: 8px;
-        border: 1px solid #d1d5db;
-        border-radius: 8px;
-        font-size: 14px;
-      }
-      .btn {
-        border: 0;
-        border-radius: 8px;
-        background: #2563eb;
-        color: #fff;
-        padding: 8px 14px;
-        font-size: 14px;
-        cursor: pointer;
-      }
-      .btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-      .status {
-        margin-bottom: 12px;
-        font-size: 14px;
-        color: #4b5563;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th, td {
-        border: 1px solid #e5e7eb;
-        padding: 8px;
-        font-size: 13px;
-        text-align: left;
-      }
-      th {
-        background: #f3f4f6;
-        font-weight: 700;
-      }
-      tbody tr:nth-child(even) {
-        background: #fafafa;
-      }
-      .muted {
-        color: #6b7280;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <header class="card page-header">
-        <h1>WAVE NETSHOP</h1>
-      </header>
-
-      <section class="card" aria-label="登録エリア">
-        <h2 class="section-title">登録</h2>
-        <div class="form-row">
-          <input id="productName" type="text" placeholder="商品名" required>
-          <input id="purchasePrice" type="number" placeholder="仕入額" min="0">
-          <input id="quantity" type="number" placeholder="数量" min="1" value="1">
-          <input id="sellingPrice" type="number" placeholder="出品価格" min="0">
-          <button id="createBtn" type="button" class="btn">商品登録</button>
-          <button id="registerButton" type="button" class="btn">登録</button>
-          <button id="updateButton" type="button" class="btn">更新</button>
-        </div>
-      </section>
-
-      <section class="card" aria-label="一覧エリア">
-        <h2 class="section-title">一覧</h2>
-        <div id="status" class="status">読み込み中...</div>
-        <div id="content" class="muted">データを取得しています。</div>
-      </section>
-    </div>
-
+<head>
+    <title>Items List</title>
     <script>
-      function escapeHtml(value) {
-        return String(value == null ? "" : value)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#39;");
-      }
-
-      function render(items) {
-        if (!Array.isArray(items) || items.length === 0) {
-          document.getElementById("status").textContent = "データなし";
-          document.getElementById("content").innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
-          return;
+        function displayItems() {
+            google.script.run.withSuccessHandler(renderItems).api_listItems();
         }
 
-        var html = "";
-        for (var i = 0; i < items.length; i++) {
-          html += "<pre>" + escapeHtml(JSON.stringify(items[i])) + "</pre>";
+        function renderItems(rows) {
+            const table = document.createElement('table');
+            const header = rows[0];
+            const data = rows.slice(1);
+
+            // Create header row
+            const headerRow = document.createElement('tr');
+            header.forEach(cell => {
+                const th = document.createElement('th');
+                th.textContent = cell;
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+
+            // Create data rows
+            data.forEach(row => {
+                const dataRow = document.createElement('tr');
+                row.forEach(cell => {
+                    const td = document.createElement('td');
+                    td.textContent = cell;
+                    dataRow.appendChild(td);
+                });
+                table.appendChild(dataRow);
+            });
+
+            document.body.appendChild(table);
         }
-
-        document.getElementById("status").textContent = "読み込み完了";
-        document.getElementById("content").innerHTML = html;
-      }
-
-      function showError(message) {
-        document.getElementById("status").textContent = "エラー";
-        document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(message) + "</span>";
-      }
-
-      function renderItemList(items) {
-        render(items);
-      }
-
-      function fetchItems() {
-        google.script.run
-          .withSuccessHandler(function(items) {
-            console.log("api_listItems result:", items);
-            renderItemList(items);
-          })
-          .withFailureHandler(function(err) {
-            showError((err && err.message) ? err.message : "データ取得に失敗しました。");
-          })
-          .api_listItems();
-      }
-
-      function successHandler(button) {
-        return function(result) {
-          button.disabled = false;
-          if (!result || !result.ok) {
-            showError((result && result.error) ? result.error : "商品登録に失敗しました。");
-            return;
-          }
-          google.script.run
-            .withSuccessHandler(function(items) {
-              renderItemList(items);
-            })
-            .withFailureHandler(function(err) {
-              showError((err && err.message) ? err.message : "データ取得に失敗しました。");
-            })
-            .api_listItems();
-        };
-      }
-
-      function createItem() {
-        var button = document.getElementById("createBtn");
-        var productName = document.getElementById("productName").value.trim();
-        var purchasePrice = document.getElementById("purchasePrice").value;
-        var quantity = document.getElementById("quantity").value;
-        var sellingPrice = document.getElementById("sellingPrice").value;
-
-        if (!productName) {
-          showError("商品名を入力してください。");
-          return;
-        }
-
-        button.disabled = true;
-        document.getElementById("status").textContent = "登録中...";
-
-        google.script.run
-          .withSuccessHandler(successHandler(button))
-          .withFailureHandler(function(err) {
-            button.disabled = false;
-            showError((err && err.message) ? err.message : "商品登録に失敗しました。");
-          })
-          .api_createItem({
-            productName: productName,
-            purchasePrice: purchasePrice ? Number(purchasePrice) : "",
-            quantity: quantity ? Number(quantity) : 1,
-            sellingPrice: sellingPrice ? Number(sellingPrice) : ""
-          });
-      }
-
-      function registerItem() {
-        var button = document.getElementById("registerButton");
-        var payload = {
-          productName: document.getElementById("productName").value.trim(),
-          purchasePrice: document.getElementById("purchasePrice").value,
-          sellingPrice: document.getElementById("sellingPrice").value,
-          quantity: document.getElementById("quantity").value
-        };
-
-        if (!payload.productName) {
-          showError("商品名を入力してください。");
-          return;
-        }
-
-        button.disabled = true;
-        document.getElementById("status").textContent = "登録中...";
-
-        google.script.run
-          .withSuccessHandler(successHandler(button))
-          .withFailureHandler(function(err) {
-            button.disabled = false;
-            showError((err && err.message) ? err.message : "商品登録に失敗しました。");
-          })
-          .api_createItem(payload);
-      }
-
-      function updateItem() {
-        var id = "固定値のid";
-        var payload = { key: "固定値のpayload" };
-        google.script.run.api_updateItem(id, payload);
-      }
-
-      document.getElementById("createBtn").addEventListener("click", createItem);
-      document.getElementById("registerButton").addEventListener("click", registerItem);
-      document.getElementById("updateButton").addEventListener("click", updateItem);
-      fetchItems();
     </script>
-    <script>api_updateItem();</script>
-  </body>
+</head>
+<body onload="displayItems()">
+</body>
 </html>
