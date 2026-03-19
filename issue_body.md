@@ -10,7 +10,7 @@ PLAN
 
 ## GOAL
 
-商品データをCSV形式で出力するAPIを実装し、Web画面からCSVダウンロードを可能にする
+売上・利益などのダッシュボード集計情報を取得するAPIを実装し、Web画面で指標表示を可能にする
 
 ---
 
@@ -42,51 +42,52 @@ API
 
 TASK1
 20_api_netshop.gs
-exportCsv(filter) を新規追加
+getDashboardSummary(filter) を新規追加
 
 TASK2
 20_api_netshop.gs
-listItems(filter) を利用してデータ取得
+listItems(filter) を利用して対象データ取得
 
 TASK3
 20_api_netshop.gs
-オブジェクト配列をCSV文字列へ変換
+総販売数・総売上・総手数料・総送料・総仕入・総利益を算出
 
 TASK4
 20_api_netshop.gs
-BOM付きUTF-8形式で返却
+利益率（profit / sales * 100）を算出
 
 ---
 
 ## SPEC
 
 API名
-exportCsv(filter)
+getDashboardSummary(filter)
 
 処理
 
 1. listItems(filter) を呼び出しデータ取得
-2. データが空の場合は空文字を返す
-3. ヘッダー行を生成（オブジェクトキー）
-4. 各行データをCSV形式に変換
-5. カンマ区切り、改行区切りで文字列生成
-6. 文字列先頭に BOM（\uFEFF）を付与
-7. CSV文字列を返却
+2. データが空の場合はすべて0で返却
+3. 以下を算出
 
-補足
+- totalCount（件数）
+- totalSales（売上）
+- totalFee（手数料）
+- totalShipping（送料）
+- totalCost（仕入）
+- totalProfit（利益）
+- profitRate（利益率）
 
-・ダブルクォートで値を囲む  
-・値内のダブルクォートはエスケープする  
-・null / undefined は空文字扱い  
+4. 各値は数値として返却
+5. profitRate は 0除算防止
 
 ---
 
 ## EXPECT RESULT
 
-- exportCsv は 20_api_netshop.gs のみ存在する
-- CSV文字列が生成される
-- 日本語文字化けしない
-- フィルタ条件で絞り込み可能
+- getDashboardSummary は 20_api_netshop.gs のみ存在する
+- 数値集計が正しく返る
+- 空データでもエラーにならない
+- filter による絞り込みが可能
 
 ---
 
@@ -94,9 +95,8 @@ exportCsv(filter)
 
 ・関数重複なし  
 ・listItems を利用している  
-・CSV変換処理がある  
-・BOM付与されている  
-・エスケープ処理がある  
+・数値計算が正しい  
+・0除算対策あり  
 
 ---
 

@@ -1,7 +1,5 @@
-1. 20_api_netshop.gs に exportCsv(filter) 関数を新規追加する。
-2. exportCsv 内で listItems(filter) を呼び出してデータ取得する処理を実装する。
-3. 取得したデータが空の場合に空文字を返す処理を追加する。
-4. ヘッダー行をオブジェクトキーから生成するロジックを追加する。
-5. 各行データをCSV形式に変換し、カンマ区切りと改行区切りで文字列を生成する処理を実装する。
-6. 文字列の先頭に BOM（\uFEFF）を付与する処理を追加する。
-7. 最後にCSV文字列を返却するロジックを組み込む。
+1. Add the function getDashboardSummary(filter) in 20_api_netshop.gs.
+2. Call listItems(filter) within getDashboardSummary to retrieve the data.
+3. Calculate totalCount, totalSales, totalFee, totalShipping, totalCost, and totalProfit based on the retrieved data.
+4. Compute profitRate using the formula (totalProfit / totalSales * 100), ensuring to handle division by zero.
+5. Ensure that the function returns all values as numerical types and handles empty data gracefully.

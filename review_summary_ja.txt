@@ -1,7 +1,7 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-CSV出力API exportCsv を新規実装する
+ダッシュボード取得API getDashboardSummary を新規実装する
 
 Changed Files
 20_api_netshop.gs, codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
