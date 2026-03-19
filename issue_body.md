@@ -10,7 +10,7 @@ PLAN
 
 ## GOAL
 
-商品のステータスを更新するAPIを実装し、Web画面から進行状態を変更できる状態にする
+商品の金額項目から粗利を再計算するAPIを実装し、Web画面から計算結果を取得できる状態にする
 
 ---
 
@@ -42,22 +42,22 @@ API
 
 TASK1
 20_api_netshop.gs
-updateItemStatus(itemId, status, memo) を新規追加
+recalculateItemProfit(itemId) を新規追加
 
 TASK2
 20_api_netshop.gs
-管理IDで対象行を特定し、ステータス列を更新する処理を実装
+対象データの金額項目を取得し、粗利計算ロジックを実装
 
 TASK3
 20_api_netshop.gs
-ステータス更新後の必要日付反映と更新後データ返却処理を実装
+計算結果を更新し、更新後データを返却する処理を実装
 
 ---
 
 ## SPEC
 
 API名
-updateItemStatus(itemId, status, memo)
+recalculateItemProfit(itemId)
 
 処理
 
@@ -66,17 +66,20 @@ updateItemStatus(itemId, status, memo)
 3. ヘッダー行とデータ行を分離
 4. 管理ID列を基準に itemId と一致する対象行を検索
 5. 対象行が存在しない場合は null を返却
-6. ステータス列を status で更新する
-7. DATE 列には更新日時を設定する
-8. status が 商品登録 で、商品登録日列が空の場合のみ 商品登録日 を設定する
-9. memo が指定されている場合はメモ列を更新する
-10. 更新後の1件データを getItem(itemId) で取得して返却する
+6. 以下の値を取得する
+　- 仕入れ値
+　- 決済金額
+　- サイト利用料
+　- 配送料
+7. 粗利を計算する  
+　粗利 = 決済金額 - サイト利用料 - 配送料 - 仕入れ値
+8. 粗利列に計算結果を書き込む
+9. 更新後の1件データを getItem(itemId) で取得して返却する
 
 補足
+- 計算対象の値が未入力の場合は 0 として扱う
 - 管理IDは変更しない
 - 個人情報列は返却対象から除外する
-- DATE はステータス更新時に毎回更新する
-- 商品登録日は初回のみ設定する
 
 返却対象から除外する列
 - 購入者名
@@ -90,11 +93,10 @@ updateItemStatus(itemId, status, memo)
 
 ## EXPECT RESULT
 
-- updateItemStatus は 20_api_netshop.gs のみ存在する
-- 管理IDで対象1件のステータス更新ができる
-- DATE が更新される
-- 商品登録日は初回のみ設定される
-- memo 指定時はメモが更新される
+- recalculateItemProfit は 20_api_netshop.gs のみ存在する
+- 管理IDで対象1件の粗利再計算ができる
+- 粗利が正しく計算される
+- 計算結果がシートに反映される
 - 更新後データをオブジェクトで返す
 - 一致しない場合は null を返す
 
@@ -103,12 +105,10 @@ updateItemStatus(itemId, status, memo)
 ## REVIEW CHECK
 
 ・関数重複なし
-・updateItemStatus が新規追加されている
+・recalculateItemProfit が新規追加されている
 ・管理ID検索になっている
-・ステータス列更新になっている
-・DATE 更新が入っている
-・商品登録日が初回のみ設定になっている
-・memo 更新が入っている
+・粗利計算式が正しい
+・シートへ反映されている
 ・個人情報除外が実装されている
 ・一致なしで null 返却になっている
 
