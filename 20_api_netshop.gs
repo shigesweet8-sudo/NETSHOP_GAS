@@ -278,6 +278,54 @@ function updateItemStatus(itemId, status, memo) {
 }
 
 /**
+ * 指定IDの商品粗利を再計算し、更新後データ（個人情報除外）を返却する。
+ * 粗利 = 決済金額 - サイト利用料 - 配送料 - 仕入れ値
+ * @param {string} itemId
+ * @returns {Object|null}
+ */
+function recalculateItemProfit(itemId) {
+  if (!itemId) return null;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return null;
+
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) return null;
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+
+  var headers = values[0];
+  var dataRows = values.slice(1);
+  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
+  if (idColIndex === -1) return null;
+
+  var targetIndex = -1;
+  for (var i = 0; i < dataRows.length; i++) {
+    if (String(dataRows[i][idColIndex]) === String(itemId)) {
+      targetIndex = i;
+      break;
+    }
+  }
+  if (targetIndex === -1) return null;
+
+  var rowValues = dataRows[targetIndex].slice();
+  var col = CONFIG.COLS;
+
+  var cost = parseFloat(rowValues[col.COST - 1]) || 0;
+  var sale = parseFloat(rowValues[col.PRICE_FINAL - 1]) || 0;
+  var fee = parseFloat(rowValues[col.FEE - 1]) || 0;
+  var shipping = parseFloat(rowValues[col.SHIPPING - 1]) || 0;
+  var profit = sale - fee - shipping - cost;
+
+  rowValues[col.PROFIT - 1] = profit;
+  var sheetRow = targetIndex + 2;
+  sheet.getRange(sheetRow, 1, 1, rowValues.length).setValues([rowValues]);
+
+  return getItem(itemId);
+}
+
+/**
  * 指定IDの商品を更新する。
  * @param {string} id
  * @param {Object} payload
