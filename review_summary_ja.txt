@@ -1,10 +1,10 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-郵便番号住所取得API lookupAddressByZip を新規実装する
+CSV出力API exportCsv を新規実装する
 
 Changed Files
-02_triggers.gs, codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
+20_api_netshop.gs, codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
 
 Risk
 SAFE
