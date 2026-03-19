@@ -1,7 +1,7 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-商品更新API updateItem を新規実装する
+ステータス更新API updateItemStatus を新規実装する
 
 Changed Files
 20_api_netshop.gs, codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
