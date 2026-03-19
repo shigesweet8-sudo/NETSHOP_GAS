@@ -1,111 +1,57 @@
-# ALTANA AI FACTORY ISSUE
-
----
-
 ## MODE
-
 PLAN
 
----
-
 ## GOAL
-
-売上・利益などのダッシュボード集計情報を取得するAPIを実装し、Web画面で指標表示を可能にする
-
----
+listItems APIの返却形式（オブジェクト配列）にUIを対応させる
 
 ## CHANGE TYPE
-
-追加
-
----
+修正
 
 ## PROJECT
-
 NETSHOP_GAS
 
----
-
 ## MODULE
-
-API
-
----
+UI
 
 ## TARGET FILE
-
-20_api_netshop.gs
-
----
+index.html
 
 ## TASK
 
 TASK1
-20_api_netshop.gs
-getDashboardSummary(filter) を新規追加
+index.html
+renderTable関数修正
 
 TASK2
-20_api_netshop.gs
-listItems(filter) を利用して対象データ取得
+Object.keys を使ってヘッダー生成
 
 TASK3
-20_api_netshop.gs
-総販売数・総売上・総手数料・総送料・総仕入・総利益を算出
-
-TASK4
-20_api_netshop.gs
-利益率（profit / sales * 100）を算出
-
----
+Object.values を使って行描画
 
 ## SPEC
 
-API名
-getDashboardSummary(filter)
+listItems() はオブジェクト配列を返す
 
-処理
+例
+[{商品名:"A",価格:1000}]
 
-1. listItems(filter) を呼び出しデータ取得
-2. データが空の場合はすべて0で返却
-3. 以下を算出
+renderTable は以下に変更
 
-- totalCount（件数）
-- totalSales（売上）
-- totalFee（手数料）
-- totalShipping（送料）
-- totalCost（仕入）
-- totalProfit（利益）
-- profitRate（利益率）
+ヘッダー
+Object.keys(items[0])
 
-4. 各値は数値として返却
-5. profitRate は 0除算防止
-
----
+行
+items.forEach(item => Object.values(item))
 
 ## EXPECT RESULT
 
-- getDashboardSummary は 20_api_netshop.gs のみ存在する
-- 数値集計が正しく返る
-- 空データでもエラーにならない
-- filter による絞り込みが可能
-
----
+オブジェクト配列でも正常に一覧表示される
 
 ## REVIEW CHECK
 
-・関数重複なし  
-・listItems を利用している  
-・数値計算が正しい  
-・0除算対策あり  
-
----
+・旧2次元配列依存削除
+・forEachエラー解消
 
 ## NOTE
 
-HTMLはシートを直接操作しない
-
-HTML  
-↓  
-GAS API  
-↓  
-Spreadsheet
+HTMLは直接シート操作しない

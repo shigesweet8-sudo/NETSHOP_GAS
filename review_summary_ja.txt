@@ -1,10 +1,10 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-ダッシュボード取得API getDashboardSummary を新規実装する
+商品一覧UIをオブジェクト形式に対応させる
 
 Changed Files
-20_api_netshop.gs, codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
+codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
 
 Risk
 SAFE
