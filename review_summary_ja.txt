@@ -1,7 +1,7 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-商品詳細取得API getItem を新規実装する
+商品登録API createItem を新規実装する
 
 Changed Files
 codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
