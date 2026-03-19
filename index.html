@@ -57,6 +57,10 @@
     <div class="wrap">
       <h1>WAVE</h1>
       <div class="card">
+        <div class="status">確認用コンテキスト</div>
+        <div id="debug-context" class="muted">確認中...</div>
+      </div>
+      <div class="card">
         <div id="status" class="status">読み込み中...</div>
         <div id="content" class="muted">データを取得しています。</div>
       </div>
@@ -70,6 +74,14 @@
           .replace(/>/g, "&gt;")
           .replace(/"/g, "&quot;")
           .replace(/'/g, "&#39;");
+      }
+
+      function renderDebugContext(context) {
+        document.getElementById("debug-context").innerHTML = "<pre>" + escapeHtml(JSON.stringify(context, null, 2)) + "</pre>";
+      }
+
+      function showDebugError(message) {
+        document.getElementById("debug-context").innerHTML = "<span class=\"muted\">" + escapeHtml(message) + "</span>";
       }
 
       function renderTable(rows) {
@@ -102,6 +114,13 @@
         document.getElementById("status").textContent = "エラー";
         document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(message) + "</span>";
       }
+
+      google.script.run
+        .withSuccessHandler(renderDebugContext)
+        .withFailureHandler(function(err) {
+          showDebugError((err && err.message) ? err.message : "確認情報の取得に失敗しました。");
+        })
+        .api_debugContext();
 
       google.script.run
         .withSuccessHandler(renderTable)
