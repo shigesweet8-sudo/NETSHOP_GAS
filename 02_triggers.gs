@@ -81,25 +81,20 @@ function handleManagementSheetEdit_(e, enableZipAutofill) {
 }
 
 function autofillAddressFromZip_(sheet, row, zipValue) {
-  var normalizedZip = normalizeZipCode_(zipValue);
-  if (!normalizedZip) return;
+  var address = lookupAddressByZip(zipValue);
+  if (!address) return;
   if (sheet.getRange(row, CONFIG.COLS.PREF).getValue() || sheet.getRange(row, CONFIG.COLS.ADDR2).getValue()) return;
 
-  var address = fetchAddressByZip_(normalizedZip);
-  if (!address) return;
-
   sheet.getRange(row, CONFIG.COLS.PREF).setValue(address.prefecture);
-  sheet.getRange(row, CONFIG.COLS.ADDR2).setValue(address.address2);
+  sheet.getRange(row, CONFIG.COLS.ADDR2).setValue(address.city + address.town);
 }
 
-function normalizeZipCode_(zipValue) {
-  var normalized = String(zipValue || '').replace(/[^0-9]/g, '');
-  return /^\d{7}$/.test(normalized) ? normalized : '';
-}
-
-function fetchAddressByZip_(zipCode) {
+function lookupAddressByZip(zip) {
   try {
-    var response = UrlFetchApp.fetch('https://zipcloud.ibsnet.co.jp/api/search?zipcode=' + encodeURIComponent(zipCode), {
+    var normalizedZip = String(zip || '').replace(/[-\s]/g, '');
+    if (!/^\d{7}$/.test(normalizedZip)) return null;
+
+    var response = UrlFetchApp.fetch('https://zipcloud.ibsnet.co.jp/api/search?zipcode=' + encodeURIComponent(normalizedZip), {
       muteHttpExceptions: true
     });
     if (response.getResponseCode() !== 200) return null;
@@ -110,7 +105,8 @@ function fetchAddressByZip_(zipCode) {
     var result = payload.results[0];
     return {
       prefecture: result.address1 || '',
-      address2: (result.address2 || '') + (result.address3 || '')
+      city: result.address2 || '',
+      town: result.address3 || ''
     };
   } catch (err) {
     return null;
