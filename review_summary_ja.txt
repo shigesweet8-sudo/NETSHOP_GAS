@@ -1,10 +1,10 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-WAVE画面 doGet復旧対応
+ダッシュボード取得API getDashboardSummary を新規実装する
 
 Changed Files
-10_webapp.gs, codex_instruction.md, index.html, issue_body.md, issue_tasks.md (+1 more)
+20_api_netshop.gs, codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
 
 Risk
 SAFE

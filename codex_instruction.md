@@ -1,1 +1,1 @@
-デプロイURLでWAVE画面を開いたときに「スクリプト関数が見つかりません: doGet」というエラーを解消するため、doGet(e) 関数を実装または復旧してください。さらに、デプロイURLからWAVE画面が正しく表示されることを確認し、既存のAPI経由設計や関数名、公開URLを変更しないように注意して作業を進めてください。
+Implement the API getDashboardSummary(filter) in 20_api_netshop.gs, which utilizes listItems(filter) to fetch data, performs necessary calculations for sales metrics, and ensures correctness and error handling as specified.
