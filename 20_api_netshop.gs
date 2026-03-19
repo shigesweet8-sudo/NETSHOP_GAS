@@ -223,6 +223,61 @@ function updateItem(itemId, input) {
 }
 
 /**
+ * 指定IDの商品ステータスを更新し、更新後データ（個人情報除外）を返却する。
+ * @param {string} itemId
+ * @param {string} status
+ * @param {string} memo
+ * @returns {Object|null}
+ */
+function updateItemStatus(itemId, status, memo) {
+  if (!itemId) return null;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return null;
+
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) return null;
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+
+  var headers = values[0];
+  var dataRows = values.slice(1);
+
+  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
+  if (idColIndex === -1) return null;
+
+  var targetIndex = -1;
+  for (var i = 0; i < dataRows.length; i++) {
+    if (String(dataRows[i][idColIndex]) === String(itemId)) {
+      targetIndex = i;
+      break;
+    }
+  }
+  if (targetIndex === -1) return null;
+
+  var rowValues = dataRows[targetIndex].slice();
+  var now = new Date();
+  var col = CONFIG.COLS;
+
+  rowValues[col.STATUS - 1] = status;
+  rowValues[col.DATE - 1] = now;
+
+  if (status === CONFIG.STATUS.LISTING && !rowValues[col.PRODUCT_REG_DATE - 1]) {
+    rowValues[col.PRODUCT_REG_DATE - 1] = now;
+  }
+
+  if (arguments.length >= 3) {
+    rowValues[col.MEMO - 1] = memo;
+  }
+
+  var sheetRow = targetIndex + 2;
+  sheet.getRange(sheetRow, 1, 1, rowValues.length).setValues([rowValues]);
+
+  return getItem(itemId);
+}
+
+/**
  * 指定IDの商品を更新する。
  * @param {string} id
  * @param {Object} payload
