@@ -84,83 +84,158 @@ function api_createItem(payload) {
   }
 }
 
+var ITEM_FIELD_TO_HEADER = Object.freeze({
+  status: 'ステータス',
+  id: '管理ID',
+  staff: '出品担当者',
+  date: '日にち',
+  productRegDate: '商品登録日',
+  shop: 'ショップ',
+  itemName: '商品名',
+  cost: '仕入れ値',
+  storage: '保管場所',
+  qty: '個数',
+  listPrice: '出品金額',
+  negotiatedPrice: '交渉金額',
+  priceFinal: '決済金額',
+  fee: 'サイト利用料',
+  shipping: '配送料',
+  shipFrom: '配送元',
+  profit: '粗利(原価引)',
+  memo: '備考',
+  customer: '購入者名',
+  carrier: '配送業者',
+  tracking: '追跡番号',
+  zip: '郵便番号',
+  pref: '都道府県',
+  addr2: '住所2(地番)',
+  addr3: '住所3(建物名)',
+  phone: '電話番号'
+});
+
+var PERSONAL_INFO_HEADERS = Object.freeze([
+  '購入者名',
+  '郵便番号',
+  '都道府県',
+  '住所2(地番)',
+  '住所3(建物名)',
+  '電話番号'
+]);
+
+/**
+ * 指定IDの商品を取得する（個人情報列は除外）。
+ * @param {string} itemId
+ * @returns {Object|null}
+ */
+function getItem(itemId) {
+  if (!itemId) return null;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return null;
+
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) return null;
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+
+  var headers = values[0];
+  var dataRows = values.slice(1);
+  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
+  if (idColIndex === -1) return null;
+
+  var targetRow = null;
+  for (var i = 0; i < dataRows.length; i++) {
+    if (String(dataRows[i][idColIndex]) === String(itemId)) {
+      targetRow = dataRows[i];
+      break;
+    }
+  }
+  if (!targetRow) return null;
+
+  var item = {};
+  Object.keys(ITEM_FIELD_TO_HEADER).forEach(function(field) {
+    var header = ITEM_FIELD_TO_HEADER[field];
+    if (PERSONAL_INFO_HEADERS.indexOf(header) !== -1) return;
+
+    var index = headers.indexOf(header);
+    if (index === -1) return;
+    item[field] = targetRow[index];
+  });
+
+  return item;
+}
+
+/**
+ * 指定IDの商品を部分更新し、更新後データ（個人情報除外）を返却する。
+ * @param {string} itemId
+ * @param {Object} input
+ * @returns {Object|null}
+ */
+function updateItem(itemId, input) {
+  if (!itemId) return null;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return null;
+
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) return null;
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+
+  var headers = values[0];
+  var dataRows = values.slice(1);
+  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
+  if (idColIndex === -1) return null;
+
+  var targetIndex = -1;
+  for (var i = 0; i < dataRows.length; i++) {
+    if (String(dataRows[i][idColIndex]) === String(itemId)) {
+      targetIndex = i;
+      break;
+    }
+  }
+  if (targetIndex === -1) return null;
+
+  var rowValues = dataRows[targetIndex].slice();
+  var payload = input || {};
+  var hasChanges = false;
+
+  Object.keys(payload).forEach(function(field) {
+    if (field === 'id') return;
+    var header = ITEM_FIELD_TO_HEADER[field];
+    if (!header) return;
+
+    var colIndex = headers.indexOf(header);
+    if (colIndex === -1) return;
+
+    rowValues[colIndex] = payload[field];
+    hasChanges = true;
+  });
+
+  if (hasChanges) {
+    var sheetRow = targetIndex + 2;
+    sheet.getRange(sheetRow, 1, 1, rowValues.length).setValues([rowValues]);
+  }
+
+  return getItem(itemId);
+}
+
 /**
  * 指定IDの商品を更新する。
  * @param {string} id
  * @param {Object} payload
- * @returns {{ok: boolean, id: string, row: number, updatedFields: Array<string>}|{ok: boolean, error: string}}
+ * @returns {{ok: boolean, item: Object}|{ok: boolean, error: string}}
  */
 function api_updateItem(id, payload) {
   try {
-    if (!id) throw new Error('id is required');
-
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) throw new Error('Spreadsheet not found');
-
-    var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-    if (!sheet) throw new Error('Sheet not found: ' + CONFIG.SHEET_NAME);
-
-    var col = CONFIG.COLS;
-    var lastRow = sheet.getLastRow();
-    if (lastRow < 2) throw new Error('No data rows found');
-
-    var idValues = sheet.getRange(2, col.ID, lastRow - 1, 1).getValues();
-    var targetRow = -1;
-    for (var i = 0; i < idValues.length; i++) {
-      if (String(idValues[i][0]) === String(id)) {
-        targetRow = i + 2;
-        break;
-      }
-    }
-    if (targetRow === -1) throw new Error('ID not found: ' + id);
-
-    var data = payload || {};
-    var updatableCols = {
-      status: col.STATUS,
-      staff: col.STAFF,
-      date: col.DATE,
-      productRegDate: col.PRODUCT_REG_DATE,
-      shop: col.SHOP,
-      itemName: col.ITEM_NAME,
-      cost: col.COST,
-      storage: col.STORAGE,
-      qty: col.QTY,
-      listPrice: col.LIST_PRICE,
-      negotiatedPrice: col.NEGOTIATED_PRICE,
-      priceFinal: col.PRICE_FINAL,
-      fee: col.FEE,
-      shipping: col.SHIPPING,
-      shipFrom: col.SHIP_FROM,
-      memo: col.MEMO,
-      customer: col.CUSTOMER,
-      carrier: col.CARRIER,
-      tracking: col.TRACKING,
-      zip: col.ZIP,
-      pref: col.PREF,
-      addr2: col.ADDR2,
-      addr3: col.ADDR3,
-      phone: col.PHONE
-    };
-
-    var rowValues = sheet.getRange(targetRow, 1, 1, CONFIG.HEADERS.length).getValues()[0];
-    var updatedFields = [];
-
-    Object.keys(updatableCols).forEach(function(key) {
-      if (Object.prototype.hasOwnProperty.call(data, key)) {
-        rowValues[updatableCols[key] - 1] = data[key];
-        updatedFields.push(key);
-      }
-    });
-
-    if (updatedFields.length === 0) throw new Error('No updatable fields in payload');
-
-    sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+    var updatedItem = updateItem(id, payload);
+    if (!updatedItem) throw new Error('ID not found: ' + id);
 
     return {
       ok: true,
-      id: String(id),
-      row: targetRow,
-      updatedFields: updatedFields
+      item: updatedItem
     };
   } catch (error) {
     Logger.log('api_updateItem error: ' + error);
