@@ -392,6 +392,85 @@ function listItems(filter) {
 }
 
 /**
+ * ダッシュボード向け集計値を返す。
+ * @param {Object=} filter
+ * @returns {{
+ *   totalCount: number,
+ *   totalSales: number,
+ *   totalFee: number,
+ *   totalShipping: number,
+ *   totalCost: number,
+ *   totalProfit: number,
+ *   profitRate: number
+ * }}
+ */
+function getDashboardSummary(filter) {
+  var emptySummary = {
+    totalCount: 0,
+    totalSales: 0,
+    totalFee: 0,
+    totalShipping: 0,
+    totalCost: 0,
+    totalProfit: 0,
+    profitRate: 0
+  };
+
+  function toNumber(value) {
+    if (typeof value === 'number') return isFinite(value) ? value : 0;
+    if (value === null || value === undefined || value === '') return 0;
+
+    var normalized = String(value)
+      .replace(/[,\s]/g, '')
+      .replace(/[￥¥]/g, '')
+      .replace(/，/g, '');
+    var num = parseFloat(normalized);
+    return isNaN(num) ? 0 : num;
+  }
+
+  try {
+    var items = listItems(filter);
+    if (!items || items.length === 0) return emptySummary;
+
+    var salesKey = CONFIG.HEADERS[CONFIG.COLS.PRICE_FINAL - 1];
+    var feeKey = CONFIG.HEADERS[CONFIG.COLS.FEE - 1];
+    var shippingKey = CONFIG.HEADERS[CONFIG.COLS.SHIPPING - 1];
+    var costKey = CONFIG.HEADERS[CONFIG.COLS.COST - 1];
+
+    var summary = {
+      totalCount: items.length,
+      totalSales: 0,
+      totalFee: 0,
+      totalShipping: 0,
+      totalCost: 0,
+      totalProfit: 0,
+      profitRate: 0
+    };
+
+    items.forEach(function(item) {
+      var sale = toNumber(item[salesKey]);
+      var fee = toNumber(item[feeKey]);
+      var shipping = toNumber(item[shippingKey]);
+      var cost = toNumber(item[costKey]);
+
+      summary.totalSales += sale;
+      summary.totalFee += fee;
+      summary.totalShipping += shipping;
+      summary.totalCost += cost;
+      summary.totalProfit += sale - fee - shipping - cost;
+    });
+
+    summary.profitRate = summary.totalSales !== 0
+      ? (summary.totalProfit / summary.totalSales) * 100
+      : 0;
+
+    return summary;
+  } catch (error) {
+    Logger.log('getDashboardSummary error: ' + error);
+    return emptySummary;
+  }
+}
+
+/**
  * 商品一覧をCSV文字列として返す（BOM付きUTF-8）。
  * @param {Object=} filter
  * @returns {string}
