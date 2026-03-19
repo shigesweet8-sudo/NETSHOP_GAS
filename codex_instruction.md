@@ -1,4 +1,1 @@
-1. `lookupAddressByZip(zip)` 関数を定義する。
-2. `zip` の値からハイフンと空白を除去し、7桁の郵便番号でない場合は null を返す。
-3. UrlFetchApp を使って外部APIにリクエストし、レスポンスを解析して結果がない場合は null を返す。
-4. 住所情報を整形して都道府県、 市区町村、 町域を返却し、エラー時には null を返す。
+20_api_netshop.gs に exportCsv(filter) 関数を実装する際に、指定された手順に従って listItems(filter) でデータを取得し、CSV形式に変換した結果を BOM付きUTF-8形式で返却するようにする。エスケープ処理も適切に行うこと。

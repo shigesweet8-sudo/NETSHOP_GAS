@@ -348,3 +348,75 @@ function api_updateItem(id, payload) {
     };
   }
 }
+
+/**
+ * 商品一覧をオブジェクト配列として返す。
+ * @param {Object=} filter
+ * @returns {Array<Object>}
+ */
+function listItems(filter) {
+  var values = api_listItems();
+  if (!values || values.length < 2) return [];
+
+  var headers = values[0].map(function(header) {
+    return String(header);
+  });
+  var rows = values.slice(1);
+
+  var items = rows.map(function(row) {
+    var item = {};
+    headers.forEach(function(header, index) {
+      item[header] = row[index];
+    });
+    return item;
+  });
+
+  if (!filter || typeof filter !== 'object') return items;
+
+  var activeKeys = Object.keys(filter).filter(function(key) {
+    return filter[key] !== null && filter[key] !== undefined && filter[key] !== '';
+  });
+  if (activeKeys.length === 0) return items;
+
+  return items.filter(function(item) {
+    return activeKeys.every(function(key) {
+      var expected = filter[key];
+      var actual = item[key];
+
+      if (Array.isArray(expected)) {
+        return expected.map(String).indexOf(String(actual)) !== -1;
+      }
+      return String(actual) === String(expected);
+    });
+  });
+}
+
+/**
+ * 商品一覧をCSV文字列として返す（BOM付きUTF-8）。
+ * @param {Object=} filter
+ * @returns {string}
+ */
+function exportCsv(filter) {
+  var items = listItems(filter);
+  if (!items || items.length === 0) return '';
+
+  var headers = Object.keys(items[0]);
+
+  function escapeCsvCell(value) {
+    if (value === null || value === undefined) return '""';
+    var text = String(value).replace(/"/g, '""');
+    return '"' + text + '"';
+  }
+
+  var lines = [];
+  lines.push(headers.map(escapeCsvCell).join(','));
+
+  items.forEach(function(item) {
+    var line = headers.map(function(header) {
+      return escapeCsvCell(item[header]);
+    }).join(',');
+    lines.push(line);
+  });
+
+  return '\uFEFF' + lines.join('\r\n');
+}
