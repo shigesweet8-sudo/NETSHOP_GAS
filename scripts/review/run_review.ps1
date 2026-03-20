@@ -22,6 +22,7 @@ payload = {
 最重要ルール:
 - 事実ベースで判断し、diff から確認できないことは推測しない
 - 指摘は「なぜ問題か」と「どこが問題か」を必ずセットで書く
+- 実装ファイルの差分がない場合は、その事実を最優先で指摘する
 - 軽微なスタイル指摘より、動作不良や運用リスクを優先する
 - 問題がなければ、その旨を明記する
 
@@ -33,20 +34,21 @@ FINDINGS:
 - [severity] file:line 内容
 
 OPEN QUESTIONS:
-- 不明点があれば列挙。なければ `(none)`。
+- 不明点があれば列挙。なければ (none)。
 
 SUMMARY:
 - 全体評価を2〜4文で要約
 
 判定基準:
 - CRITICAL: 本番障害、データ破壊、重大なセキュリティ事故の可能性が高い
-- HIGH: 仕様逸脱、明確な不具合、重要な回帰の可能性が高い
+- HIGH: 実装対象コードの差分なし、仕様逸脱、明確な不具合、重要な回帰の可能性が高い
 - WARNING: 要確認事項やテスト不足、設計上の懸念
 - SAFE: 明確な問題を確認できない
 
 レビュー観点:
 - Issue の意図に沿っているか
 - 変更対象ファイルが適切か
+- .gs .js .html .py .ps1 .yml など実装ファイルの変更があるか
 - null/empty/error 時の挙動が破綻しないか
 - 既存利用者への影響がないか
 - 運用時に困るログ不足や例外処理漏れがないか"""
@@ -72,3 +74,4 @@ with urllib.request.urlopen(req) as res:
     body = res.read().decode("utf-8")
     pathlib.Path("review_result.json").write_text(body, encoding="utf-8")
     print(body)
+'@ | python -
