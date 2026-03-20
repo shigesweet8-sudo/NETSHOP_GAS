@@ -1,10 +1,10 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-商品一覧UIをオブジェクト形式に対応させる
+修復が効いているか検証
 
 Changed Files
-codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
+20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
 
 Risk
 SAFE

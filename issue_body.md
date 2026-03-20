@@ -1,57 +1,79 @@
+# ALTANA AI FACTORY ISSUE
+
 ## MODE
-PLAN
+DIRECT
+
+---
 
 ## GOAL
-listItems APIの返却形式（オブジェクト配列）にUIを対応させる
+
+テスト：商品一覧API作成
+
+---
 
 ## CHANGE TYPE
-修正
+
+追加
+
+---
 
 ## PROJECT
+
 NETSHOP_GAS
 
+---
+
 ## MODULE
-UI
+
+API
+
+---
 
 ## TARGET FILE
-index.html
+
+20_api_netshop.gs
+
+---
 
 ## TASK
 
-TASK1
-index.html
-renderTable関数修正
+TASK1  
+20_api_netshop.gs  
+api_testList 関数を追加  
 
-TASK2
-Object.keys を使ってヘッダー生成
+TASK2  
+20_api_netshop.gs  
+固定のダミー配列を返す処理を実装  
 
-TASK3
-Object.values を使って行描画
+TASK3  
+20_api_netshop.gs  
+JSON形式で return する  
+
+---
 
 ## SPEC
 
-listItems() はオブジェクト配列を返す
+API名  
+api_testList()
 
-例
-[{商品名:"A",価格:1000}]
+処理  
+固定データを返す
 
-renderTable は以下に変更
-
-ヘッダー
-Object.keys(items[0])
-
-行
-items.forEach(item => Object.values(item))
+---
 
 ## EXPECT RESULT
 
-オブジェクト配列でも正常に一覧表示される
+api_testList が追加される
+
+---
 
 ## REVIEW CHECK
 
-・旧2次元配列依存削除
-・forEachエラー解消
+関数重複なし  
+正常にreturnされる  
+
+---
 
 ## NOTE
 
-HTMLは直接シート操作しない
+HTMLは触らない

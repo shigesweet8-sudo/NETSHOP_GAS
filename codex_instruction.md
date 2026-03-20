@@ -1,5 +1,3 @@
-- listItems()から返されたオブジェクト配列に基づき、renderTable関数を更新する。
-- テーブルヘッダーはObject.keys(items[0])で生成する。
-- テーブルの各行はitems.forEach(item => Object.values(item))を用いて描画する。
-- 旧2次元配列依存を削除し、forEachエラーを解消するように注意する。
-- HTMLは直接シート操作を行わず、適切にUIを更新する。
+1. 20_api_netshop.gs に `api_testList` 関数を追加する。
+2. 固定のダミー配列を返す処理を実装する。
+3. JSON形式で戻り値を返すようにする。
