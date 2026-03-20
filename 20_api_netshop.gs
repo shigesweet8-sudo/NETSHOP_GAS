@@ -397,6 +397,74 @@ function updateItemStatus(itemId, status, memo) {
 }
 
 /**
+ * 複数商品のステータスを一括更新する。
+ * 各要素は { id, status } を想定し、status は CONFIG.STATUS_LIST のみ許可。
+ * @param {Array<{id: string, status: string}>} items
+ * @returns {Array<{id: string, status: string}>}
+ */
+function bulkUpdateItemStatus(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error('items must be a non-empty array');
+  }
+
+  var allowedStatuses = CONFIG.STATUS_LIST || [];
+  var updatedItems = items.map(function(item, index) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error('items[' + index + '] must be an object');
+    }
+
+    var id = String(item.id || '').trim();
+    var status = String(item.status || '').trim();
+    if (!id) {
+      throw new Error('items[' + index + '].id is required');
+    }
+    if (!status) {
+      throw new Error('items[' + index + '].status is required');
+    }
+    if (allowedStatuses.indexOf(status) === -1) {
+      throw new Error('items[' + index + '].status is invalid: ' + status);
+    }
+
+    var updated = updateItemStatus(id, status);
+    if (!updated) {
+      throw new Error('ID not found: ' + id);
+    }
+
+    return {
+      id: id,
+      status: status
+    };
+  });
+
+  return updatedItems;
+}
+
+/**
+ * 複数商品のステータスを一括更新するAPI公開用ラッパー。
+ * 返却データは最小限の情報のみ。
+ * @param {Array<{id: string, status: string}>} items
+ * @returns {{success: boolean, updatedCount: number, items: Array<{id: string, status: string}>, error?: string}}
+ */
+function api_bulkUpdateItemStatus(items) {
+  try {
+    var updatedItems = bulkUpdateItemStatus(items);
+    return {
+      success: true,
+      updatedCount: updatedItems.length,
+      items: updatedItems
+    };
+  } catch (error) {
+    Logger.log('api_bulkUpdateItemStatus error: ' + error);
+    return {
+      success: false,
+      updatedCount: 0,
+      items: [],
+      error: String(error)
+    };
+  }
+}
+
+/**
  * 指定IDの商品粗利を再計算し、更新後データ（個人情報除外）を返却する。
  * 粗利 = 決済金額 - サイト利用料 - 配送料 - 仕入れ値
  * @param {string} itemId
