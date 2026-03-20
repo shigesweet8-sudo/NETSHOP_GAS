@@ -1,5 +1,5 @@
-1. 20_api_netshop.gs に一括ステータス更新APIを追加する。
-2. 複数の管理IDを受け取り、同一ステータスへ一括更新できるようにする。
-3. 更新時は既存の単体更新と同じ業務ルールを守る。
-4. 返却値は、成功件数・失敗件数・対象ID一覧が分かる最小限のJSON形式にする。
-5. 既存の単体 updateItemStatus を壊さないようにする。
+1. 修正対象の .github/workflows/altana_ai_factory.yml ファイルを開く。
+2. "Create Japanese review summary" ステップを見つけて、review_result.json の content を使用して review_summary_ja.txt を生成するように修正する。
+3. 必要に応じて、Issue と Changed Files の補助情報を日本語で追加する。
+4. 英語固定テンプレを削除し、出力を日本語のレビュー内容に基づくように変更する。
+5. review severity 判定に影響を与えないように既存のロジックを維持する。
