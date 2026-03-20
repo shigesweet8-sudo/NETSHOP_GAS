@@ -274,6 +274,111 @@ function api_updateItem(id, payload) {
   }
 }
 
+function getStatusList_() {
+  if (CONFIG.STATUS_LIST && CONFIG.STATUS_LIST.length) return CONFIG.STATUS_LIST.slice();
+  if (CONFIG.STATUS) {
+    return Object.keys(CONFIG.STATUS).map(function(key) {
+      return CONFIG.STATUS[key];
+    });
+  }
+  return [];
+}
+
+function applyStatusUpdateToRowValues_(rowValues, status, memo) {
+  var nextRow = rowValues.slice();
+  var now = new Date();
+  var col = CONFIG.COLS;
+
+  nextRow[col.STATUS - 1] = status;
+  nextRow[col.DATE - 1] = now;
+  if (status === CONFIG.STATUS.LISTING && !nextRow[col.PRODUCT_REG_DATE - 1]) {
+    nextRow[col.PRODUCT_REG_DATE - 1] = now;
+  }
+  if (memo !== undefined) {
+    nextRow[col.MEMO - 1] = memo;
+  }
+  return nextRow;
+}
+
+function buildBulkUpdateResponse_(ok, message, successCount, failureCount, updatedItemIds, failedItemIds) {
+  return {
+    ok: ok,
+    message: message || '',
+    successCount: successCount || 0,
+    failureCount: failureCount || 0,
+    updatedItemIds: updatedItemIds || [],
+    failedItemIds: failedItemIds || []
+  };
+}
+
+function bulkUpdateStatus(itemIds, status, memo) {
+  var normalizedIds = (Array.isArray(itemIds) ? itemIds : []).map(function(itemId) {
+    return String(itemId || '').trim();
+  }).filter(function(itemId) {
+    return itemId !== '';
+  });
+
+  if (!normalizedIds.length) {
+    return buildBulkUpdateResponse_(false, 'itemIds is required', 0, 0, [], []);
+  }
+
+  var statusList = getStatusList_();
+  if (statusList.indexOf(status) === -1) {
+    return buildBulkUpdateResponse_(false, 'invalid status', 0, normalizedIds.length, [], normalizedIds.slice());
+  }
+
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot) {
+    return buildBulkUpdateResponse_(false, 'sheet not found', 0, normalizedIds.length, [], normalizedIds.slice());
+  }
+  if (!snapshot.rows.length) {
+    return buildBulkUpdateResponse_(false, 'no data rows', 0, normalizedIds.length, [], normalizedIds.slice());
+  }
+
+  var updatedItemIds = [];
+  var failedItemIds = [];
+  var rowIndexesToUpdate = [];
+
+  normalizedIds.forEach(function(itemId) {
+    var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
+    if (rowIndex === -1) {
+      failedItemIds.push(itemId);
+      return;
+    }
+    snapshot.rows[rowIndex] = applyStatusUpdateToRowValues_(snapshot.rows[rowIndex], status, memo);
+    rowIndexesToUpdate.push(rowIndex);
+    updatedItemIds.push(itemId);
+  });
+
+  if (rowIndexesToUpdate.length) {
+    try {
+      snapshot.sheet.getRange(2, 1, snapshot.rows.length, snapshot.headers.length).setValues(snapshot.rows);
+    } catch (error) {
+      Logger.log('bulkUpdateStatus error: ' + error);
+      return buildBulkUpdateResponse_(false, String(error), 0, normalizedIds.length, [], normalizedIds.slice());
+    }
+  }
+
+  return buildBulkUpdateResponse_(
+    failedItemIds.length === 0,
+    failedItemIds.length ? 'partial success' : 'success',
+    updatedItemIds.length,
+    failedItemIds.length,
+    updatedItemIds,
+    failedItemIds
+  );
+}
+
+function api_bulkUpdateStatus(payload) {
+  try {
+    payload = payload && typeof payload === 'object' ? payload : {};
+    return bulkUpdateStatus(payload.itemIds, payload.status, payload.memo);
+  } catch (error) {
+    Logger.log('api_bulkUpdateStatus error: ' + error);
+    return buildBulkUpdateResponse_(false, String(error), 0, 0, [], []);
+  }
+}
+
 /**
  * 指定IDの商品ステータスを更新し、更新後データ（個人情報除外）を返却する。
  * @param {string} itemId
