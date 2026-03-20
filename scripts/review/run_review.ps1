@@ -1,4 +1,4 @@
-@'
+﻿@'
 import json
 import os
 import pathlib
@@ -8,45 +8,48 @@ diff_text = pathlib.Path(os.environ["DIFF_PATH"]).read_text(encoding="utf-8")
 api_key = os.environ["OPENAI_API_KEY"]
 
 payload = {
-    "model": "gpt-4o-mini",
+    "model": "gpt-5-mini",
     "messages": [
         {
             "role": "system",
-            "content": """あなたは ALTANA AI FACTORY の厳格なコードレビュアーです。
-与えられた git diff をレビューし、日本語で簡潔に返してください。
+            "content": """あなたは ALTANA AI FACTORY のコードレビュー担当です。入力は Git diff です。
 
-出力形式は必ず以下に統一してください。
+目的:
+- Pull Request 作成前に、製品品質と仕様整合性の観点からレビューする
+- 実装の不具合、仕様逸脱、回帰、データ破壊、権限ミス、例外処理漏れを優先して指摘する
+- 日本語で、簡潔かつ具体的に書く
 
-【判定】
-SAFE / WARNING / HIGH / CRITICAL
+最重要ルール:
+- 事実ベースで判断し、diff から確認できないことは推測しない
+- 指摘は「なぜ問題か」と「どこが問題か」を必ずセットで書く
+- 軽微なスタイル指摘より、動作不良や運用リスクを優先する
+- 問題がなければ、その旨を明記する
 
-【変更内容】
-何が変更されたかを簡潔に記載
+出力形式:
+SEVERITY: SAFE / WARNING / HIGH / CRITICAL
+ACTION: MERGE OK / REVIEW NEEDED / STOP
 
-【レビュー結果】
-問題点 or 問題なし
+FINDINGS:
+- [severity] file:line 内容
 
-【アクション】
-MERGE OK / REVIEW NEEDED / STOP
+OPEN QUESTIONS:
+- 不明点があれば列挙。なければ `(none)`。
+
+SUMMARY:
+- 全体評価を2〜4文で要約
+
+判定基準:
+- CRITICAL: 本番障害、データ破壊、重大なセキュリティ事故の可能性が高い
+- HIGH: 仕様逸脱、明確な不具合、重要な回帰の可能性が高い
+- WARNING: 要確認事項やテスト不足、設計上の懸念
+- SAFE: 明確な問題を確認できない
 
 レビュー観点:
-- 変更対象ファイルが Issue の目的に合っているか
-- 実コード差分が存在するか
-- md/json のみ変更で実装なしになっていないか
-- 対象外ファイル変更がないか
-- 仕様逸脱がないか
-- 危険な変更がないか
-
-必ず検出する項目:
-- 実コード差分なし
-- md/jsonのみ変更
-- 対象外ファイル変更
-- 危険変更
-
-判定方針:
-- 過剰に厳しくしすぎない
-- ただし実装なしは必ず検出する
-- 危険な場合のみ HIGH / CRITICAL を使う"""
+- Issue の意図に沿っているか
+- 変更対象ファイルが適切か
+- null/empty/error 時の挙動が破綻しないか
+- 既存利用者への影響がないか
+- 運用時に困るログ不足や例外処理漏れがないか"""
         },
         {
             "role": "user",
@@ -69,4 +72,3 @@ with urllib.request.urlopen(req) as res:
     body = res.read().decode("utf-8")
     pathlib.Path("review_result.json").write_text(body, encoding="utf-8")
     print(body)
-'@ | python -

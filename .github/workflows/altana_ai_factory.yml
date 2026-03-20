@@ -42,6 +42,7 @@ jobs:
       - name: Send Issue to OpenAI
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
         run: |
           python scripts/gpt/issue_to_instruction.py
 
@@ -86,7 +87,6 @@ jobs:
           import json
           import os
           import pathlib
-          import re
 
           review_data = json.loads(pathlib.Path("review_result.json").read_text(encoding="utf-8"))
           content = review_data["choices"][0]["message"]["content"].strip()
@@ -104,36 +104,14 @@ jobs:
           if len(changed_files) > 5:
               changed_files_text += f" (+{len(changed_files) - 5} more)"
 
-          review_upper = content.upper()
-
-          if "CRITICAL" in review_upper:
-              risk_level = "CRITICAL"
-          elif re.search(r"\bHIGH\b", review_upper):
-              risk_level = "HIGH"
-          elif re.search(r"\bMEDIUM\b", review_upper):
-              risk_level = "MEDIUM"
-          elif re.search(r"\bLOW\b", review_upper):
-              risk_level = "LOW"
-          else:
-              risk_level = "SAFE"
-
-          is_danger = risk_level in {"HIGH", "CRITICAL"}
-          final_action = "MERGE STOP" if is_danger else ("REVIEW NEEDED" if risk_level == "MEDIUM" else "MERGE OK")
-
           lines = [
-              "ALTANA AI FACTORY REVIEW",
-              "",
-              "Issue",
+              "Issue title",
               issue_title or "(no title)",
               "",
               "Changed Files",
               changed_files_text,
               "",
-              "Risk",
-              risk_level,
-              "",
-              "Action",
-              final_action,
+              content,
           ]
 
           summary = "\n".join(lines)

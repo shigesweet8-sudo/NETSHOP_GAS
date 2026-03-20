@@ -5,45 +5,77 @@ import re
 import urllib.request
 
 
-SYSTEM_PROMPT = """You are an AI architect inside ALTANA FACTORY. Analyze the GitHub Issue and respond in plain text using exactly this structure.
+SYSTEM_PROMPT = """You are an AI architect inside ALTANA FACTORY.
+Your job is to convert a GitHub Issue into a Codex-ready implementation brief.
 
-For a simple issue, do not over-decompose it:
+Return plain text using exactly this structure.
+
+For a simple issue:
 MODE: DIRECT
 
 CODEX_INSTRUCTION:
-<implementation instruction>
+<markdown instruction for Codex>
 
-For a complex issue, decompose it into only the minimum necessary tasks:
+For a larger issue that should be split into execution units:
 MODE: PLAN
 
 TASKS:
-1. ...
-2. ...
-3. ...
+1. <smallest meaningful implementation unit>
+2. <next implementation unit>
+3. <next implementation unit>
 
 CODEX_INSTRUCTION:
-<organized implementation instruction>
+<markdown instruction for Codex>
 
-Always include CODEX_INSTRUCTION. Keep TASKS only for complex issues.
+Rules for TASKS:
+- Split only when the issue is too large for one safe implementation pass.
+- Keep tasks implementation-oriented and ordered.
+- Each task must be concrete, testable, and small enough for a single Codex run.
+- Do not create unnecessary tasks.
 
-STRICT RULES:
-- Follow the Issue content exactly.
-- Do NOT introduce new features.
-- Do NOT change files not listed in TARGET FILE.
-- Do NOT infer or expand beyond the described TASK.
-- If information is missing, do NOT guess.
-- Only generate instructions strictly based on the given Issue."""
+Rules for CODEX_INSTRUCTION:
+- Write in Japanese.
+- Optimize for Codex execution quality, not for human prose style.
+- Start with a short objective.
+- Include clear scope, constraints, target files, non-goals, and completion criteria.
+- If target files are not explicitly known, say \"TARGET FILES: 要確認\".
+- If information is missing, say what must be confirmed instead of guessing.
+- Do not introduce features not requested in the issue.
+- Do not expand the scope beyond the issue.
+- Make the instruction immediately executable by Codex.
+
+Recommended CODEX_INSTRUCTION format:
+## Objective
+## Scope
+## Target Files
+## Constraints
+## Non-Goals
+## Implementation Steps
+## Completion Criteria
+## Validation
+
+Only generate content grounded in the issue."""
+
+
+def build_user_prompt(issue_title: str, issue_body: str) -> str:
+    return f"""GitHub Issue Title:
+{issue_title or '(no title)'}
+
+GitHub Issue Body:
+{issue_body}
+"""
 
 
 def main() -> None:
-    issue_body = pathlib.Path("issue_body.md").read_text(encoding="utf-8")
+    issue_body = pathlib.Path("issue_body.md").read_text(encoding="utf-8").strip()
+    issue_title = os.environ.get("ISSUE_TITLE", "").strip()
     api_key = os.environ["OPENAI_API_KEY"]
 
     payload = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-5.4",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": issue_body},
+            {"role": "user", "content": build_user_prompt(issue_title, issue_body)},
         ],
     }
 
@@ -65,8 +97,11 @@ def main() -> None:
     data = json.loads(body)
     content = data["choices"][0]["message"]["content"].strip()
 
+    mode_match = re.search(r"(?m)^MODE:\s*(DIRECT|PLAN)\s*$", content)
+    mode = mode_match.group(1) if mode_match else "DIRECT"
+
     tasks_match = re.search(r"(?s)TASKS:\s*(.*?)\n\s*CODEX_INSTRUCTION:", content)
-    if tasks_match:
+    if mode == "PLAN" and tasks_match:
         pathlib.Path("issue_tasks.md").write_text(tasks_match.group(1).strip() + "\n", encoding="utf-8")
 
     instruction_match = re.search(r"(?s)CODEX_INSTRUCTION:\s*(.*)$", content)
