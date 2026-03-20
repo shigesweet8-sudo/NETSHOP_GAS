@@ -1,148 +1,6 @@
-/**
- * 商品一覧をシートから取得して返却する。
- * @param {Object=} filter
- * @returns {Object[]}
+﻿/**
+ * NETSHOP API helpers and endpoints.
  */
-function listItems(filter) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    Logger.log("Spreadsheet Name: " + ss.getName());
-    if (!ss) return [];
-
-    var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-    Logger.log("Sheet Exists: " + (sheet ? "YES" : "NO"));
-    if (sheet) {
-      Logger.log("LastRow: " + sheet.getLastRow());
-    }
-    if (!sheet) return [];
-
-    var lastRow = sheet.getLastRow();
-    var lastColumn = sheet.getLastColumn();
-    if (lastRow === 0 || lastColumn === 0) return [];
-
-    var rows = sheet.getDataRange().getValues();
-    if (!rows.length) return [];
-
-    var headers = rows[0].map(function(header) {
-      return String(header || "").trim();
-    });
-    var dataRows = rows.slice(1);
-    var excludedHeaders = {
-      "購入者名": true,
-      "郵便番号": true,
-      "都道府県": true,
-      "住所2(地番)": true,
-      "住所3(建物名)": true,
-      "電話番号": true
-    };
-    var targetIndexes = [];
-
-    headers.forEach(function(header, index) {
-      if (!excludedHeaders[header]) {
-        targetIndexes.push(index);
-      }
-    });
-
-    var items = dataRows.map(function(row) {
-      var item = {};
-      targetIndexes.forEach(function(index) {
-        item[headers[index]] = row[index];
-      });
-      return item;
-    });
-
-    if (filter && typeof filter === "object") {
-      items = items.filter(function(item) {
-        return Object.keys(filter).every(function(key) {
-          if (!(key in item)) return false;
-          return item[key] === filter[key];
-        });
-      });
-    }
-
-    Logger.log(JSON.stringify(items));
-    return items;
-  } catch (error) {
-    Logger.log('listItems error: ' + error);
-    return [];
-  }
-}
-
-<<<<<<< HEAD
-function getItem(itemId) {
-  var normalizedItemId = String(itemId || "").trim();
-  if (!normalizedItemId) return null;
-
-  var items = listItems({ "管理ID": normalizedItemId });
-  return items.length ? items[0] : null;
-}
-
-function createItem(input) {
-  var payload = input && typeof input === "object" ? input : {};
-=======
-/**
- * 商品を1件追加する。
- * @param {Object} payload
- * @returns {{ok: boolean, id: string, status: string, row: number}|{ok: boolean, error: string}}
- */
-function api_createItem(payload) {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (!ss) throw new Error('Spreadsheet not found');
-
-    var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-    if (!sheet) throw new Error('Sheet not found: ' + CONFIG.SHEET_NAME);
-
-    var col = CONFIG.COLS;
-    var data = payload || {};
-    var now = new Date();
-    var itemId = 'ITEM-' + now.getTime();
-    var initialStatus = data.status || CONFIG.STATUS.LISTING;
-
-    var rowData = new Array(CONFIG.HEADERS.length).fill('');
-    rowData[col.STATUS - 1] = initialStatus;
-    rowData[col.ID - 1] = itemId;
-    rowData[col.STAFF - 1] = data.staff || '';
-    rowData[col.DATE - 1] = data.date || now;
-    rowData[col.PRODUCT_REG_DATE - 1] = data.productRegDate || now;
-    rowData[col.SHOP - 1] = data.shop || '';
-    rowData[col.ITEM_NAME - 1] = data.itemName || '';
-    rowData[col.COST - 1] = data.cost || '';
-    rowData[col.STORAGE - 1] = data.storage || '';
-    rowData[col.QTY - 1] = data.qty || 1;
-    rowData[col.LIST_PRICE - 1] = data.listPrice || '';
-    rowData[col.NEGOTIATED_PRICE - 1] = data.negotiatedPrice || '';
-    rowData[col.PRICE_FINAL - 1] = data.priceFinal || '';
-    rowData[col.FEE - 1] = data.fee || '';
-    rowData[col.SHIPPING - 1] = data.shipping || '';
-    rowData[col.SHIP_FROM - 1] = data.shipFrom || '';
-    rowData[col.MEMO - 1] = data.memo || '';
-    rowData[col.CUSTOMER - 1] = data.customer || '';
-    rowData[col.CARRIER - 1] = data.carrier || '';
-    rowData[col.TRACKING - 1] = data.tracking || '';
-    rowData[col.ZIP - 1] = data.zip || '';
-    rowData[col.PREF - 1] = data.pref || '';
-    rowData[col.ADDR2 - 1] = data.addr2 || '';
-    rowData[col.ADDR3 - 1] = data.addr3 || '';
-    rowData[col.PHONE - 1] = data.phone || '';
-
-    sheet.appendRow(rowData);
-
-    return {
-      ok: true,
-      id: itemId,
-      status: initialStatus,
-      row: sheet.getLastRow()
-    };
-  } catch (error) {
-    Logger.log('api_createItem error: ' + error);
-    return {
-      ok: false,
-      error: String(error)
-    };
-  }
-}
-
 var ITEM_FIELD_TO_HEADER = Object.freeze({
   status: 'ステータス',
   id: '管理ID',
@@ -181,6 +39,99 @@ var PERSONAL_INFO_HEADERS = Object.freeze([
   '電話番号'
 ]);
 
+function getManagementSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return null;
+  return ss.getSheetByName(CONFIG.SHEET_NAME);
+}
+
+function getSheetSnapshot_() {
+  var sheet = getManagementSheet_();
+  if (!sheet) return null;
+
+  var values = sheet.getDataRange().getValues();
+  if (!values.length) {
+    return {
+      sheet: sheet,
+      headers: CONFIG.HEADERS.slice(),
+      rows: []
+    };
+  }
+
+  return {
+    sheet: sheet,
+    headers: values[0].map(function(header) {
+      return String(header || '').trim();
+    }),
+    rows: values.slice(1)
+  };
+}
+
+function findRowIndexById_(rows, headers, itemId) {
+  var idHeader = ITEM_FIELD_TO_HEADER.id;
+  var idColIndex = headers.indexOf(idHeader);
+  if (idColIndex === -1) return -1;
+
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][idColIndex] || '').trim() === String(itemId || '').trim()) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function buildPublicItemFromRow_(headers, row) {
+  var item = {};
+  headers.forEach(function(header, index) {
+    if (PERSONAL_INFO_HEADERS.indexOf(header) !== -1) return;
+    item[header] = row[index];
+  });
+  return item;
+}
+
+function applyFilter_(items, filter) {
+  if (!filter || typeof filter !== 'object') return items;
+  return items.filter(function(item) {
+    return Object.keys(filter).every(function(key) {
+      if (!(key in item)) return false;
+      return String(item[key]) === String(filter[key]);
+    });
+  });
+}
+
+/**
+ * 商品一覧をシートから取得して返却する。
+ * @param {Object=} filter
+ * @returns {Object[]}
+ */
+function listItems(filter) {
+  try {
+    var snapshot = getSheetSnapshot_();
+    if (!snapshot) return [];
+    var items = snapshot.rows.map(function(row) {
+      return buildPublicItemFromRow_(snapshot.headers, row);
+    });
+    return applyFilter_(items, filter);
+  } catch (error) {
+    Logger.log('listItems error: ' + error);
+    return [];
+  }
+}
+
+function api_listItems(filter) {
+  return listItems(filter);
+}
+
+function api_debugContext() {
+  var sheet = getManagementSheet_();
+  return {
+    sheetName: CONFIG.SHEET_NAME,
+    sheetExists: !!sheet,
+    lastRow: sheet ? sheet.getLastRow() : 0,
+    lastColumn: sheet ? sheet.getLastColumn() : 0
+  };
+}
+
 /**
  * 指定IDの商品を取得する（個人情報列は除外）。
  * @param {string} itemId
@@ -189,58 +140,83 @@ var PERSONAL_INFO_HEADERS = Object.freeze([
 function getItem(itemId) {
   if (!itemId) return null;
 
->>>>>>> origin/master
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return null;
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot || !snapshot.rows.length) return null;
 
-  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
+  if (rowIndex === -1) return null;
+
+  return buildPublicItemFromRow_(snapshot.headers, snapshot.rows[rowIndex]);
+}
+
+function buildRowFromPayload_(payload) {
+  var rowData = new Array(CONFIG.HEADERS.length).fill('');
+  var col = CONFIG.COLS;
+  var now = new Date();
+  var shopValue = payload.shop || '';
+  var itemId = generateId_(shopValue);
+  var statusValue = payload.status || CONFIG.STATUS.LISTING;
+
+  rowData[col.ID - 1] = itemId;
+  rowData[col.STATUS - 1] = statusValue;
+  rowData[col.DATE - 1] = payload.date || now;
+  rowData[col.PRODUCT_REG_DATE - 1] = payload.productRegDate || (statusValue === CONFIG.STATUS.LISTING ? now : '');
+
+  Object.keys(ITEM_FIELD_TO_HEADER).forEach(function(field) {
+    if (field === 'id' || field === 'status' || field === 'date' || field === 'productRegDate') return;
+    var header = ITEM_FIELD_TO_HEADER[field];
+    var index = CONFIG.HEADERS.indexOf(header);
+    if (index === -1) return;
+    rowData[index] = payload[field] !== undefined ? payload[field] : rowData[index];
+  });
+
+  return {
+    itemId: itemId,
+    rowData: rowData,
+    statusValue: statusValue
+  };
+}
+
+/**
+ * 商品を1件追加する。
+ * @param {Object} input
+ * @returns {Object|null}
+ */
+function createItem(input) {
+  var payload = input && typeof input === 'object' ? input : {};
+  var sheet = getManagementSheet_();
   if (!sheet) return null;
 
-<<<<<<< HEAD
-  var headers = CONFIG.HEADERS.slice();
+  var created = buildRowFromPayload_(payload);
   var nextRow = Math.max(sheet.getLastRow() + 1, 2);
-  var rowData = headers.map(function(header) {
-    return Object.prototype.hasOwnProperty.call(payload, header) ? payload[header] : "";
-  });
-  var shopValue = Object.prototype.hasOwnProperty.call(payload, "ショップ") ? payload["ショップ"] : "";
-  var itemId = generateId_(shopValue);
+  sheet.getRange(nextRow, 1, 1, CONFIG.HEADERS.length).setValues([created.rowData]);
 
-  rowData[CONFIG.COLS.ID - 1] = itemId;
+  return {
+    id: created.itemId,
+    row: nextRow,
+    status: created.statusValue,
+    item: getItem(created.itemId)
+  };
+}
 
-  if (!rowData[CONFIG.COLS.STATUS - 1]) {
-    rowData[CONFIG.COLS.STATUS - 1] = CONFIG.STATUS.LISTING;
+function api_createItem(payload) {
+  try {
+    var created = createItem(payload);
+    if (!created) throw new Error('createItem failed');
+    return {
+      ok: true,
+      id: created.id,
+      status: created.status,
+      row: created.row,
+      item: created.item
+    };
+  } catch (error) {
+    Logger.log('api_createItem error: ' + error);
+    return {
+      ok: false,
+      error: String(error)
+    };
   }
-
-  sheet.getRange(nextRow, 1, 1, headers.length).setValues([rowData]);
-=======
-  var values = sheet.getDataRange().getValues();
-  if (values.length < 2) return null;
-
-  var headers = values[0];
-  var dataRows = values.slice(1);
-  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
-  if (idColIndex === -1) return null;
-
-  var targetRow = null;
-  for (var i = 0; i < dataRows.length; i++) {
-    if (String(dataRows[i][idColIndex]) === String(itemId)) {
-      targetRow = dataRows[i];
-      break;
-    }
-  }
-  if (!targetRow) return null;
-
-  var item = {};
-  Object.keys(ITEM_FIELD_TO_HEADER).forEach(function(field) {
-    var header = ITEM_FIELD_TO_HEADER[field];
-    if (PERSONAL_INFO_HEADERS.indexOf(header) !== -1) return;
-
-    var index = headers.indexOf(header);
-    if (index === -1) return;
-    item[field] = targetRow[index];
-  });
-
-  return item;
 }
 
 /**
@@ -252,209 +228,39 @@ function getItem(itemId) {
 function updateItem(itemId, input) {
   if (!itemId) return null;
 
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return null;
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot || !snapshot.rows.length) return null;
 
-  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-  if (!sheet) return null;
+  var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
+  if (rowIndex === -1) return null;
 
-  var values = sheet.getDataRange().getValues();
-  if (values.length < 2) return null;
-
-  var headers = values[0];
-  var dataRows = values.slice(1);
-  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
-  if (idColIndex === -1) return null;
-
-  var targetIndex = -1;
-  for (var i = 0; i < dataRows.length; i++) {
-    if (String(dataRows[i][idColIndex]) === String(itemId)) {
-      targetIndex = i;
-      break;
-    }
-  }
-  if (targetIndex === -1) return null;
-
-  var rowValues = dataRows[targetIndex].slice();
+  var rowValues = snapshot.rows[rowIndex].slice();
   var payload = input || {};
-  var hasChanges = false;
+  var changed = false;
 
   Object.keys(payload).forEach(function(field) {
     if (field === 'id') return;
     var header = ITEM_FIELD_TO_HEADER[field];
     if (!header) return;
 
-    var colIndex = headers.indexOf(header);
-    if (colIndex === -1) return;
+    var headerIndex = snapshot.headers.indexOf(header);
+    if (headerIndex === -1) return;
 
-    rowValues[colIndex] = payload[field];
-    hasChanges = true;
+    rowValues[headerIndex] = payload[field];
+    changed = true;
   });
 
-  if (hasChanges) {
-    var sheetRow = targetIndex + 2;
-    sheet.getRange(sheetRow, 1, 1, rowValues.length).setValues([rowValues]);
+  if (changed) {
+    snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
   }
->>>>>>> origin/master
 
   return getItem(itemId);
 }
 
-<<<<<<< HEAD
-function lookupAddressByZip(zip) {
-  try {
-    var normalizedZip = String(zip || "").replace(/[^0-9]/g, "");
-    if (!/^\d{7}$/.test(normalizedZip)) return null;
-
-    var response = UrlFetchApp.fetch(
-      "https://zipcloud.ibsnet.co.jp/api/search?zipcode=" + encodeURIComponent(normalizedZip),
-      { muteHttpExceptions: true }
-    );
-    var payload = JSON.parse(response.getContentText());
-    if (!payload || !payload.results || !payload.results.length) return null;
-
-    var result = payload.results[0];
-    return {
-      prefecture: result.address1 || "",
-      city: result.address2 || "",
-      address: result.address3 || ""
-    };
-  } catch (error) {
-    return null;
-  }
-}
-
-function api_listItems(filter) {
-  Logger.log('api_listItems called');
-  return listItems(filter);
-}
-
-function api_debugContext() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss ? ss.getSheetByName(CONFIG.SHEET_NAME) : null;
-
-  return {
-    spreadsheetName: ss ? ss.getName() : '',
-    sheetName: CONFIG.SHEET_NAME,
-    sheetExists: !!sheet,
-    lastRow: sheet ? sheet.getLastRow() : 0,
-    lastColumn: sheet ? sheet.getLastColumn() : 0
-  };
-=======
-/**
- * 指定IDの商品ステータスを更新し、更新後データ（個人情報除外）を返却する。
- * @param {string} itemId
- * @param {string} status
- * @param {string} memo
- * @returns {Object|null}
- */
-function updateItemStatus(itemId, status, memo) {
-  if (!itemId) return null;
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return null;
-
-  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-  if (!sheet) return null;
-
-  var values = sheet.getDataRange().getValues();
-  if (values.length < 2) return null;
-
-  var headers = values[0];
-  var dataRows = values.slice(1);
-
-  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
-  if (idColIndex === -1) return null;
-
-  var targetIndex = -1;
-  for (var i = 0; i < dataRows.length; i++) {
-    if (String(dataRows[i][idColIndex]) === String(itemId)) {
-      targetIndex = i;
-      break;
-    }
-  }
-  if (targetIndex === -1) return null;
-
-  var rowValues = dataRows[targetIndex].slice();
-  var now = new Date();
-  var col = CONFIG.COLS;
-
-  rowValues[col.STATUS - 1] = status;
-  rowValues[col.DATE - 1] = now;
-
-  if (status === CONFIG.STATUS.LISTING && !rowValues[col.PRODUCT_REG_DATE - 1]) {
-    rowValues[col.PRODUCT_REG_DATE - 1] = now;
-  }
-
-  if (arguments.length >= 3) {
-    rowValues[col.MEMO - 1] = memo;
-  }
-
-  var sheetRow = targetIndex + 2;
-  sheet.getRange(sheetRow, 1, 1, rowValues.length).setValues([rowValues]);
-
-  return getItem(itemId);
-}
-
-/**
- * 指定IDの商品粗利を再計算し、更新後データ（個人情報除外）を返却する。
- * 粗利 = 決済金額 - サイト利用料 - 配送料 - 仕入れ値
- * @param {string} itemId
- * @returns {Object|null}
- */
-function recalculateItemProfit(itemId) {
-  if (!itemId) return null;
-
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss) return null;
-
-  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
-  if (!sheet) return null;
-
-  var values = sheet.getDataRange().getValues();
-  if (values.length < 2) return null;
-
-  var headers = values[0];
-  var dataRows = values.slice(1);
-  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
-  if (idColIndex === -1) return null;
-
-  var targetIndex = -1;
-  for (var i = 0; i < dataRows.length; i++) {
-    if (String(dataRows[i][idColIndex]) === String(itemId)) {
-      targetIndex = i;
-      break;
-    }
-  }
-  if (targetIndex === -1) return null;
-
-  var rowValues = dataRows[targetIndex].slice();
-  var col = CONFIG.COLS;
-
-  var cost = parseFloat(rowValues[col.COST - 1]) || 0;
-  var sale = parseFloat(rowValues[col.PRICE_FINAL - 1]) || 0;
-  var fee = parseFloat(rowValues[col.FEE - 1]) || 0;
-  var shipping = parseFloat(rowValues[col.SHIPPING - 1]) || 0;
-  var profit = sale - fee - shipping - cost;
-
-  rowValues[col.PROFIT - 1] = profit;
-  var sheetRow = targetIndex + 2;
-  sheet.getRange(sheetRow, 1, 1, rowValues.length).setValues([rowValues]);
-
-  return getItem(itemId);
-}
-
-/**
- * 指定IDの商品を更新する。
- * @param {string} id
- * @param {Object} payload
- * @returns {{ok: boolean, item: Object}|{ok: boolean, error: string}}
- */
 function api_updateItem(id, payload) {
   try {
     var updatedItem = updateItem(id, payload);
     if (!updatedItem) throw new Error('ID not found: ' + id);
-
     return {
       ok: true,
       item: updatedItem
@@ -469,59 +275,69 @@ function api_updateItem(id, payload) {
 }
 
 /**
- * 商品一覧をオブジェクト配列として返す。
- * @param {Object=} filter
- * @returns {Array<Object>}
+ * 指定IDの商品ステータスを更新し、更新後データ（個人情報除外）を返却する。
+ * @param {string} itemId
+ * @param {string} status
+ * @param {string=} memo
+ * @returns {Object|null}
  */
-function listItems(filter) {
-  var values = api_listItems();
-  if (!values || values.length < 2) return [];
+function updateItemStatus(itemId, status, memo) {
+  if (!itemId) return null;
+  if (CONFIG.STATUS_LIST.indexOf(status) === -1) return null;
 
-  var headers = values[0].map(function(header) {
-    return String(header);
-  });
-  var rows = values.slice(1);
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot || !snapshot.rows.length) return null;
 
-  var items = rows.map(function(row) {
-    var item = {};
-    headers.forEach(function(header, index) {
-      item[header] = row[index];
-    });
-    return item;
-  });
+  var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
+  if (rowIndex === -1) return null;
 
-  if (!filter || typeof filter !== 'object') return items;
+  var rowValues = snapshot.rows[rowIndex].slice();
+  var col = CONFIG.COLS;
+  var now = new Date();
 
-  var activeKeys = Object.keys(filter).filter(function(key) {
-    return filter[key] !== null && filter[key] !== undefined && filter[key] !== '';
-  });
-  if (activeKeys.length === 0) return items;
+  rowValues[col.STATUS - 1] = status;
+  rowValues[col.DATE - 1] = now;
+  if (status === CONFIG.STATUS.LISTING && !rowValues[col.PRODUCT_REG_DATE - 1]) {
+    rowValues[col.PRODUCT_REG_DATE - 1] = now;
+  }
+  if (arguments.length >= 3) {
+    rowValues[col.MEMO - 1] = memo;
+  }
 
-  return items.filter(function(item) {
-    return activeKeys.every(function(key) {
-      var expected = filter[key];
-      var actual = item[key];
+  snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
+  return getItem(itemId);
+}
 
-      if (Array.isArray(expected)) {
-        return expected.map(String).indexOf(String(actual)) !== -1;
-      }
-      return String(actual) === String(expected);
-    });
-  });
+/**
+ * 指定IDの商品粗利を再計算し、更新後データ（個人情報除外）を返却する。
+ * @param {string} itemId
+ * @returns {Object|null}
+ */
+function recalculateItemProfit(itemId) {
+  if (!itemId) return null;
+
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot || !snapshot.rows.length) return null;
+
+  var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
+  if (rowIndex === -1) return null;
+
+  var rowValues = snapshot.rows[rowIndex].slice();
+  var col = CONFIG.COLS;
+  var cost = parseFloat(rowValues[col.COST - 1]) || 0;
+  var sale = parseFloat(rowValues[col.PRICE_FINAL - 1]) || 0;
+  var fee = parseFloat(rowValues[col.FEE - 1]) || 0;
+  var shipping = parseFloat(rowValues[col.SHIPPING - 1]) || 0;
+  rowValues[col.PROFIT - 1] = sale - fee - shipping - cost;
+
+  snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
+  return getItem(itemId);
 }
 
 /**
  * ダッシュボード向け集計値を返す。
  * @param {Object=} filter
- * @returns {{
- *   totalCount: number,
- *   totalSales: number,
- *   totalFee: number,
- *   totalShipping: number,
- *   totalCost: number,
- *   totalProfit: number,
- *   profitRate: number
- * }}
+ * @returns {{totalCount:number,totalSales:number,totalFee:number,totalShipping:number,totalCost:number,totalProfit:number,profitRate:number}}
  */
 function getDashboardSummary(filter) {
   var emptySummary = {
@@ -537,18 +353,14 @@ function getDashboardSummary(filter) {
   function toNumber(value) {
     if (typeof value === 'number') return isFinite(value) ? value : 0;
     if (value === null || value === undefined || value === '') return 0;
-
-    var normalized = String(value)
-      .replace(/[,\s]/g, '')
-      .replace(/[￥¥]/g, '')
-      .replace(/，/g, '');
+    var normalized = String(value).replace(/[\s,，￥¥]/g, '');
     var num = parseFloat(normalized);
     return isNaN(num) ? 0 : num;
   }
 
   try {
     var items = listItems(filter);
-    if (!items || items.length === 0) return emptySummary;
+    if (!items.length) return emptySummary;
 
     var salesKey = CONFIG.HEADERS[CONFIG.COLS.PRICE_FINAL - 1];
     var feeKey = CONFIG.HEADERS[CONFIG.COLS.FEE - 1];
@@ -570,7 +382,6 @@ function getDashboardSummary(filter) {
       var fee = toNumber(item[feeKey]);
       var shipping = toNumber(item[shippingKey]);
       var cost = toNumber(item[costKey]);
-
       summary.totalSales += sale;
       summary.totalFee += fee;
       summary.totalShipping += shipping;
@@ -578,10 +389,7 @@ function getDashboardSummary(filter) {
       summary.totalProfit += sale - fee - shipping - cost;
     });
 
-    summary.profitRate = summary.totalSales !== 0
-      ? (summary.totalProfit / summary.totalSales) * 100
-      : 0;
-
+    summary.profitRate = summary.totalSales ? (summary.totalProfit / summary.totalSales) * 100 : 0;
     return summary;
   } catch (error) {
     Logger.log('getDashboardSummary error: ' + error);
@@ -596,34 +404,25 @@ function getDashboardSummary(filter) {
  */
 function exportCsv(filter) {
   var items = listItems(filter);
-  if (!items || items.length === 0) return '';
+  if (!items.length) return '';
 
   var headers = Object.keys(items[0]);
 
   function escapeCsvCell(value) {
     if (value === null || value === undefined) return '""';
-    var text = String(value).replace(/"/g, '""');
-    return '"' + text + '"';
+    return '"' + String(value).replace(/"/g, '""') + '"';
   }
 
-  var lines = [];
-  lines.push(headers.map(escapeCsvCell).join(','));
-
+  var lines = [headers.map(escapeCsvCell).join(',')];
   items.forEach(function(item) {
-    var line = headers.map(function(header) {
+    lines.push(headers.map(function(header) {
       return escapeCsvCell(item[header]);
-    }).join(',');
-    lines.push(line);
+    }).join(','));
   });
 
   return '\uFEFF' + lines.join('\r\n');
->>>>>>> origin/master
 }
 
-/**
- * テスト用の固定ダミー配列をJSON形式で返す。
- * @returns {GoogleAppsScript.Content.TextOutput}
- */
 function api_testList() {
   var dummyList = [
     { id: 'TEST-001', name: 'テスト商品A', price: 1000 },
