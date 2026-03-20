@@ -9,6 +9,8 @@ if not os.environ.get("SLACK_WEBHOOK_URL"):
     raise SystemExit(0)
 
 text = pathlib.Path("review_summary_ja.txt").read_text(encoding="utf-8").strip()
+if pathlib.Path("retry_issue_body.md").exists():
+    text += "\n\n?????????: retry_issue_body.md"
 payload = json.dumps({"text": text}).encode("utf-8")
 
 req = urllib.request.Request(
