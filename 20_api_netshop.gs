@@ -325,6 +325,7 @@ function lookupAddressByZip(zip) {
 }
 
 function api_listItems(filter) {
+  Logger.log('api_listItems called');
   return listItems(filter);
 }
 

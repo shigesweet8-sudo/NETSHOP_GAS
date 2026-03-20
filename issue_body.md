@@ -1,79 +1,57 @@
 # ALTANA AI FACTORY ISSUE
 
+---
+
 ## MODE
 DIRECT
 
 ---
 
 ## GOAL
-
-テスト：商品一覧API作成
+商品一覧取得APIに軽微なログ出力を追加し、実コード差分が確実に発生するテストを行う
 
 ---
 
 ## CHANGE TYPE
-
-追加
+修正
 
 ---
 
 ## PROJECT
-
 NETSHOP_GAS
 
 ---
 
 ## MODULE
-
 API
 
 ---
 
 ## TARGET FILE
-
 20_api_netshop.gs
 
 ---
 
-## TASK
+## TASKS
 
-TASK1  
-20_api_netshop.gs  
-api_testList 関数を追加  
-
-TASK2  
-20_api_netshop.gs  
-固定のダミー配列を返す処理を実装  
-
-TASK3  
-20_api_netshop.gs  
-JSON形式で return する  
+1. api_listItems 関数内に Logger.log を1行追加する  
+2. 既存ロジックは一切変更しない  
+3. 実コード差分のみを発生させる（md/json変更禁止）
 
 ---
 
-## SPEC
+## CONSTRAINTS
 
-API名  
-api_testList()
-
-処理  
-固定データを返す
-
----
-
-## EXPECT RESULT
-
-api_testList が追加される
+- 他ファイルは変更しない
+- ロジック変更禁止
+- 削除禁止
+- 追加は Logger.log のみ
+- 最小差分
 
 ---
 
-## REVIEW CHECK
+## DONE CONDITION
 
-関数重複なし  
-正常にreturnされる  
-
----
-
-## NOTE
-
-HTMLは触らない
+- 20_api_netshop.gs に1行のログ追加が入る
+- PRに実コード差分が含まれる
+- ReviewがSAFEまたは適切な判定になる
