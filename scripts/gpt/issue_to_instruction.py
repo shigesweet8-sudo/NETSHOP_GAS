@@ -5,34 +5,31 @@ import re
 import urllib.request
 
 
-SYSTEM_PROMPT = """You are an AI architect inside ALTANA FACTORY. Analyze the GitHub Issue and respond in plain text using exactly this structure.
+SYSTEM_PROMPT = """You are an AI architect inside ALTANA FACTORY.
 
-For a simple issue, do not over-decompose it:
-MODE: DIRECT
+You must ALWAYS decompose the given Issue into implementation tasks.
+
+OUTPUT FORMAT (STRICT):
+
+TASKS:
+1.
+2.
+3.
 
 CODEX_INSTRUCTION:
 <implementation instruction>
 
-For a complex issue, decompose it into only the minimum necessary tasks:
-MODE: PLAN
-
-TASKS:
-1. ...
-2. ...
-3. ...
-
-CODEX_INSTRUCTION:
-<organized implementation instruction>
-
-Always include CODEX_INSTRUCTION. Keep TASKS only for complex issues.
-
-STRICT RULES:
-- Follow the Issue content exactly.
-- Do NOT introduce new features.
-- Do NOT change files not listed in TARGET FILE.
-- Do NOT infer or expand beyond the described TASK.
-- If information is missing, do NOT guess.
-- Only generate instructions strictly based on the given Issue."""
+RULES:
+- Always output TASKS (1 to 3 tasks only; no empty tasks)
+- Each task must include:
+  - target file
+  - exact implementation action
+- Do NOT summarize the issue
+- Do NOT use abstract expressions (ensure, verify, check, etc.)
+- Do NOT introduce new features
+- Do NOT modify files not listed in TARGET FILE
+- If information is missing, do NOT guess
+- Keep instructions concrete and directly implementable"""
 
 
 def main() -> None:
@@ -40,7 +37,7 @@ def main() -> None:
     api_key = os.environ["OPENAI_API_KEY"]
 
     payload = {
-        "model": "gpt-4o-mini",
+        "model": "gpt-5.4",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": issue_body},
@@ -66,8 +63,8 @@ def main() -> None:
     content = data["choices"][0]["message"]["content"].strip()
 
     tasks_match = re.search(r"(?s)TASKS:\s*(.*?)\n\s*CODEX_INSTRUCTION:", content)
-    if tasks_match:
-        pathlib.Path("issue_tasks.md").write_text(tasks_match.group(1).strip() + "\n", encoding="utf-8")
+    tasks = tasks_match.group(1).strip() if tasks_match else ""
+    pathlib.Path("issue_tasks.md").write_text(tasks + "\n", encoding="utf-8")
 
     instruction_match = re.search(r"(?s)CODEX_INSTRUCTION:\s*(.*)$", content)
     instruction = instruction_match.group(1).strip() if instruction_match else content
