@@ -311,6 +311,30 @@ function buildBulkUpdateResponse_(ok, message, successCount, failureCount, updat
   };
 }
 
+function writeUpdatedRows_(sheet, headersLength, rows, rowIndexes) {
+  if (!rowIndexes.length) return;
+
+  var sortedIndexes = rowIndexes.slice().sort(function(a, b) {
+    return a - b;
+  });
+  var blockStart = sortedIndexes[0];
+  var blockValues = [rows[blockStart]];
+
+  for (var i = 1; i < sortedIndexes.length; i++) {
+    var rowIndex = sortedIndexes[i];
+    if (rowIndex === sortedIndexes[i - 1] + 1) {
+      blockValues.push(rows[rowIndex]);
+      continue;
+    }
+
+    sheet.getRange(blockStart + 2, 1, blockValues.length, headersLength).setValues(blockValues);
+    blockStart = rowIndex;
+    blockValues = [rows[rowIndex]];
+  }
+
+  sheet.getRange(blockStart + 2, 1, blockValues.length, headersLength).setValues(blockValues);
+}
+
 function bulkUpdateStatus(itemIds, status, memo) {
   var normalizedIds = (Array.isArray(itemIds) ? itemIds : []).map(function(itemId) {
     return String(itemId || '').trim();
@@ -337,7 +361,7 @@ function bulkUpdateStatus(itemIds, status, memo) {
 
   var updatedItemIds = [];
   var failedItemIds = [];
-  var rowIndexesToUpdate = [];
+  var rowIndexesToUpdate = {};
 
   normalizedIds.forEach(function(itemId) {
     var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
@@ -346,13 +370,17 @@ function bulkUpdateStatus(itemIds, status, memo) {
       return;
     }
     snapshot.rows[rowIndex] = applyStatusUpdateToRowValues_(snapshot.rows[rowIndex], status, memo);
-    rowIndexesToUpdate.push(rowIndex);
+    rowIndexesToUpdate[rowIndex] = true;
     updatedItemIds.push(itemId);
   });
 
-  if (rowIndexesToUpdate.length) {
+  var uniqueRowIndexes = Object.keys(rowIndexesToUpdate).map(function(rowIndex) {
+    return Number(rowIndex);
+  });
+
+  if (uniqueRowIndexes.length) {
     try {
-      snapshot.sheet.getRange(2, 1, snapshot.rows.length, snapshot.headers.length).setValues(snapshot.rows);
+      writeUpdatedRows_(snapshot.sheet, snapshot.headers.length, snapshot.rows, uniqueRowIndexes);
     } catch (error) {
       Logger.log('bulkUpdateStatus error: ' + error);
       return buildBulkUpdateResponse_(false, String(error), 0, normalizedIds.length, [], normalizedIds.slice());
