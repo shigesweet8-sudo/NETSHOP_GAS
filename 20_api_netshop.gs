@@ -618,3 +618,19 @@ function exportCsv(filter) {
   return '\uFEFF' + lines.join('\r\n');
 >>>>>>> origin/master
 }
+
+/**
+ * テスト用の固定ダミー配列をJSON形式で返す。
+ * @returns {GoogleAppsScript.Content.TextOutput}
+ */
+function api_testList() {
+  var dummyList = [
+    { id: 'TEST-001', name: 'テスト商品A', price: 1000 },
+    { id: 'TEST-002', name: 'テスト商品B', price: 2000 },
+    { id: 'TEST-003', name: 'テスト商品C', price: 3000 }
+  ];
+
+  return ContentService
+    .createTextOutput(JSON.stringify(dummyList))
+    .setMimeType(ContentService.MimeType.JSON);
+}
