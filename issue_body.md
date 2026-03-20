@@ -4,10 +4,8 @@
 DIRECT
 
 ## GOAL
-NETSHOP_GAS の WAVE Phase1 正式番号 [6] として、一括ステータス更新APIを追加する
-
-## CHANGE TYPE
-追加
+NETSHOP_GAS の WAVE Phase1 正式番号 [6] として、
+一括ステータス更新APIを 20_api_netshop.gs に追加する。
 
 ## PROJECT
 NETSHOP_GAS
@@ -15,38 +13,54 @@ NETSHOP_GAS
 ## MODULE
 API
 
+## CHANGE TYPE
+追加
+修正
+
 ## TARGET FILE
 20_api_netshop.gs
 
-## CONTEXT
-既存の単体ステータス更新API [5] updateItemStatus は存在している
-次は正式番号順に [6] 一括ステータス更新API を実装する
-既存業務仕様では、統合売上データのステータス更新時に D列 DATE を更新する
-また、ステータスが「商品登録」で E列が空の場合のみ、E列 商品登録日を初回固定する
-今回の一括更新でも、この既存ルールを崩さず継承すること
-
 ## TASKS
-1. 20_api_netshop.gs に一括ステータス更新APIを追加する
-2. 複数の管理IDを受け取り、同一ステータスへ一括更新できるようにする
-3. 更新時は既存の単体更新と同じ業務ルールを守る
-   - ステータス更新時に D列 DATE を更新
-   - ステータスが「商品登録」かつ E列が空のときのみ E列 商品登録日を設定
-4. 返却値は、成功件数・失敗件数・対象ID一覧が分かる最小限のJSONにする
-5. 既存の単体 updateItemStatus を壊さない
+1.
+bulkUpdateItemStatus(items) を追加する
+- 入力は配列
+- 各要素は { id, status } を想定
+- id は管理ID
+- status は CONFIG.STATUS_LIST の既存ステータスのみ許可
+- 空配列や不正入力はエラーにする
+
+2.
+既存の updateItemStatus の業務ルールを流用して、
+対象行の A列ステータスを更新する
+- D列 DATE は更新日時として更新する
+- status が「商品登録」で、E列 商品登録日 が空の場合のみ E列を設定する
+- 既存データの他列は変更しない
+
+3.
+API公開用の薄いラッパを追加する
+- 既存命名に合わせる
+- 戻り値は success / updatedCount / items など最小限でよい
+- 個人情報列は返さない
+
+## ACCEPTANCE CRITERIA
+- 20_api_netshop.gs のみ変更
+- 一括で複数 id のステータス更新ができる
+- D列 DATE 更新ロジックが入る
+- E列 商品登録日 固定ロジックが入る
+- 個人情報を返さない
+- 構文エラーがない
 
 ## CONSTRAINTS
 - 変更対象は 20_api_netshop.gs のみ
-- 他ファイル変更禁止
-- 最小差分
-- 既存構造を壊さない
+- 既存の listItems / getItem / createItem / updateItem / updateItemStatus は壊さない
+- UIファイルは触らない
+- 新規ライブラリ追加禁止
 - 推測で列構成を増やさない
-- 個人情報列の新規返却禁止
-- 実コードdiffを必ず含める
-- diff --git 形式で出力
+- 最小差分で実装する
 
-## DONE CONDITION
-- 20_api_netshop.gs に [6] 一括ステータス更新API が追加される
-- 複数IDに対して同一ステータス更新の処理が存在する
-- D列 DATE 更新ロジックが入っている
-- 「商品登録」初回時のみ E列 商品登録日固定ロジックが入っている
-- PR に .gs の実コード差分が含まれる
+## NOTES
+- 正式番号ベースでは [6] 一括ステータス更新API
+- Spreadsheet の中核シートは「統合売上データ」
+- 業務ルールは既存仕様に合わせる
+- D列 = DATE（ステータス更新日時）
+- E列 = 商品登録日（status が 商品登録 かつ空のときのみ設定）
