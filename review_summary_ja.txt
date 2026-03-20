@@ -1,10 +1,10 @@
 ALTANA AI FACTORY REVIEW
 
 Issue
-feat: [6] bulkUpdateStatus API（ステータス一括更新API）追加
+test: review日本語化確認（2回目）
 
 Changed Files
-codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
+20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
 
 Risk
 SAFE
