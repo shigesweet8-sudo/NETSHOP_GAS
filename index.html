@@ -865,7 +865,11 @@
         if (!response || typeof response !== "object") return [];
         if (Array.isArray(response.data)) return response.data;
         if (response.data && Array.isArray(response.data.items)) return response.data.items;
+        if (response.data && Array.isArray(response.data.list)) return response.data.list;
+        if (response.data && Array.isArray(response.data.rows)) return response.data.rows;
         if (Array.isArray(response.items)) return response.items;
+        if (Array.isArray(response.list)) return response.list;
+        if (Array.isArray(response.rows)) return response.rows;
         return [];
       }
 
@@ -971,13 +975,30 @@
 
       function getCurrentHeaders(items) {
         if (!items || !items.length) return [];
-        return Object.keys(items[0]);
+        var seen = {};
+        var headers = [];
+        items.forEach(function(item) {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return;
+          Object.keys(item).forEach(function(key) {
+            if (seen[key]) return;
+            seen[key] = true;
+            headers.push(key);
+          });
+        });
+        return headers;
       }
 
       function resolveItemId(item) {
         if (!item || typeof item !== "object") return "";
         if (item.id != null && String(item.id).trim() !== "") return String(item.id).trim();
         if (item["管理ID"] != null && String(item["管理ID"]).trim() !== "") return String(item["管理ID"]).trim();
+        return "";
+      }
+
+      function resolveItemStatus(item) {
+        if (!item || typeof item !== "object") return "";
+        if (item.status != null && String(item.status).trim() !== "") return String(item.status).trim();
+        if (item["ステータス"] != null && String(item["ステータス"]).trim() !== "") return String(item["ステータス"]).trim();
         return "";
       }
 
@@ -992,7 +1013,7 @@
         var statusFilter = String(state.statusFilter || "").trim();
         return (items || []).filter(function(item) {
           if (statusFilter) {
-            var itemStatus = item && item.status != null ? String(item.status) : "";
+            var itemStatus = resolveItemStatus(item);
             if (itemStatus !== statusFilter) return false;
           }
           if (!keyword) return true;
@@ -1033,9 +1054,8 @@
         var statusMap = {};
 
         list.forEach(function(item) {
-          if (item && item.status != null && String(item.status).trim()) {
-            statusMap[String(item.status)] = true;
-          }
+          var status = resolveItemStatus(item);
+          if (status) statusMap[status] = true;
         });
 
         var statuses = Object.keys(statusMap).sort();
@@ -1774,6 +1794,20 @@
         document.getElementById("edit-memo").value = values.memo;
       }
 
+      function buildEditUpdatePayload() {
+        var current = collectEditPayload();
+        var initial = state.editInitialValues || {};
+        var payload = {};
+        Object.keys(current).forEach(function(key) {
+          var currentValue = String(current[key] || "").trim();
+          var initialValue = String(initial[key] || "").trim();
+          if (currentValue !== initialValue) {
+            payload[key] = currentValue;
+          }
+        });
+        return payload;
+      }
+
       function resetEditFormToInitial() {
         if (!state.editInitialValues) return;
         ensureSelectHasValue("edit-status", state.editInitialValues.status);
@@ -1852,9 +1886,19 @@
           return;
         }
 
+        if (!state.editInitialValues) {
+          setEditInlineMessage("error", "初期データが未取得のため保存できません。");
+          return;
+        }
+
         setEditSubmitting(true);
         setEditInlineMessage("info", "保存しています...");
-        var payload = collectEditPayload();
+        var payload = buildEditUpdatePayload();
+        if (!Object.keys(payload).length) {
+          setEditInlineMessage("info", "変更がないため保存は不要です。");
+          setEditSubmitting(false);
+          return;
+        }
 
         callWrappedApi("api_updateItem", [itemId, payload]).then(function() {
           setEditInlineMessage("success", "保存に成功しました。");
@@ -1885,9 +1929,13 @@
 
         return callWrappedApi("getItem", [normalizedId]).then(function(response) {
           state.detailItem = response && response.data ? response.data : null;
-          state.detailErrorMessage = "";
+          state.detailErrorMessage = state.detailItem ? "" : "対象データが見つかりません。";
           if (!opts.silentSuccessBanner) {
-            setBanner("info", "商品詳細を表示しました。");
+            if (state.detailItem) {
+              setBanner("info", "商品詳細を表示しました。");
+            } else {
+              setBanner("error", "対象データが見つかりませんでした。");
+            }
           }
         }).catch(function(err) {
           state.detailItem = null;
