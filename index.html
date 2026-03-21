@@ -893,10 +893,146 @@
         editSubmitting: false,
         createSubmitting: false,
         dashboardLoading: false,
+        routeSyncLock: false,
         mastersLoaded: false,
         masterStatusOptions: [],
         masterShopOptions: []
       };
+
+      var ROUTE_MODES = {
+        list: true,
+        detail: true,
+        create: true,
+        edit: true,
+        dashboard: true
+      };
+
+      function normalizeRouteMode(mode) {
+        var normalized = String(mode || "").trim().toLowerCase();
+        return ROUTE_MODES[normalized] ? normalized : "list";
+      }
+
+      function normalizeRouteId(id) {
+        return String(id == null ? "" : id).trim();
+      }
+
+      function parseRouteFromParams(params) {
+        var mode = normalizeRouteMode(
+          params.get("v") ||
+          params.get("view") ||
+          params.get("mode")
+        );
+        var id = normalizeRouteId(
+          params.get("id") ||
+          params.get("itemId")
+        );
+        if ((mode === "detail" || mode === "edit") && !id) {
+          mode = "list";
+        }
+        return { mode: mode, id: id };
+      }
+
+      function parseRouteFromHash(hash) {
+        var raw = String(hash || "").replace(/^#/, "").trim();
+        if (!raw) return null;
+        if (raw.charAt(0) === "/") raw = raw.slice(1);
+
+        if (raw.indexOf("=") === -1) {
+          var modeOnly = normalizeRouteMode(raw.split(":")[0]);
+          var simpleId = normalizeRouteId(raw.split(":")[1] || "");
+          if ((modeOnly === "detail" || modeOnly === "edit") && !simpleId) modeOnly = "list";
+          return { mode: modeOnly, id: simpleId };
+        }
+
+        return parseRouteFromParams(new URLSearchParams(raw));
+      }
+
+      function parseRouteFromSearch(search) {
+        var raw = String(search || "").replace(/^\?/, "").trim();
+        if (!raw) return null;
+        return parseRouteFromParams(new URLSearchParams(raw));
+      }
+
+      function resolveRouteFromUrl() {
+        var fromHash = parseRouteFromHash(window.location.hash);
+        if (fromHash) return fromHash;
+        var fromSearch = parseRouteFromSearch(window.location.search);
+        if (fromSearch) return fromSearch;
+        return { mode: "list", id: "" };
+      }
+
+      function getCurrentRouteState() {
+        var mode = normalizeRouteMode(state.viewMode || "list");
+        var id = "";
+        if (mode === "detail") {
+          id = normalizeRouteId(state.detailItemId);
+        } else if (mode === "edit") {
+          id = normalizeRouteId(state.editItemId || state.detailItemId);
+        }
+        return { mode: mode, id: id };
+      }
+
+      function buildHashFromRoute(route) {
+        var normalizedMode = normalizeRouteMode(route && route.mode);
+        var normalizedId = normalizeRouteId(route && route.id);
+        var params = new URLSearchParams();
+        params.set("v", normalizedMode);
+        if ((normalizedMode === "detail" || normalizedMode === "edit") && normalizedId) {
+          params.set("id", normalizedId);
+        }
+        return "#" + params.toString();
+      }
+
+      function isSameRoute(routeA, routeB) {
+        var a = routeA || {};
+        var b = routeB || {};
+        return normalizeRouteMode(a.mode) === normalizeRouteMode(b.mode) &&
+          normalizeRouteId(a.id) === normalizeRouteId(b.id);
+      }
+
+      function syncUrlWithState(options) {
+        var opts = options && typeof options === "object" ? options : {};
+        var targetHash = buildHashFromRoute(getCurrentRouteState());
+        if (window.location.hash === targetHash) return;
+
+        if (opts.replace) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search + targetHash);
+          return;
+        }
+
+        state.routeSyncLock = true;
+        window.location.hash = targetHash;
+      }
+
+      function restoreRoute(route, options) {
+        var opts = options && typeof options === "object" ? options : {};
+        var resolved = route && typeof route === "object" ? route : { mode: "list", id: "" };
+        var targetMode = normalizeRouteMode(resolved.mode);
+        var targetId = normalizeRouteId(resolved.id);
+
+        if (!opts.skipConfirm && !confirmNavigationIfNeeded(targetMode)) {
+          syncUrlWithState({ replace: true });
+          return;
+        }
+
+        if (targetMode === "detail") {
+          openDetailById(targetId, { silentSuccessBanner: true, fromRouteRestore: true });
+          return;
+        }
+        if (targetMode === "edit") {
+          openEditScreen(targetId, { fromRouteRestore: true });
+          return;
+        }
+        if (targetMode === "create") {
+          openCreateScreen({ skipConfirm: true, ignoreBusy: true });
+          return;
+        }
+        if (targetMode === "dashboard") {
+          openDashboardScreen({ skipConfirm: true, ignoreBusy: true });
+          return;
+        }
+        switchScreen("list");
+      }
 
       function getViewModeLabel(mode) {
         if (mode === "detail") return "商品詳細";
@@ -908,7 +1044,8 @@
 
       function updateScreenContext() {
         var mode = state.viewMode || "list";
-        var idText = state.detailItemId ? " / 管理ID: " + state.detailItemId : "";
+        var contextId = mode === "edit" ? state.editItemId : state.detailItemId;
+        var idText = (mode === "detail" || mode === "edit") && contextId ? " / 管理ID: " + contextId : "";
         var modeLabel = getViewModeLabel(mode);
         var routeText = mode === "list"
           ? "主要導線: 詳細 / ダッシュボード / 新規登録"
@@ -1469,9 +1606,10 @@
         });
       }
 
-      function openCreateScreen() {
-        if (isAnyBusy()) return;
-        if (!confirmNavigationIfNeeded("create")) return;
+      function openCreateScreen(options) {
+        var opts = options && typeof options === "object" ? options : {};
+        if (!opts.ignoreBusy && isAnyBusy()) return;
+        if (!opts.skipConfirm && !confirmNavigationIfNeeded("create")) return;
         setInlineMessage("", "");
         clearValidationResult("create");
         switchScreen("create");
@@ -1502,6 +1640,11 @@
         editSection.classList.toggle("screen-hidden", state.viewMode !== "edit");
         updateScreenContext();
         refreshGlobalActionState();
+        syncUrlWithState();
+
+        if (state.viewMode === "list" && !state.loading && !state.allItems.length) {
+          loadItemsWithCurrentSort({ forceBaseLoad: true });
+        }
       }
 
       function findFirstValue(item, keys) {
@@ -1701,9 +1844,10 @@
         });
       }
 
-      function openDashboardScreen() {
-        if (isAnyBusy()) return;
-        if (!confirmNavigationIfNeeded("dashboard")) return;
+      function openDashboardScreen(options) {
+        var opts = options && typeof options === "object" ? options : {};
+        if (!opts.ignoreBusy && isAnyBusy()) return;
+        if (!opts.skipConfirm && !confirmNavigationIfNeeded("dashboard")) return;
         switchScreen("dashboard");
         loadDashboard();
       }
@@ -1842,14 +1986,21 @@
         };
       }
 
-      function openEditScreen(itemId) {
+      function openEditScreen(itemId, options) {
+        var opts = options && typeof options === "object" ? options : {};
         var normalizedId = String(itemId || state.detailItemId || "").trim();
         if (!normalizedId) {
-          setBanner("error", "管理IDを特定できないため編集画面を開けません。");
+          if (opts.fromRouteRestore) {
+            setBanner("error", "編集対象を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+          } else {
+            setBanner("error", "管理IDを特定できないため編集画面を開けません。");
+          }
           return;
         }
 
         state.editItemId = normalizedId;
+        state.detailItemId = normalizedId;
         state.editInitialValues = null;
         setEditInlineMessage("", "");
         clearValidationResult("edit");
@@ -1871,8 +2022,13 @@
         Promise.all([mastersPromise, detailPromise]).then(function() {
           resetEditFormToInitial();
         }).catch(function(err) {
-          setEditInlineMessage("error", "編集データの取得に失敗しました: " + resolveErrorMessage(err));
-          setBanner("error", "編集画面の初期化に失敗しました。");
+          if (opts.fromRouteRestore) {
+            setBanner("error", "編集画面を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+          } else {
+            setEditInlineMessage("error", "編集データの取得に失敗しました: " + resolveErrorMessage(err));
+            setBanner("error", "編集画面の初期化に失敗しました。");
+          }
         }).finally(function() {
           setEditLoading(false);
         });
@@ -1916,7 +2072,12 @@
         var opts = options && typeof options === "object" ? options : {};
         var normalizedId = String(itemId || "").trim();
         if (!normalizedId) {
-          setBanner("error", "管理IDを特定できないため詳細を開けません。");
+          if (opts.fromRouteRestore) {
+            setBanner("error", "詳細対象を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+          } else {
+            setBanner("error", "管理IDを特定できないため詳細を開けません。");
+          }
           return Promise.resolve();
         }
 
@@ -1930,6 +2091,11 @@
         return callWrappedApi("getItem", [normalizedId]).then(function(response) {
           state.detailItem = response && response.data ? response.data : null;
           state.detailErrorMessage = state.detailItem ? "" : "対象データが見つかりません。";
+          if (!state.detailItem && opts.fromRouteRestore) {
+            setBanner("error", "詳細対象を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+            return;
+          }
           if (!opts.silentSuccessBanner) {
             if (state.detailItem) {
               setBanner("info", "商品詳細を表示しました。");
@@ -1940,7 +2106,12 @@
         }).catch(function(err) {
           state.detailItem = null;
           state.detailErrorMessage = resolveErrorMessage(err);
-          setBanner("error", "商品詳細の取得に失敗しました: " + resolveErrorMessage(err));
+          if (opts.fromRouteRestore) {
+            setBanner("error", "詳細画面を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+          } else {
+            setBanner("error", "商品詳細の取得に失敗しました: " + resolveErrorMessage(err));
+          }
         }).finally(function() {
           state.detailLoading = false;
           renderDetailContent();
@@ -2255,9 +2426,21 @@
         }
       });
 
+      window.addEventListener("hashchange", function() {
+        if (state.routeSyncLock) {
+          state.routeSyncLock = false;
+          return;
+        }
+
+        var targetRoute = resolveRouteFromUrl();
+        var currentRoute = getCurrentRouteState();
+        if (isSameRoute(targetRoute, currentRoute)) return;
+
+        restoreRoute(targetRoute, { skipConfirm: false });
+      });
+
       updateBulkUiState();
-      switchScreen("list");
-      loadItemsWithCurrentSort({ forceBaseLoad: true });
+      restoreRoute(resolveRouteFromUrl(), { skipConfirm: true });
     </script>
   </body>
 </html>
