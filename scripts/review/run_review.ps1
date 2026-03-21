@@ -21,6 +21,9 @@ payload = {
 
 最重要ルール:
 - 事実ベースで判断し、diff から確認できないことは推測しない
+- diff だけでは断定できない懸念は OPEN QUESTIONS または WARNING に留める
+- 「存在する場合」「未確認」「可能性がある」だけの指摘を HIGH / CRITICAL にしてはいけない
+- HIGH / CRITICAL は、diff 上で直接確認できる明確な不具合・破壊的変更・構文問題・互換性破壊に限定する
 - 指摘は「なぜ問題か」と「どこが問題か」を必ずセットで書く
 - 実装ファイルの差分がない場合は、その事実を最優先で指摘する
 - 軽微なスタイル指摘より、動作不良や運用リスクを優先する
@@ -44,6 +47,11 @@ SUMMARY:
 - HIGH: 実装対象コードの差分なし、仕様逸脱、明確な不具合、重要な回帰の可能性が高い
 - WARNING: 要確認事項やテスト不足、設計上の懸念
 - SAFE: 明確な問題を確認できない
+
+重要な補足:
+- 既存ファイルに同名関数があるか不明、別ファイルの定義が見えていない、外部クライアント互換が diff だけでは分からない、のような論点は WARNING か OPEN QUESTIONS にする
+- Issue の要求を満たす実装が入っていて、diff 上で明確な不具合を確認できないなら SAFE または WARNING にする
+- 最上位の SEVERITY は、個別 FINDINGS の中で最も重い「確定指摘」に合わせる
 
 レビュー観点:
 - Issue の意図に沿っているか
@@ -75,3 +83,4 @@ with urllib.request.urlopen(req) as res:
     pathlib.Path("review_result.json").write_text(body, encoding="utf-8")
     print(body)
 '@ | python -
+

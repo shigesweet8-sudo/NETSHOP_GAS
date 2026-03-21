@@ -27,11 +27,13 @@ def extract_changed_files(diff_text: str) -> list[str]:
 
 
 def classify_review(content: str, changed_files: list[str]) -> dict:
-    review_upper = content.upper()
+    content = content.lstrip('\ufeff')
     implementation_files = [p for p in changed_files if p.endswith(IMPLEMENTATION_SUFFIXES)]
     meta_only = bool(changed_files) and all(pathlib.Path(p).name in META_ONLY_NAMES for p in changed_files)
-    has_critical = 'CRITICAL' in review_upper
-    has_high = bool(re.search(r'\bHIGH\b', review_upper))
+    severity_match = re.search(r'^SEVERITY:\s*(SAFE|WARNING|HIGH|CRITICAL)\s*$', content, re.MULTILINE | re.IGNORECASE)
+    severity = severity_match.group(1).upper() if severity_match else ''
+    has_critical = severity == 'CRITICAL'
+    has_high = severity == 'HIGH'
 
     if not changed_files:
         status = 'PIPELINE_NG'
@@ -58,6 +60,7 @@ def classify_review(content: str, changed_files: list[str]) -> dict:
         'implementation_files': implementation_files,
         'meta_only': meta_only,
         'has_high_or_critical': has_critical or has_high,
+        'top_severity': severity,
     }
 
 
@@ -153,3 +156,4 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
+
