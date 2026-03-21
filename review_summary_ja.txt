@@ -1,10 +1,10 @@
 ALTANA AI FACTORY レビュー
 
 Issue
-UI設計着手前の確１
+phase１最適化
 
 変更ファイル
-20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
+20_api_netshop.gs, codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
 
 実装判定
 実装あり
@@ -23,17 +23,21 @@ SEVERITY: WARNING
 ACTION: REVIEW NEEDED
 
 FINDINGS:
-- [WARNING] 20_api_netshop.gs:extractUiFilterPayload_ — ITEM_FIELD_TO_HEADER を直接参照しています (Object.keys(ITEM_FIELD_TO_HEADER)). この定数がこのファイル内またはグローバルで必ず定義されているとは diff からは確認できません。未定義だとこの関数呼び出し時に TypeError (Cannot convert undefined or null to object) が発生し、UI API が例外で失敗します。対処案：存在チェックを入れるか、フォールバック（空オブジェクト）を使用してください。
-- [WARNING] 20_api_netshop.gs:api_uiDashboardKpi — getDashboardSummary を存在チェックせずに呼んでいます。try/catch により例外はハンドルされますが、存在しない場合のエラーメッセージが分かりにくくなります。関数未定義時は明示的なエラー応答を返すか、呼び出す前に typeof チェックを追加することを推奨します。
-- [WARNING] 20_api_netshop.gs:api_uiExportCsv — CSV の戻り値として csvText（元文字列、BOM を含む可能性あり）を返しつつ、body（BOM を取り除いた文字列）を行数計算にのみ使用しています。UI に渡す CSV を BOM あり/なしどちらにするか仕様を明確にしてください。現状だと hasBom フラグは返されていますが、UI 側でどちらを使うべきか混乱する可能性があります。
-- [WARNING] 20_api_netshop.gs:api_uiLookupZip — lookupAddressByZip の有無はチェックしていますが、lookupAddressByZip が非同期処理や例外を投げる実装だと catch 以外の細かい状況説明が無いため、UI 側で問題切り分けがしづらくなります。問題が発生したときにどのような details を含めるか検討してください（ただし個人情報取り扱いに注意）。
-- [WARNING] 20_api_netshop.gs:命名/戻り値整合性 — buildUiApiSuccessResponse_ / buildUiApiErrorResponse_ による統一レスポンスは良いですが、既存の他 API から返ってくる生の配列や文字列をこのラッパーで吸収する前提があるかどうかは diff から未確認です。既存の API 呼び出し経路が配列直返し等を期待しているクライアントが無いか確認してください。
+- [warning] 20_api_netshop.gs:1-120 共通レスポンスヘルパーの追加（buildApiSuccessResponse_, buildApiErrorResponse_ 等）は概ね正しいが、エラー詳細に「payload/result オブジェクト」をそのまま埋めるケースが複数あります。例えば bulkRecalculateProfit の catch/エラー経路（関数定義周辺）や buildDisableResponse_/buildArchiveResponse_（それぞれ payload を details/extra に渡す）で、内部の item オブジェクトやシート由来のフィールドが error.details や extra に含まれる可能性があります。シート内部のカラムや個人情報が含まれる場合、情報漏洩につながるリスクがあります。
+- [warning] 20_api_netshop.gs:224-320 多くの既存関数を「Raw_」サフィックス付きの内部実装とし、元の名前を API ラッパー（ok/error/data を返す）に置き換えています（例: listItems → listItemsRaw_ / listItems（ラッパー））。このパターンは UI 入口向けには良いが、プロジェクト内の他のコード（別ファイル・トリガー・内部ユーティリティ等）が従来の生データ（配列や単純オブジェクト）を直接返すことを前提に listItems 等を呼んでいる場合、戻り値の型が変わるため互換性破壊になります。diff 上で全ての内部呼び出しが Raw_ を参照するように置換されているかは確認できないため、既存呼び出し側の影響調査が必要です。
+- [warning] 20_api_netshop.gs:950-1010 validateVariation 系の変更では、元の validateVariation が API ラッパー（ok/error/data）を返すように置き換えられています。validateVariation は検証ユーティリティとして内部からも使われるケースが想定されやすく、内部利用箇所が生の検証オブジェクトを期待している場合は破壊的です（diff では呼び出し箇所の網羅確認ができないため要確認）。
+- [warning] 20_api_netshop.gs:1317-1560 サマリー系・CSV 出力系 API をラップして ok/data 形式にした変更は UI には有用ですが、exportCsv 等の関数名を wrapper と raw の二重構造にしているため、他モジュールが exportCsv を直接呼んで CSV 文字列を期待している場合に戻り値がオブジェクトに変わります。diff 上で呼び出し元の全置換が確認できないため影響調査が必要です。
+- [warning] 20_api_netshop.gs:1854-2060 buildBulkDisableResponse_, buildArchiveResponse_ 等で成功時・失敗時に返す shape が以前とは変わっています（ラッパーで ok/error/data を返す）。API の互換性維持のためトップレベルへの互換フィールド（例: items, platforms 等）を浅くコピーする意図はあるものの、copyDataToTopLevel オプションの利用でトップレベルに冗長なフィールドが増える可能性があります。既存の呼び出し側がトップレベルフィールドに依存している場合、どのキーを正として参照すべきかのドキュメント化が必要です。
+- [warning] 20_api_netshop.gs:1420-1500 buildUiApiErrorResponse_ のシグネチャを (message, details, code) に変更し buildApiErrorResponse_ を呼ぶ形に変更されています。diff 内の呼び出しは概ね合わせて更新されていますが、他ファイルからの呼び出しや未更新の呼び出しが残っていると引数の順序違いで誤った code/details の割当が起き得ます（呼び出し側の網羅確認を推奨）。
+- [warning] 20_api_netshop.gs:2018-2362 updateItemStatus / recalculateItemProfit 等で「Raw_」実装と API ラッパーを二重に定義していますが、同名の api_* エンドポイントが別に存在するところと混在しています。diff 上は多くの api_* が新しい wrapper を経由するように見えますが、古い呼び出し経路（外部スクリプトやトリガー）が残る可能性があるため、外部参照の洗い出しが必要です。
 
 OPEN QUESTIONS:
-- ITEM_FIELD_TO_HEADER はこのリポジトリ上で定義済みですか？（存在しない場合は extractUiFilterPayload_ が確実に失敗します）
-- getDashboardSummary / exportCsv / lookupAddressByZip の定義場所と戻り値フォーマットはどのようになっていますか？（期待される構造に合わせたラップが行われていますか）
-- api_uiExportCsv で UI に渡す CSV は BOM を残す想定ですか？それとも BOM を除去したものを渡す想定ですか？
-- これらの UI 用 API を呼び出す既存のフロントエンド（または他のコード）がある場合、戻り値形式の変更（{ok,data} / {ok,false,error}）に影響する呼び出しはありませんか？
+- このリポジトリ内で別ファイル（例: 10_webapp.gs, 02_triggers.gs など）や外部のバッチスクリプトが、今回ラップされた関数（listItems, getItem, exportCsv, validateVariation, createItem, updateItem, updateItemStatus 等）を「生の戻り値」を期待して直接呼んでいる箇所はありますか？ある場合、呼び出し側の差し替え/テストは済んでいますか？
+- error.details や compatibility.extra として返しているオブジェクト（payload/result）にシートの内部カラム（個人情報や運用上公開すべきでない値）が含まれる可能性はありますか？もしある場合、どのフィールドを除外するポリシーにしますか（例: 個人情報は除外）？
+- UI 側や既存の api_dispatchAction を経由するクライアントが、トップレベルの移行的フィールド（例: items, item, platforms, monthly, masters 等）に依存している件数は確認できますか？依存が多い場合、互換維持のための追加ラッパーが必要です。
+- buildApiErrorResponse_ の第3引数(details) と第4引数(compatibility) の使い分けルール（何を details に入れるか、compat.extra にどれだけ互換フィールドを残すか）をチームで合意していますか？（必要ならガイドライン化を推奨します）
 
 SUMMARY:
-- 20_api_netshop.gs に UI 用の API 入口とレスポンス統一ヘルパーが追加されており、概ね意図どおりに実装されています。重大な構文エラーや即時の致命的不具合は見つかりませんでした。ただし、ITEM_FIELD_TO_HEADER の存在確認漏れと外部関数（getDashboardSummary/exportCsv 等）への依存が diff から未確認のため、呼び出し時のランタイム例外や期待フォーマットの不一致が発生する可能性があります。これらについて確認・防御コードの追加をお願いします。
+- 目的どおり UI 向けに成功/失敗レスポンスを統一するヘルパー追加と各 API のラッピングは概ね実装されています。コードの一貫性向上と UI 側の扱いやすさは改善される見込みです。
+- ただし、既存の内部/外部呼び出しが「生の戻り値（配列・文字列・オブジェクトなど）」を期待している場合、戻り値型の変更により互換性が壊れるリスクがあります（diff 上で網羅的に置換されているか不明）。また、エラー時に内部オブジェクトを details/extra に詰める実装が複数あり、シート内部データ（場合によっては個人情報）を外部へ露出する可能性があるため注意が必要です。
+- 提案: ① 既存呼び出し（別ファイル・外部スクリプト含む）をリストアップして Raw_/wrapper 置換の影響を確認する、② エラーの details/extra に含めるフィールドを最小限にしセンシティブ情報を除外するポリシーを適用する、③ 変更後の戻り値仕様を簡潔にドキュメント化して依存箇所の修正を確実に行ってください。
