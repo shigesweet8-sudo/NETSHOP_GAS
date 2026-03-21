@@ -776,6 +776,27 @@
           return raw;
         }
 
+        // Backward compatibility for older deployed Apps Script versions
+        // that still return plain arrays for list/summary style APIs.
+        if (Array.isArray(raw)) {
+          return {
+            ok: true,
+            error: null,
+            data: raw
+          };
+        }
+
+        if (raw && typeof raw === "object") {
+          if (Array.isArray(raw.items) || Array.isArray(raw.list) || Array.isArray(raw.rows) ||
+              Array.isArray(raw.monthly) || Array.isArray(raw.platforms)) {
+            return {
+              ok: true,
+              error: null,
+              data: raw
+            };
+          }
+        }
+
         return {
           ok: false,
           error: {
@@ -862,6 +883,7 @@
       }
 
       function extractListItemsFromResponse(response) {
+        if (Array.isArray(response)) return response;
         if (!response || typeof response !== "object") return [];
         if (Array.isArray(response.data)) return response.data;
         if (response.data && Array.isArray(response.data.items)) return response.data.items;
