@@ -30,6 +30,11 @@ var ITEM_FIELD_TO_HEADER = Object.freeze({
   phone: '電話番号'
 });
 
+var ITEM_HEADER_TO_FIELD = Object.freeze(Object.keys(ITEM_FIELD_TO_HEADER).reduce(function(map, field) {
+  map[ITEM_FIELD_TO_HEADER[field]] = field;
+  return map;
+}, {}));
+
 var PERSONAL_INFO_HEADERS = Object.freeze([
   '購入者名',
   '郵便番号',
@@ -38,6 +43,44 @@ var PERSONAL_INFO_HEADERS = Object.freeze([
   '住所3(建物名)',
   '電話番号'
 ]);
+
+function toApiFieldKey_(key) {
+  if (key === null || key === undefined) return '';
+  var text = String(key);
+  if (Object.prototype.hasOwnProperty.call(ITEM_FIELD_TO_HEADER, text)) return text;
+  if (Object.prototype.hasOwnProperty.call(ITEM_HEADER_TO_FIELD, text)) return ITEM_HEADER_TO_FIELD[text];
+  return text;
+}
+
+function isPlainObject_(value) {
+  return value !== null &&
+    typeof value === 'object' &&
+    Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function convertValueKeysToApi_(value) {
+  if (Array.isArray(value)) {
+    return value.map(convertValueKeysToApi_);
+  }
+  if (!isPlainObject_(value)) {
+    return value;
+  }
+
+  var converted = {};
+  Object.keys(value).forEach(function(key) {
+    converted[toApiFieldKey_(key)] = convertValueKeysToApi_(value[key]);
+  });
+  return converted;
+}
+
+function convertFilterKeysToApi_(filter) {
+  if (!isPlainObject_(filter)) return filter;
+  var converted = {};
+  Object.keys(filter).forEach(function(key) {
+    converted[toApiFieldKey_(key)] = filter[key];
+  });
+  return converted;
+}
 
 function getManagementSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -148,20 +191,21 @@ function findRowIndexById_(rows, headers, itemId) {
 }
 
 function buildPublicItemFromRow_(headers, row) {
-  var item = {};
+  var source = {};
   headers.forEach(function(header, index) {
     if (PERSONAL_INFO_HEADERS.indexOf(header) !== -1) return;
-    item[header] = row[index];
+    source[header] = row[index];
   });
-  return item;
+  return convertValueKeysToApi_(source);
 }
 
 function applyFilter_(items, filter) {
   if (!filter || typeof filter !== 'object') return items;
+  var normalizedFilter = convertFilterKeysToApi_(filter);
   return items.filter(function(item) {
-    return Object.keys(filter).every(function(key) {
+    return Object.keys(normalizedFilter).every(function(key) {
       if (!(key in item)) return false;
-      return String(item[key]) === String(filter[key]);
+      return String(item[key]) === String(normalizedFilter[key]);
     });
   });
 }
@@ -208,6 +252,11 @@ function resolveSortKey_(items, sortKey) {
   var headerKey = ITEM_FIELD_TO_HEADER[key];
   if (headerKey && Object.prototype.hasOwnProperty.call(items[0], headerKey)) {
     return headerKey;
+  }
+
+  var fieldKey = ITEM_HEADER_TO_FIELD[key];
+  if (fieldKey && Object.prototype.hasOwnProperty.call(items[0], fieldKey)) {
+    return fieldKey;
   }
 
   return '';
@@ -720,7 +769,7 @@ function getMasters(payload) {
   });
 
   return {
-    masters: masters
+    masters: convertValueKeysToApi_(masters)
   };
 }
 
@@ -901,12 +950,12 @@ function validateVariationPayload_(payload) {
     );
   });
 
-  return {
+  return convertValueKeysToApi_({
     ok: issues.errors.length === 0,
     mode: mode,
     errors: issues.errors,
     warnings: issues.warnings
-  };
+  });
 }
 
 function api_validateVariation(payload) {
@@ -924,6 +973,10 @@ function api_validateVariation(payload) {
       warnings: []
     };
   }
+}
+
+function validateVariation(payload) {
+  return validateVariationPayload_(payload);
 }
 
 function applyStatusUpdateToRowValues_(rowValues, status, memo, headerResolution) {
@@ -1106,6 +1159,10 @@ function getMonthlySummaryForApi() {
   return getMonthlySummaryRows_();
 }
 
+function getMonthlySummary() {
+  return getMonthlySummaryForApi();
+}
+
 function getPlatformSummaryRows_() {
   var sheet = getManagementSheet_();
   if (!sheet) return [];
@@ -1157,6 +1214,10 @@ function getPlatformSummaryRows_() {
 
 function getPlatformSummaryForApi() {
   return getPlatformSummaryRows_();
+}
+
+function getPlatformSummary() {
+  return getPlatformSummaryForApi();
 }
 
 function api_getPlatformSummary() {
@@ -1683,10 +1744,10 @@ function getDashboardSummary(filter) {
     var items = listItems(filter);
     if (!items.length) return emptySummary;
 
-    var salesKey = CONFIG.HEADERS[CONFIG.COLS.PRICE_FINAL - 1];
-    var feeKey = CONFIG.HEADERS[CONFIG.COLS.FEE - 1];
-    var shippingKey = CONFIG.HEADERS[CONFIG.COLS.SHIPPING - 1];
-    var costKey = CONFIG.HEADERS[CONFIG.COLS.COST - 1];
+    var salesKey = toApiFieldKey_(CONFIG.HEADERS[CONFIG.COLS.PRICE_FINAL - 1]);
+    var feeKey = toApiFieldKey_(CONFIG.HEADERS[CONFIG.COLS.FEE - 1]);
+    var shippingKey = toApiFieldKey_(CONFIG.HEADERS[CONFIG.COLS.SHIPPING - 1]);
+    var costKey = toApiFieldKey_(CONFIG.HEADERS[CONFIG.COLS.COST - 1]);
 
     var summary = {
       totalCount: items.length,
