@@ -100,6 +100,48 @@ const CONFIG = Object.freeze({
     'キャンセル'
   ]),
 
+  NETSHOP_MASTERS: Object.freeze({
+    STATUS: Object.freeze([
+      '商品登録',
+      '出品中',
+      '値段交渉中',
+      '決済完了',
+      '発送準備中',
+      '発送完了',
+      '取引完了',
+      'キャンセル'
+    ]),
+    SHOP: Object.freeze([
+      'メルカリ(Cappa)',
+      'メルカリ(どすこい)',
+      'メルカリShops',
+      'ヤフオク(Cappa)',
+      'ヤフオク(海坊主)',
+      'Yahoo!Shop',
+      'Amazon'
+    ]),
+    ASSIGNEE: Object.freeze([
+      '長谷川',
+      '小園',
+      '堀田',
+      '柏原',
+      '本田',
+      '伊藤',
+      '宮廻',
+      '体験者'
+    ]),
+    SHIPPING_FROM: Object.freeze([
+      '自社',
+      '外部依頼',
+      '手打ち'
+    ]),
+    CARRIER: Object.freeze([
+      'ヤマト運輸',
+      '佐川急便',
+      '日本郵便'
+    ])
+  }),
+
   CALC_TARGETS: Object.freeze([
     '決済完了',
     '発送準備中',
