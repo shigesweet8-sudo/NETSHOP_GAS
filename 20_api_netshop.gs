@@ -1139,6 +1139,11 @@ function api_dispatchAction(payload) {
     case 'sortedItems':
     case 'getSortedItems':
       return api_listItemsSorted(payload);
+    case 'cancelItem':
+    case 'cancelStatus':
+    case 'cancelTransaction':
+    case 'cancel':
+      return api_cancelItem(payload);
     default:
       return {
         ok: false,
@@ -1339,6 +1344,58 @@ function api_bulkUpdateStatus(payload) {
   }
 }
 
+function resolveItemIdFromPayload_(payload) {
+  payload = payload && typeof payload === 'object' ? payload : {};
+  var itemId = payload.itemId;
+  if (itemId === undefined || itemId === null || itemId === '') itemId = payload.id;
+  if (itemId === undefined || itemId === null || itemId === '') itemId = payload['管理ID'];
+  return String(itemId || '').trim();
+}
+
+function cancelItemById(itemId, memo) {
+  var normalizedId = String(itemId || '').trim();
+  if (!normalizedId) return null;
+
+  return arguments.length >= 2
+    ? updateItemStatus(normalizedId, CONFIG.STATUS.CANCEL, memo)
+    : updateItemStatus(normalizedId, CONFIG.STATUS.CANCEL);
+}
+
+function api_cancelItem(payload) {
+  try {
+    var itemId = resolveItemIdFromPayload_(payload);
+    if (!itemId) {
+      return {
+        ok: false,
+        error: 'itemId is required'
+      };
+    }
+
+    var memo = payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'memo')
+      ? payload.memo
+      : undefined;
+    var updatedItem = memo === undefined ? cancelItemById(itemId) : cancelItemById(itemId, memo);
+
+    if (!updatedItem) {
+      return {
+        ok: false,
+        error: 'ID not found: ' + itemId
+      };
+    }
+
+    return {
+      ok: true,
+      item: updatedItem
+    };
+  } catch (error) {
+    Logger.log('api_cancelItem error: ' + error);
+    return {
+      ok: false,
+      error: String(error)
+    };
+  }
+}
+
 /**
  * 指定IDの商品ステータスを更新し、更新後データ（個人情報除外）を返却する。
  * @param {string} itemId
@@ -1356,18 +1413,11 @@ function updateItemStatus(itemId, status, memo) {
   var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
   if (rowIndex === -1) return null;
 
-  var rowValues = snapshot.rows[rowIndex].slice();
-  var col = CONFIG.COLS;
-  var now = new Date();
-
-  rowValues[col.STATUS - 1] = status;
-  rowValues[col.DATE - 1] = now;
-  if (status === CONFIG.STATUS.LISTING && !rowValues[col.PRODUCT_REG_DATE - 1]) {
-    rowValues[col.PRODUCT_REG_DATE - 1] = now;
-  }
-  if (arguments.length >= 3) {
-    rowValues[col.MEMO - 1] = memo;
-  }
+  var rowValues = applyStatusUpdateToRowValues_(
+    snapshot.rows[rowIndex],
+    status,
+    arguments.length >= 3 ? memo : undefined
+  );
 
   snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
   return getItem(itemId);
