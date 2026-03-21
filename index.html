@@ -771,6 +771,17 @@
         };
       }
 
+      function extractAllowedListArray(source) {
+        if (Array.isArray(source)) return source;
+        if (!source || typeof source !== "object") return null;
+        if (Array.isArray(source.items)) return source.items;
+        if (Array.isArray(source.list)) return source.list;
+        if (Array.isArray(source.rows)) return source.rows;
+        if (Array.isArray(source.monthly)) return source.monthly;
+        if (Array.isArray(source.platforms)) return source.platforms;
+        return null;
+      }
+
       function normalizeApiEnvelope(raw) {
         if (raw && typeof raw === "object" && typeof raw.ok === "boolean") {
           return raw;
@@ -778,23 +789,12 @@
 
         // Backward compatibility for older deployed Apps Script versions
         // that still return plain arrays for list/summary style APIs.
-        if (Array.isArray(raw)) {
+        if (extractAllowedListArray(raw) !== null) {
           return {
             ok: true,
             error: null,
             data: raw
           };
-        }
-
-        if (raw && typeof raw === "object") {
-          if (Array.isArray(raw.items) || Array.isArray(raw.list) || Array.isArray(raw.rows) ||
-              Array.isArray(raw.monthly) || Array.isArray(raw.platforms)) {
-            return {
-              ok: true,
-              error: null,
-              data: raw
-            };
-          }
         }
 
         return {
@@ -883,15 +883,10 @@
       }
 
       function extractListItemsFromResponse(response) {
-        if (Array.isArray(response)) return response;
-        if (!response || typeof response !== "object") return [];
-        if (Array.isArray(response.data)) return response.data;
-        if (response.data && Array.isArray(response.data.items)) return response.data.items;
-        if (response.data && Array.isArray(response.data.list)) return response.data.list;
-        if (response.data && Array.isArray(response.data.rows)) return response.data.rows;
-        if (Array.isArray(response.items)) return response.items;
-        if (Array.isArray(response.list)) return response.list;
-        if (Array.isArray(response.rows)) return response.rows;
+        var fromData = extractAllowedListArray(response && response.data);
+        if (fromData !== null) return fromData;
+        var fromResponse = extractAllowedListArray(response);
+        if (fromResponse !== null) return fromResponse;
         return [];
       }
 
