@@ -200,21 +200,14 @@
       <header class="page-header">
         <div>
           <h1 class="page-title">WAVE</h1>
-          <p class="page-subtitle">一覧 UI の土台を確認するためのローカル最適化画面です。</p>
+          <p class="page-subtitle">商品一覧画面の正式実装に向けた UI 土台画面です。</p>
         </div>
         <div class="page-actions">
-          <button id="reload-debug" class="btn btn-secondary" type="button">コンテキスト再取得</button>
           <button id="reload-items" class="btn btn-primary" type="button">一覧を再取得</button>
         </div>
       </header>
 
       <div id="global-banner" class="state-banner" aria-live="polite"></div>
-
-      <section class="card">
-        <h2 class="card-title">確認用コンテキスト</h2>
-        <div id="debug-status" class="status-line">確認中...</div>
-        <div id="debug-context" class="muted">データを取得しています。</div>
-      </section>
 
       <section class="card">
         <h2 class="card-title">商品一覧</h2>
@@ -257,10 +250,6 @@
         el.textContent = message;
       }
 
-      function renderStructuredData(targetId, value) {
-        document.getElementById(targetId).innerHTML = "<pre>" + escapeHtml(JSON.stringify(value, null, 2)) + "</pre>";
-      }
-
       function normalizeExecutionError(err) {
         if (typeof err === "string") {
           return {
@@ -283,20 +272,9 @@
         };
       }
 
-      function normalizeApiEnvelope(raw, options) {
-        var settings = options || {};
-        var allowLegacyRaw = !!settings.allowLegacyRaw;
-
+      function normalizeApiEnvelope(raw) {
         if (raw && typeof raw === "object" && typeof raw.ok === "boolean") {
           return raw;
-        }
-
-        if (allowLegacyRaw) {
-          return {
-            ok: true,
-            error: null,
-            data: raw
-          };
         }
 
         return {
@@ -343,7 +321,7 @@
 
       function callWrappedApi(apiName, args) {
         return runGasApi(apiName, args).then(function(raw) {
-          var response = normalizeApiEnvelope(raw, { allowLegacyRaw: false });
+          var response = normalizeApiEnvelope(raw);
           if (!response.ok) {
             throw {
               type: "api",
@@ -355,10 +333,12 @@
         });
       }
 
-      function callLegacyApi(apiName, args) {
-        return runGasApi(apiName, args).then(function(raw) {
-          return normalizeApiEnvelope(raw, { allowLegacyRaw: true });
-        });
+      function extractListItemsFromResponse(response) {
+        if (!response || typeof response !== "object") return [];
+        if (Array.isArray(response.data)) return response.data;
+        if (response.data && Array.isArray(response.data.items)) return response.data.items;
+        if (Array.isArray(response.items)) return response.items;
+        return [];
       }
 
       function renderItemsTable(items) {
@@ -388,22 +368,10 @@
         document.getElementById("content").innerHTML = html;
       }
 
-      function loadDebugContext() {
-        document.getElementById("debug-status").textContent = "確認中...";
-        return callLegacyApi("api_debugContext").then(function(response) {
-          document.getElementById("debug-status").textContent = "確認完了";
-          renderStructuredData("debug-context", response.data);
-        }).catch(function(err) {
-          document.getElementById("debug-status").textContent = "エラー";
-          document.getElementById("debug-context").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(err)) + "</span>";
-          setBanner("error", "確認用コンテキストの取得に失敗しました。");
-        });
-      }
-
       function loadItems() {
         document.getElementById("items-status").textContent = "読み込み中...";
         return callWrappedApi("api_listItems").then(function(response) {
-          var items = Array.isArray(response.data) ? response.data : Array.isArray(response.items) ? response.items : [];
+          var items = extractListItemsFromResponse(response);
           renderItemsTable(items);
           setBanner("success", "商品一覧を取得しました。");
         }).catch(function(err) {
@@ -413,17 +381,11 @@
         });
       }
 
-      document.getElementById("reload-debug").addEventListener("click", function() {
-        setBanner("info", "確認用コンテキストを再取得しています。");
-        loadDebugContext();
-      });
-
       document.getElementById("reload-items").addEventListener("click", function() {
         setBanner("info", "商品一覧を再取得しています。");
         loadItems();
       });
 
-      loadDebugContext();
       loadItems();
     </script>
   </body>
