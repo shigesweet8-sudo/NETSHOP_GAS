@@ -13,6 +13,8 @@ META_ONLY_NAMES = {
     'review_summary_ja.txt',
     'retry_issue_body.md',
     'review_status.json',
+    'reviewed_commit.txt',
+    'reviewed_branch.txt',
 }
 DOC_PATH_PREFIXES = ('docs/',)
 SPEC_KEYWORDS = (

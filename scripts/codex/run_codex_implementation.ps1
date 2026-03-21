@@ -11,7 +11,9 @@ $generatedArtifacts = @(
     'review_result.json',
     'review_summary_ja.txt',
     'review_status.json',
-    'retry_issue_body.md'
+    'retry_issue_body.md',
+    'reviewed_commit.txt',
+    'reviewed_branch.txt'
 )
 
 switch ($Step) {
