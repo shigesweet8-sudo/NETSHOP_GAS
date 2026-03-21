@@ -301,14 +301,31 @@ function applyStatusUpdateToRowValues_(rowValues, status, memo) {
 }
 
 function buildBulkUpdateResponse_(ok, message, successCount, failureCount, updatedItemIds, failedItemIds) {
+  var successIds = updatedItemIds || [];
+  var failureIds = failedItemIds || [];
   return {
     ok: ok,
     message: message || '',
     successCount: successCount || 0,
     failureCount: failureCount || 0,
-    updatedItemIds: updatedItemIds || [],
-    failedItemIds: failedItemIds || []
+    successIds: successIds,
+    failureIds: failureIds,
+    updatedItemIds: successIds,
+    failedItemIds: failureIds
   };
+}
+
+function buildRowIndexMapById_(rows, headers) {
+  var map = {};
+  var idColIndex = headers.indexOf(ITEM_FIELD_TO_HEADER.id);
+  if (idColIndex === -1) return map;
+
+  for (var i = 0; i < rows.length; i++) {
+    var itemId = String(rows[i][idColIndex] || '').trim();
+    if (!itemId) continue;
+    map[itemId] = i;
+  }
+  return map;
 }
 
 function writeUpdatedRows_(sheet, headersLength, rows, rowIndexes) {
@@ -336,7 +353,11 @@ function writeUpdatedRows_(sheet, headersLength, rows, rowIndexes) {
 }
 
 function bulkUpdateStatus(itemIds, status, memo) {
-  var normalizedIds = (Array.isArray(itemIds) ? itemIds : []).map(function(itemId) {
+  if (!Array.isArray(itemIds)) {
+    return buildBulkUpdateResponse_(false, 'itemIds must be array', 0, 0, [], []);
+  }
+
+  var normalizedIds = itemIds.map(function(itemId) {
     return String(itemId || '').trim();
   }).filter(function(itemId) {
     return itemId !== '';
@@ -344,6 +365,10 @@ function bulkUpdateStatus(itemIds, status, memo) {
 
   if (!normalizedIds.length) {
     return buildBulkUpdateResponse_(false, 'itemIds is required', 0, 0, [], []);
+  }
+
+  if (!status) {
+    return buildBulkUpdateResponse_(false, 'status is required', 0, normalizedIds.length, [], normalizedIds.slice());
   }
 
   var statusList = getStatusList_();
@@ -362,10 +387,11 @@ function bulkUpdateStatus(itemIds, status, memo) {
   var updatedItemIds = [];
   var failedItemIds = [];
   var rowIndexesToUpdate = {};
+  var rowIndexMapById = buildRowIndexMapById_(snapshot.rows, snapshot.headers);
 
   normalizedIds.forEach(function(itemId) {
-    var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
-    if (rowIndex === -1) {
+    var rowIndex = rowIndexMapById[itemId];
+    if (rowIndex === undefined) {
       failedItemIds.push(itemId);
       return;
     }

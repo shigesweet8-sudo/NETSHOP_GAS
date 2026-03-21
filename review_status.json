@@ -1,0 +1,20 @@
+{
+  "issue_title": "feat: [6] bulkUpdateStatus API（ステータス一括更新API）を実装する",
+  "changed_files": [
+    "20_api_netshop.gs",
+    "codex_instruction.md",
+    "issue_body.md",
+    "openai_response.json"
+  ],
+  "status": "OK",
+  "merge_decision": "マージOK",
+  "reason": "実装ファイル差分があり、重大な指摘は検出されませんでした。",
+  "implementation_present": true,
+  "implementation_files": [
+    "20_api_netshop.gs"
+  ],
+  "meta_only": false,
+  "has_high_or_critical": false,
+  "top_severity": "WARNING",
+  "retry_issue_path": ""
+}
