@@ -71,6 +71,11 @@ jobs:
         run: |
           pwsh -File scripts/codex/run_codex_implementation.ps1 -Step generate-implementation-diff
 
+      - name: Capture review context
+        run: |
+          git rev-parse HEAD > reviewed_commit.txt
+          git branch --show-current > reviewed_branch.txt
+
       - name: Review implementation diff
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

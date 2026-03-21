@@ -174,6 +174,10 @@ def main() -> None:
     issue_title = os.environ.get('ISSUE_TITLE', '').strip()
     issue_body_path = pathlib.Path('issue_body.md')
     issue_body = issue_body_path.read_text(encoding='utf-8') if issue_body_path.exists() else ''
+    reviewed_commit_path = pathlib.Path('reviewed_commit.txt')
+    reviewed_branch_path = pathlib.Path('reviewed_branch.txt')
+    reviewed_commit = reviewed_commit_path.read_text(encoding='utf-8').strip() if reviewed_commit_path.exists() else ''
+    reviewed_branch = reviewed_branch_path.read_text(encoding='utf-8').strip() if reviewed_branch_path.exists() else ''
 
     changed_files = extract_changed_files(diff_text)
     changed_files_text = ', '.join(changed_files[:5]) if changed_files else '(none)'
@@ -185,6 +189,8 @@ def main() -> None:
 
     status_payload = {
         'issue_title': issue_title,
+        'reviewed_commit': reviewed_commit,
+        'reviewed_branch': reviewed_branch,
         'changed_files': changed_files,
         **classification,
         'retry_issue_path': 'retry_issue_body.md' if retry_needed else '',
