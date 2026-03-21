@@ -67,6 +67,16 @@
         flex-wrap: wrap;
       }
 
+      .screen-context {
+        margin-bottom: 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 10px;
+        background: var(--surface);
+        font-size: 13px;
+        color: var(--muted);
+      }
+
       .card {
         background: var(--surface);
         border: 1px solid var(--border);
@@ -479,6 +489,7 @@
           <p class="page-subtitle">商品一覧画面の正式実装に向けた UI 土台画面です。</p>
         </div>
         <div class="page-actions">
+          <button id="open-list" class="btn btn-secondary" type="button">一覧へ</button>
           <button id="open-dashboard" class="btn btn-secondary" type="button">ダッシュボード</button>
           <button id="open-create-item" class="btn btn-secondary" type="button">新規商品登録</button>
           <button id="reload-items" class="btn btn-primary" type="button">一覧を再取得</button>
@@ -486,6 +497,7 @@
       </header>
 
       <div id="global-banner" class="state-banner" aria-live="polite"></div>
+      <div id="screen-context" class="screen-context" aria-live="polite"></div>
 
       <section id="list-section" class="card">
         <h2 class="card-title">商品一覧</h2>
@@ -882,6 +894,81 @@
         masterShopOptions: []
       };
 
+      function getViewModeLabel(mode) {
+        if (mode === "detail") return "商品詳細";
+        if (mode === "edit") return "商品編集";
+        if (mode === "create") return "新規商品登録";
+        if (mode === "dashboard") return "ダッシュボード";
+        return "商品一覧";
+      }
+
+      function updateScreenContext() {
+        var mode = state.viewMode || "list";
+        var idText = state.detailItemId ? " / 管理ID: " + state.detailItemId : "";
+        var modeLabel = getViewModeLabel(mode);
+        var routeText = mode === "list"
+          ? "主要導線: 詳細 / ダッシュボード / 新規登録"
+          : mode === "detail"
+            ? "主要導線: 一覧へ戻る / 編集へ"
+            : mode === "edit"
+              ? "主要導線: 詳細へ戻る / 一覧へ"
+              : mode === "create"
+                ? "主要導線: 一覧へ戻る / 保存"
+                : "主要導線: 一覧へ戻る / 再取得";
+        document.getElementById("screen-context").textContent = "現在: " + modeLabel + idText + " | " + routeText;
+      }
+
+      function isAnyBusy() {
+        return !!(
+          state.loading ||
+          state.detailLoading ||
+          state.createSubmitting ||
+          state.editLoading ||
+          state.editSubmitting ||
+          state.dashboardLoading
+        );
+      }
+
+      function hasCreateFormChanges() {
+        var payload = collectCreatePayload();
+        return Object.keys(payload).some(function(key) {
+          return String(payload[key] || "").trim() !== "";
+        });
+      }
+
+      function hasEditUnsavedChanges() {
+        if (!state.editInitialValues) return false;
+        var current = collectEditPayload();
+        var initial = state.editInitialValues;
+        return Object.keys(current).some(function(key) {
+          return String(current[key] || "").trim() !== String(initial[key] || "").trim();
+        });
+      }
+
+      function confirmAction(message) {
+        return window.confirm(String(message || "").trim());
+      }
+
+      function confirmNavigationIfNeeded(targetMode) {
+        if (state.createSubmitting || state.editSubmitting || state.editLoading) return false;
+
+        if (state.viewMode === "create" && targetMode !== "create" && hasCreateFormChanges()) {
+          return confirmAction("新規登録フォームの入力内容を破棄して移動します。よろしいですか？");
+        }
+        if (state.viewMode === "edit" && targetMode !== "edit" && hasEditUnsavedChanges()) {
+          return confirmAction("編集内容が保存されていません。破棄して移動します。よろしいですか？");
+        }
+        return true;
+      }
+
+      function refreshGlobalActionState() {
+        var busy = isAnyBusy();
+        document.getElementById("open-list").disabled = busy || state.viewMode === "list";
+        document.getElementById("open-dashboard").disabled = busy;
+        document.getElementById("open-create-item").disabled = busy;
+        document.getElementById("reload-items").disabled = busy || state.viewMode !== "list";
+      }
+
       function getCurrentHeaders(items) {
         if (!items || !items.length) return [];
         return Object.keys(items[0]);
@@ -1003,6 +1090,36 @@
           selectedCount === 0 ||
           !action ||
           (action === "updateStatus" && !statusSelected);
+      }
+
+      function isHighImpactStatus(statusValue) {
+        var text = String(statusValue || "").trim();
+        if (!text) return false;
+        return /(キャンセル|取消|無効|停止|アーカイブ|削除)/.test(text);
+      }
+
+      function buildBulkConfirmMessage(action, selectedCount, statusValue) {
+        var actionLabel = action === "updateStatus"
+          ? "一括ステータス変更"
+          : action === "recalculate"
+            ? "一括再計算"
+            : "一括無効化";
+        var details = [actionLabel + "を " + selectedCount + " 件に実行します。"];
+
+        if (action === "updateStatus") {
+          details.push("変更後ステータス: " + String(statusValue || "").trim());
+          if (isHighImpactStatus(statusValue)) {
+            details.push("この操作は取り消しづらい可能性があります。");
+          }
+        }
+        if (action === "disable") {
+          details.push("無効化後の復旧には追加操作が必要になる場合があります。");
+        }
+        details.push("実行してよろしいですか？");
+        return {
+          label: actionLabel,
+          message: details.join("\n")
+        };
       }
 
       function setInlineMessageById(elementId, kind, message) {
@@ -1195,6 +1312,7 @@
         document.getElementById("create-lookup-zip").disabled = !!flag;
         document.getElementById("create-reset-form").disabled = !!flag;
         document.getElementById("create-back-to-list").disabled = !!flag;
+        refreshGlobalActionState();
       }
 
       function refreshEditButtons() {
@@ -1204,6 +1322,7 @@
         document.getElementById("edit-lookup-zip").disabled = disabled;
         document.getElementById("edit-reset-form").disabled = disabled;
         document.getElementById("edit-back-to-detail").disabled = !!state.editSubmitting;
+        refreshGlobalActionState();
       }
 
       function setEditLoading(flag) {
@@ -1331,6 +1450,8 @@
       }
 
       function openCreateScreen() {
+        if (isAnyBusy()) return;
+        if (!confirmNavigationIfNeeded("create")) return;
         setInlineMessage("", "");
         clearValidationResult("create");
         switchScreen("create");
@@ -1359,6 +1480,8 @@
         detailSection.classList.toggle("screen-hidden", state.viewMode !== "detail");
         createSection.classList.toggle("screen-hidden", state.viewMode !== "create");
         editSection.classList.toggle("screen-hidden", state.viewMode !== "edit");
+        updateScreenContext();
+        refreshGlobalActionState();
       }
 
       function findFirstValue(item, keys) {
@@ -1489,10 +1612,12 @@
         state.dashboardLoading = !!flag;
         document.getElementById("dashboard-reload").disabled = !!flag;
         document.getElementById("dashboard-back-to-list").disabled = !!flag;
+        refreshGlobalActionState();
       }
 
       function loadDashboard() {
         setDashboardLoading(true);
+        setBanner("info", "ダッシュボードを取得しています。");
         document.getElementById("dashboard-kpi-status").textContent = "読み込み中...";
         document.getElementById("dashboard-monthly-status").textContent = "読み込み中...";
         document.getElementById("dashboard-platform-status").textContent = "読み込み中...";
@@ -1508,10 +1633,12 @@
           var kpiResult = results[0];
           var monthlyResult = results[1];
           var platformResult = results[2];
+          var failedCount = 0;
 
           if (kpiResult.status === "fulfilled") {
             renderDashboardKpi(kpiResult.value && kpiResult.value.data ? kpiResult.value.data : null);
           } else {
+            failedCount++;
             document.getElementById("dashboard-kpi-status").textContent = "取得失敗";
             document.getElementById("dashboard-kpi-content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(kpiResult.reason)) + "</span>";
           }
@@ -1523,6 +1650,7 @@
               extractArrayData(monthlyResult.value, ["monthly", "items"])
             );
           } else {
+            failedCount++;
             document.getElementById("dashboard-monthly-status").textContent = "取得失敗";
             document.getElementById("dashboard-monthly-content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(monthlyResult.reason)) + "</span>";
           }
@@ -1534,15 +1662,28 @@
               extractArrayData(platformResult.value, ["platforms", "items"])
             );
           } else {
+            failedCount++;
             document.getElementById("dashboard-platform-status").textContent = "取得失敗";
             document.getElementById("dashboard-platform-content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(platformResult.reason)) + "</span>";
           }
+
+          if (failedCount === 0) {
+            setBanner("success", "ダッシュボードを取得しました。");
+          } else if (failedCount < 3) {
+            setBanner("error", "ダッシュボードの一部取得に失敗しました。");
+          } else {
+            setBanner("error", "ダッシュボードの取得に失敗しました。");
+          }
+        }).catch(function(err) {
+          setBanner("error", "ダッシュボードの取得に失敗しました: " + resolveErrorMessage(err));
         }).finally(function() {
           setDashboardLoading(false);
         });
       }
 
       function openDashboardScreen() {
+        if (isAnyBusy()) return;
+        if (!confirmNavigationIfNeeded("dashboard")) return;
         switchScreen("dashboard");
         loadDashboard();
       }
@@ -1551,6 +1692,8 @@
         var statusEl = document.getElementById("detail-status");
         var contentEl = document.getElementById("detail-content");
         document.getElementById("open-edit-item").disabled = state.detailLoading || !state.detailItemId;
+        updateScreenContext();
+        refreshGlobalActionState();
 
         if (state.detailLoading) {
           statusEl.textContent = "詳細を読み込み中...";
@@ -1778,7 +1921,7 @@
         state.viewItems.forEach(function(item) {
           var itemId = resolveItemId(item);
           var checked = itemId && state.selectedById[itemId] ? " checked" : "";
-          var disabled = itemId ? "" : " disabled";
+          var disabled = itemId && !state.loading ? "" : " disabled";
           html += "<tr>";
           html += "<td class=\"select-cell\"><input class=\"row-select\" type=\"checkbox\" data-item-id=\"" + escapeHtml(itemId) + "\"" + checked + disabled + " aria-label=\"行選択\"></td>";
           html += "<td class=\"action-cell\"><button class=\"btn btn-secondary btn-small row-detail-open\" type=\"button\" data-item-id=\"" + escapeHtml(itemId) + "\"" + disabled + ">詳細</button></td>";
@@ -1806,6 +1949,7 @@
         document.getElementById("reload-items").disabled = !!flag;
         document.getElementById("open-dashboard").disabled = !!flag;
         document.getElementById("open-create-item").disabled = !!flag;
+        document.getElementById("open-list").disabled = !!flag || state.viewMode === "list";
         document.getElementById("sort-order-toggle").disabled = !!flag;
         document.getElementById("keyword-search").disabled = !!flag;
         document.getElementById("status-filter").disabled = !!flag;
@@ -1814,6 +1958,7 @@
           document.getElementById("items-status").textContent = message;
         }
         updateBulkUiState();
+        refreshGlobalActionState();
       }
 
       function loadItemsWithCurrentSort(options) {
@@ -1846,6 +1991,7 @@
       }
 
       function executeBulkAction() {
+        if (state.loading) return;
         var selectedIds = getSelectedIds();
         var action = document.getElementById("bulk-action").value;
         var statusValue = document.getElementById("bulk-status").value;
@@ -1864,17 +2010,13 @@
           return;
         }
 
-        var actionLabel = action === "updateStatus"
-          ? "一括ステータス変更"
-          : action === "recalculate"
-            ? "一括再計算"
-            : "一括無効化";
-        if (!window.confirm(actionLabel + "を " + selectedIds.length + " 件に実行します。よろしいですか？")) {
+        var confirmInfo = buildBulkConfirmMessage(action, selectedIds.length, statusValue);
+        if (!confirmAction(confirmInfo.message)) {
           return;
         }
 
         setLoading(true, "一括処理中...");
-        setBanner("info", actionLabel + "を実行しています。");
+        setBanner("info", confirmInfo.label + "を実行しています。");
 
         var apiName = "";
         var payload = { itemIds: selectedIds };
@@ -1888,10 +2030,10 @@
         }
 
         callWrappedApi(apiName, [payload]).then(function() {
-          setBanner("success", actionLabel + "が完了しました。");
+          setBanner("success", confirmInfo.label + "が完了しました。");
           return loadItemsWithCurrentSort({ forceBaseLoad: false });
         }).catch(function(err) {
-          setBanner("error", actionLabel + "に失敗しました: " + resolveErrorMessage(err));
+          setBanner("error", confirmInfo.label + "に失敗しました: " + resolveErrorMessage(err));
         }).finally(function() {
           setLoading(false);
           updateBulkUiState();
@@ -1899,8 +2041,15 @@
       }
 
       document.getElementById("reload-items").addEventListener("click", function() {
+        if (isAnyBusy()) return;
         setBanner("info", "商品一覧を再取得しています。");
         loadItemsWithCurrentSort({ forceBaseLoad: true });
+      });
+
+      document.getElementById("open-list").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        if (!confirmNavigationIfNeeded("list")) return;
+        switchScreen("list");
       });
 
       document.getElementById("open-create-item").addEventListener("click", function() {
@@ -1912,10 +2061,13 @@
       });
 
       document.getElementById("dashboard-back-to-list").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        if (!confirmNavigationIfNeeded("list")) return;
         switchScreen("list");
       });
 
       document.getElementById("dashboard-reload").addEventListener("click", function() {
+        if (isAnyBusy()) return;
         loadDashboard();
       });
 
@@ -1956,6 +2108,7 @@
       });
 
       document.getElementById("back-to-list").addEventListener("click", function() {
+        if (isAnyBusy()) return;
         switchScreen("list");
       });
 
@@ -1964,6 +2117,8 @@
       });
 
       document.getElementById("create-back-to-list").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        if (!confirmNavigationIfNeeded("list")) return;
         switchScreen("list");
       });
 
@@ -1980,11 +2135,15 @@
       });
 
       document.getElementById("create-reset-form").addEventListener("click", function() {
+        if (state.createSubmitting) return;
+        if (hasCreateFormChanges() && !confirmAction("入力内容をクリアします。よろしいですか？")) return;
         resetCreateForm();
         setInlineMessage("", "");
       });
 
       document.getElementById("edit-back-to-detail").addEventListener("click", function() {
+        if (state.editSubmitting || state.editLoading) return;
+        if (hasEditUnsavedChanges() && !confirmAction("編集内容を破棄して詳細へ戻ります。よろしいですか？")) return;
         if (!state.editItemId) {
           switchScreen("list");
           return;
@@ -2005,11 +2164,14 @@
       });
 
       document.getElementById("edit-reset-form").addEventListener("click", function() {
+        if (state.editSubmitting || state.editLoading) return;
+        if (hasEditUnsavedChanges() && !confirmAction("編集内容を初期値に戻します。よろしいですか？")) return;
         resetEditFormToInitial();
         setEditInlineMessage("", "");
       });
 
       document.getElementById("content").addEventListener("change", function(event) {
+        if (state.loading) return;
         var target = event.target;
         if (!target) return;
 
@@ -2036,6 +2198,7 @@
       });
 
       document.getElementById("content").addEventListener("click", function(event) {
+        if (state.loading) return;
         var target = event.target;
         if (!target) return;
         if (target.classList.contains("row-detail-open")) {
