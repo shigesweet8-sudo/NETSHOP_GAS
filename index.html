@@ -317,6 +317,53 @@
         color: var(--primary);
       }
 
+      .validation-results {
+        margin-top: 12px;
+        border-radius: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        background: var(--surface-soft);
+        display: none;
+      }
+
+      .validation-results.is-visible {
+        display: block;
+      }
+
+      .validation-group + .validation-group {
+        margin-top: 8px;
+      }
+
+      .validation-title {
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 4px;
+      }
+
+      .validation-title.is-error {
+        color: var(--danger);
+      }
+
+      .validation-title.is-warning {
+        color: #92400e;
+      }
+
+      .validation-list {
+        margin: 0;
+        padding-left: 18px;
+        font-size: 12px;
+      }
+
+      .zip-input-row {
+        display: flex;
+        gap: 8px;
+      }
+
+      .zip-input-row .control-input {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
       pre {
         margin: 0;
         white-space: pre-wrap;
@@ -354,6 +401,10 @@
         .control-input,
         .control-select {
           width: 100%;
+        }
+
+        .zip-input-row .btn {
+          width: auto;
         }
 
         .toolbar-spacer {
@@ -462,6 +513,25 @@
             <input id="create-shipping" class="control-input" type="text" inputmode="decimal" placeholder="0">
           </div>
           <div class="form-field">
+            <label for="create-zip">郵便番号</label>
+            <div class="zip-input-row">
+              <input id="create-zip" class="control-input" type="text" inputmode="numeric" placeholder="1234567">
+              <button id="create-lookup-zip" class="btn btn-secondary" type="button">住所補完</button>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="create-pref">都道府県</label>
+            <input id="create-pref" class="control-input" type="text" placeholder="都道府県">
+          </div>
+          <div class="form-field">
+            <label for="create-addr2">住所2(地番)</label>
+            <input id="create-addr2" class="control-input" type="text" placeholder="市区町村・番地">
+          </div>
+          <div class="form-field">
+            <label for="create-addr3">住所3(建物名)</label>
+            <input id="create-addr3" class="control-input" type="text" placeholder="建物名など">
+          </div>
+          <div class="form-field">
             <label for="create-memo">備考</label>
             <textarea id="create-memo" class="control-input form-textarea" placeholder="備考"></textarea>
           </div>
@@ -470,6 +540,7 @@
           <button id="create-save-item" class="btn btn-primary" type="button">保存</button>
           <button id="create-reset-form" class="btn btn-secondary" type="button">入力をクリア</button>
         </div>
+        <div id="create-validation-result" class="validation-results" aria-live="polite"></div>
         <div id="create-message" class="inline-message" aria-live="polite"></div>
       </section>
 
@@ -512,6 +583,25 @@
             <input id="edit-shipping" class="control-input" type="text" inputmode="decimal" placeholder="0">
           </div>
           <div class="form-field">
+            <label for="edit-zip">郵便番号</label>
+            <div class="zip-input-row">
+              <input id="edit-zip" class="control-input" type="text" inputmode="numeric" placeholder="1234567">
+              <button id="edit-lookup-zip" class="btn btn-secondary" type="button">住所補完</button>
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="edit-pref">都道府県</label>
+            <input id="edit-pref" class="control-input" type="text" placeholder="都道府県">
+          </div>
+          <div class="form-field">
+            <label for="edit-addr2">住所2(地番)</label>
+            <input id="edit-addr2" class="control-input" type="text" placeholder="市区町村・番地">
+          </div>
+          <div class="form-field">
+            <label for="edit-addr3">住所3(建物名)</label>
+            <input id="edit-addr3" class="control-input" type="text" placeholder="建物名など">
+          </div>
+          <div class="form-field">
             <label for="edit-memo">備考</label>
             <textarea id="edit-memo" class="control-input form-textarea" placeholder="備考"></textarea>
           </div>
@@ -520,6 +610,7 @@
           <button id="edit-save-item" class="btn btn-primary" type="button">保存</button>
           <button id="edit-reset-form" class="btn btn-secondary" type="button">初期値へ戻す</button>
         </div>
+        <div id="edit-validation-result" class="validation-results" aria-live="polite"></div>
         <div id="edit-message" class="inline-message" aria-live="polite"></div>
       </section>
     </div>
@@ -694,6 +785,7 @@
         detailErrorMessage: "",
         editItemId: "",
         editInitialValues: null,
+        editAddressTouched: false,
         editLoading: false,
         editSubmitting: false,
         createSubmitting: false,
@@ -851,6 +943,7 @@
         document.getElementById("create-save-item").disabled = !!flag;
         document.getElementById("create-reset-form").disabled = !!flag;
         document.getElementById("create-back-to-list").disabled = !!flag;
+        document.getElementById("create-lookup-zip").disabled = !!flag;
       }
 
       function refreshEditButtons() {
@@ -858,6 +951,108 @@
         document.getElementById("edit-save-item").disabled = disabled;
         document.getElementById("edit-reset-form").disabled = disabled;
         document.getElementById("edit-back-to-detail").disabled = !!state.editSubmitting;
+        document.getElementById("edit-lookup-zip").disabled = disabled;
+      }
+
+      function normalizeValidationIssues(value) {
+        if (!Array.isArray(value)) return [];
+        return value.map(function(issue) {
+          if (!issue || typeof issue !== "object") {
+            return { code: "", field: "", message: String(issue || "") };
+          }
+          return {
+            code: String(issue.code || "").trim(),
+            field: String(issue.field || "").trim(),
+            message: String(issue.message || "").trim()
+          };
+        }).filter(function(issue) {
+          return !!issue.message;
+        });
+      }
+
+      function extractValidationResult(apiResponse) {
+        var response = apiResponse && typeof apiResponse === "object" ? apiResponse : {};
+        var details = response.error && response.error.details && typeof response.error.details === "object"
+          ? response.error.details
+          : {};
+        var data = response.data && typeof response.data === "object" ? response.data : {};
+        return {
+          errors: normalizeValidationIssues(response.errors || data.errors || details.errors || []),
+          warnings: normalizeValidationIssues(response.warnings || data.warnings || details.warnings || [])
+        };
+      }
+
+      function buildValidationHtml(title, titleClassName, issues) {
+        var lines = issues.map(function(issue) {
+          var code = issue.code ? "[" + issue.code + "] " : "";
+          var field = issue.field ? "(" + issue.field + ") " : "";
+          return "<li>" + escapeHtml(code + field + issue.message) + "</li>";
+        }).join("");
+        return "<div class=\"validation-group\"><div class=\"validation-title " + titleClassName + "\">" + escapeHtml(title) + "</div><ul class=\"validation-list\">" + lines + "</ul></div>";
+      }
+
+      function renderValidationResult(elementId, validation) {
+        var el = document.getElementById(elementId);
+        if (!el) return;
+        var errors = validation && Array.isArray(validation.errors) ? validation.errors : [];
+        var warnings = validation && Array.isArray(validation.warnings) ? validation.warnings : [];
+        if (!errors.length && !warnings.length) {
+          el.className = "validation-results";
+          el.innerHTML = "";
+          return;
+        }
+        var html = "";
+        if (errors.length) html += buildValidationHtml("Errors", "is-error", errors);
+        if (warnings.length) html += buildValidationHtml("Warnings", "is-warning", warnings);
+        el.className = "validation-results is-visible";
+        el.innerHTML = html;
+      }
+
+      function runVariationValidation(mode, payload) {
+        return runGasApi("api_validateVariation", [{
+          mode: mode,
+          item: payload
+        }]).then(function(raw) {
+          return extractValidationResult(normalizeApiEnvelope(raw));
+        });
+      }
+
+      function applyZipLookupResult(formType, data) {
+        var safeData = data && typeof data === "object" ? data : {};
+        var zip = String(safeData.zip || "").trim();
+        var prefecture = String(safeData.prefecture || "").trim();
+        var addressLine = String(safeData.addressLine || "").trim();
+        if (zip) document.getElementById(formType + "-zip").value = zip;
+        document.getElementById(formType + "-pref").value = prefecture;
+        document.getElementById(formType + "-addr2").value = addressLine;
+      }
+
+      function lookupZipForForm(formType) {
+        var zip = String(document.getElementById(formType + "-zip").value || "").trim();
+        var setMessage = formType === "edit" ? setEditInlineMessage : setInlineMessage;
+        if (!zip) {
+          setMessage("error", "郵便番号を入力してください。");
+          return Promise.resolve();
+        }
+        var button = document.getElementById(formType + "-lookup-zip");
+        if (button) button.disabled = true;
+        setMessage("info", "住所を補完しています...");
+        return callWrappedApi("api_uiLookupZip", [{ zip: zip }]).then(function(response) {
+          applyZipLookupResult(formType, response && response.data ? response.data : {});
+          if (formType === "edit") {
+            state.editAddressTouched = true;
+          }
+          setMessage("success", "住所を補完しました。");
+        }).catch(function(err) {
+          setMessage("error", "住所補完に失敗しました: " + resolveErrorMessage(err));
+        }).finally(function() {
+          if (!button) return;
+          if (formType === "create") {
+            button.disabled = !!state.createSubmitting;
+          } else {
+            button.disabled = !!state.editLoading || !!state.editSubmitting;
+          }
+        });
       }
 
       function setEditLoading(flag) {
@@ -876,6 +1071,10 @@
         document.getElementById("create-price-final").value = "";
         document.getElementById("create-fee").value = "";
         document.getElementById("create-shipping").value = "";
+        document.getElementById("create-zip").value = "";
+        document.getElementById("create-pref").value = "";
+        document.getElementById("create-addr2").value = "";
+        document.getElementById("create-addr3").value = "";
         document.getElementById("create-memo").value = "";
       }
 
@@ -950,6 +1149,10 @@
           priceFinal: String(document.getElementById("create-price-final").value || "").trim(),
           fee: String(document.getElementById("create-fee").value || "").trim(),
           shipping: String(document.getElementById("create-shipping").value || "").trim(),
+          zip: String(document.getElementById("create-zip").value || "").trim(),
+          pref: String(document.getElementById("create-pref").value || "").trim(),
+          addr2: String(document.getElementById("create-addr2").value || "").trim(),
+          addr3: String(document.getElementById("create-addr3").value || "").trim(),
           memo: String(document.getElementById("create-memo").value || "").trim()
         };
       }
@@ -957,17 +1160,35 @@
       function saveNewItem() {
         if (state.createSubmitting) return;
         setCreateSubmitting(true);
-        setInlineMessage("info", "保存しています...");
         var payload = collectCreatePayload();
+        setInlineMessage("info", "入力内容を確認しています...");
+        renderValidationResult("create-validation-result", { errors: [], warnings: [] });
 
-        callWrappedApi("api_createItem", [payload]).then(function(response) {
+        runVariationValidation("create", payload).then(function(validation) {
+          renderValidationResult("create-validation-result", validation);
+          if (validation.errors.length) {
+            var validationStopError = new Error("validation errors");
+            validationStopError.isValidationStop = true;
+            throw validationStopError;
+          }
+          if (validation.warnings.length) {
+            setInlineMessage("info", "警告がありますが保存を続行します...");
+          }
+          setInlineMessage("info", "保存しています...");
+          return callWrappedApi("api_createItem", [payload]);
+        }).then(function(response) {
           var createdId = response && response.data && response.data.id ? String(response.data.id) : "";
           setInlineMessage("success", "保存に成功しました" + (createdId ? " (管理ID: " + createdId + ")" : "") + "。");
           setBanner("success", "新規商品を登録しました。");
           resetCreateForm();
+          renderValidationResult("create-validation-result", { errors: [], warnings: [] });
           switchScreen("list");
           loadItemsWithCurrentSort({ forceBaseLoad: true });
         }).catch(function(err) {
+          if (err && err.isValidationStop) {
+            setInlineMessage("error", "入力内容を確認してください。");
+            return;
+          }
           setInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
           setBanner("error", "新規商品の保存に失敗しました。");
         }).finally(function() {
@@ -977,6 +1198,7 @@
 
       function openCreateScreen() {
         setInlineMessage("", "");
+        renderValidationResult("create-validation-result", { errors: [], warnings: [] });
         switchScreen("create");
         loadCreateMastersIfNeeded(false, "create-message").catch(function() {});
       }
@@ -1098,6 +1320,7 @@
           memo: getItemFieldText(safeItem, ["memo", "備考"])
         };
         state.editInitialValues = values;
+        state.editAddressTouched = false;
         ensureSelectHasValue("edit-status", values.status);
         ensureSelectHasValue("edit-shop", values.shop);
         document.getElementById("edit-item-name").value = values.itemName;
@@ -1105,6 +1328,10 @@
         document.getElementById("edit-price-final").value = values.priceFinal;
         document.getElementById("edit-fee").value = values.fee;
         document.getElementById("edit-shipping").value = values.shipping;
+        document.getElementById("edit-zip").value = "";
+        document.getElementById("edit-pref").value = "";
+        document.getElementById("edit-addr2").value = "";
+        document.getElementById("edit-addr3").value = "";
         document.getElementById("edit-memo").value = values.memo;
       }
 
@@ -1117,11 +1344,16 @@
         document.getElementById("edit-price-final").value = state.editInitialValues.priceFinal || "";
         document.getElementById("edit-fee").value = state.editInitialValues.fee || "";
         document.getElementById("edit-shipping").value = state.editInitialValues.shipping || "";
+        document.getElementById("edit-zip").value = "";
+        document.getElementById("edit-pref").value = "";
+        document.getElementById("edit-addr2").value = "";
+        document.getElementById("edit-addr3").value = "";
         document.getElementById("edit-memo").value = state.editInitialValues.memo || "";
+        state.editAddressTouched = false;
       }
 
       function collectEditPayload() {
-        return {
+        var payload = {
           status: String(document.getElementById("edit-status").value || "").trim(),
           shop: String(document.getElementById("edit-shop").value || "").trim(),
           itemName: String(document.getElementById("edit-item-name").value || "").trim(),
@@ -1131,6 +1363,13 @@
           shipping: String(document.getElementById("edit-shipping").value || "").trim(),
           memo: String(document.getElementById("edit-memo").value || "").trim()
         };
+        if (state.editAddressTouched) {
+          payload.zip = String(document.getElementById("edit-zip").value || "").trim();
+          payload.pref = String(document.getElementById("edit-pref").value || "").trim();
+          payload.addr2 = String(document.getElementById("edit-addr2").value || "").trim();
+          payload.addr3 = String(document.getElementById("edit-addr3").value || "").trim();
+        }
+        return payload;
       }
 
       function openEditScreen(itemId) {
@@ -1142,7 +1381,9 @@
 
         state.editItemId = normalizedId;
         state.editInitialValues = null;
+        state.editAddressTouched = false;
         setEditInlineMessage("", "");
+        renderValidationResult("edit-validation-result", { errors: [], warnings: [] });
         switchScreen("edit");
         setEditLoading(true);
         setEditInlineMessage("info", "編集データを取得しています...");
@@ -1177,14 +1418,37 @@
         }
 
         setEditSubmitting(true);
-        setEditInlineMessage("info", "保存しています...");
         var payload = collectEditPayload();
+        var validationPayload = {};
+        Object.keys(payload).forEach(function(key) {
+          validationPayload[key] = payload[key];
+        });
+        validationPayload.id = itemId;
+        setEditInlineMessage("info", "入力内容を確認しています...");
+        renderValidationResult("edit-validation-result", { errors: [], warnings: [] });
 
-        callWrappedApi("api_updateItem", [itemId, payload]).then(function() {
+        runVariationValidation("update", validationPayload).then(function(validation) {
+          renderValidationResult("edit-validation-result", validation);
+          if (validation.errors.length) {
+            var validationStopError = new Error("validation errors");
+            validationStopError.isValidationStop = true;
+            throw validationStopError;
+          }
+          if (validation.warnings.length) {
+            setEditInlineMessage("info", "警告がありますが保存を続行します...");
+          }
+          setEditInlineMessage("info", "保存しています...");
+          return callWrappedApi("api_updateItem", [itemId, payload]);
+        }).then(function() {
           setEditInlineMessage("success", "保存に成功しました。");
           setBanner("success", "商品を更新しました。");
+          renderValidationResult("edit-validation-result", { errors: [], warnings: [] });
           openDetailById(itemId, { silentSuccessBanner: true });
         }).catch(function(err) {
+          if (err && err.isValidationStop) {
+            setEditInlineMessage("error", "入力内容を確認してください。");
+            return;
+          }
           setEditInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
           setBanner("error", "商品の更新に失敗しました。");
         }).finally(function() {
@@ -1425,8 +1689,13 @@
         saveNewItem();
       });
 
+      document.getElementById("create-lookup-zip").addEventListener("click", function() {
+        lookupZipForForm("create");
+      });
+
       document.getElementById("create-reset-form").addEventListener("click", function() {
         resetCreateForm();
+        renderValidationResult("create-validation-result", { errors: [], warnings: [] });
         setInlineMessage("", "");
       });
 
@@ -1442,8 +1711,19 @@
         saveEditedItem();
       });
 
+      ["edit-zip", "edit-pref", "edit-addr2", "edit-addr3"].forEach(function(id) {
+        document.getElementById(id).addEventListener("input", function() {
+          state.editAddressTouched = true;
+        });
+      });
+
+      document.getElementById("edit-lookup-zip").addEventListener("click", function() {
+        lookupZipForForm("edit");
+      });
+
       document.getElementById("edit-reset-form").addEventListener("click", function() {
         resetEditFormToInitial();
+        renderValidationResult("edit-validation-result", { errors: [], warnings: [] });
         setEditInlineMessage("", "");
       });
 
