@@ -959,6 +959,14 @@
         if (!raw) return null;
         if (raw.charAt(0) === "/") raw = raw.slice(1);
 
+        var pathMatch = raw.match(/^([a-zA-Z]+)\/(.+)$/);
+        if (pathMatch) {
+          var pathMode = normalizeRouteMode(pathMatch[1]);
+          var pathId = normalizeRouteId(pathMatch[2]);
+          if ((pathMode === "detail" || pathMode === "edit") && !pathId) pathMode = "list";
+          return { mode: pathMode, id: pathId };
+        }
+
         if (raw.indexOf("=") === -1) {
           var modeOnly = normalizeRouteMode(raw.split(":")[0]);
           var simpleId = normalizeRouteId(raw.split(":")[1] || "");
@@ -2223,6 +2231,11 @@
           applyAndRenderCurrentView();
           setBanner("success", "商品一覧を取得しました。");
         }).catch(function(err) {
+          state.allItems = [];
+          state.viewItems = [];
+          state.selectedById = {};
+          updateToolbarOptions([]);
+          updateSelectedCount();
           document.getElementById("items-status").textContent = "エラー";
           document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(err)) + "</span>";
           setBanner("error", "商品一覧の取得に失敗しました。");
