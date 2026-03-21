@@ -1,62 +1,53 @@
 ## 目的
-`20_api_netshop.gs` において、`cancelItem` を「業務上のキャンセル処理」、`archiveItem` または `disableItem` を「運用上の無効化処理」として明確に分離し、一括無効化 API もキャンセルと同義にならないよう実装を整理する。
+`cancelItem` を業務上のキャンセル処理として維持しつつ、`bulkDisableNetshopRecords` / `api_bulkDisableNetshop` を運用上の無効化処理として分離し、API 名・返却値・処理内容の意味を一致させる。
 
 ## 実装スコープ
-- `cancelItem` の責務を業務ステータス変更のみに限定する
-- `archiveItem` または `disableItem` を新設または整理し、表示・管理上の無効化処理として実装する
-- 既存の `bulkDisableNetshopRecords` が `キャンセル` ステータス変更を行っている場合は、運用上の無効化処理へ修正する
-- API 名、返却値、内部処理が業務意味と一致するよう統一する
-- 既存データを破壊せず、既存 API 基盤との互換性を極力維持する
-- 必要な定数追加・名称整理がある場合のみ `01_config.gs` を更新してよい
+- `20_api_netshop.gs` にて、キャンセル処理と disable/archive 処理を明確に分離する。
+- `bulkDisableNetshopRecords` が `CONFIG.STATUS.CANCEL` を直接設定する実装になっている場合は、それをやめて無効化専用処理へ置き換える。
+- 必要に応じて `01_config.gs` に disable/archive 用の定数を追加または整理する。
+- 既存 API 基盤は壊さず、存在しない ID は安全に失敗として返す。
+- 既存データの物理削除は行わない。
 
 ## 対象ファイル
-- 必須: `20_api_netshop.gs`
-- 必要に応じて: `01_config.gs`
-
-候補となる実装箇所:
-- `cancelItem`
-- `archiveItem` / `disableItem` の既存有無確認と整理
-- `bulkDisableNetshopRecords`
-- ステータス判定・返却値生成・対象レコード更新処理
-- 必要なら業務ステータス/運用無効フラグ用の定数定義
+- `20_api_netshop.gs`
+- 必要に応じて `01_config.gs`
+- 関連する共通更新関数が同一責務で存在する場合は、その実装ファイルも候補として最小限変更してよい
 
 ## 制約
-- 既存データを破壊しないこと
-- 既存 API 基盤を壊さないこと
-- `cancel` は業務ステータス変更として扱うこと
-- `archive` / `disable` は表示・管理上の無効化として扱うこと
-- 一括無効化 API を `cancel` と同義にしないこと
-- 返却値は API 名・処理意味に整合するようにすること
-- 不明な列名や既存フラグ名がある場合は、`20_api_netshop.gs` 内の既存レコード構造に合わせて最小変更で実装すること
-- `codex_instruction.md` / `issue_tasks.md` / `openai_response.json` だけを変更して終わらせることを禁止する
+- 実装は調査メモではなく、実コード変更を伴うこと。
+- `cancel = 業務ステータス変更`、`disable / archive = 表示・管理上の無効化` の業務ルールを厳守すること。
+- 既存 API の呼び出し基盤やレスポンス形式は、必要最小限の変更に留めること。
+- 存在しない ID や更新対象なしのケースは、安全に失敗結果を返すこと。
+- `bulkDisableNetshopRecords` を単なる cancel の別名にしないこと。
+- 不明点がある場合は、既存コードの命名・返却形式に合わせて最も保守的に実装すること。
 
 ## 非対象
 - UI 実装
-- 物理削除
-- Issue に記載のない別 API の挙動変更
-- 広範なリファクタリングのみを目的とした変更
+- 物理削除の追加
+- Issue にない別機能の修正
+- md/json/txt のみを変更して終了すること
 
 ## 実装ステップ
-1. `20_api_netshop.gs` の `cancelItem`、`bulkDisableNetshopRecords`、および関連する更新処理を確認し、現在 `キャンセル` ステータスと無効化処理が混在している箇所を特定する。
-2. `cancelItem` を、対象レコードの業務ステータスのみを `キャンセル` 相当へ変更する実装に修正する。表示・管理上の無効化フラグやアーカイブ状態はここで変更しない。
-3. `archiveItem` または `disableItem` が未実装なら追加し、既存なら責務を整理して、対象レコードの運用上の無効化のみを行うよう修正する。業務ステータスは変更しない。
-4. `bulkDisableNetshopRecords` を、複数レコードに対する運用上の無効化 API として実装し直す。ここでは `キャンセル` ステータスへ変更しない。
-5. 返却値を見直し、`cancel` 系 API は業務キャンセル結果、`archive` / `disable` 系 API は無効化結果として意味が分かるレスポンスに揃える。既存レスポンス形式がある場合は互換性を保ちながらメッセージやフィールド名を改善する。
-6. 定数やステータス文字列が重複・混在している場合のみ、`01_config.gs` に業務ステータス用と運用無効化用の定義を追加または整理する。
-7. 既存 API 呼び出し経路を壊さないよう、関数名変更が必要な場合は互換ラッパーまたは既存名維持で対応する。
+1. `20_api_netshop.gs` の `cancelItem`、`bulkDisableNetshopRecords`、`api_bulkDisableNetshop` の現在の更新対象列・更新値・返却値を確認し、cancel と disable/archive が同じ処理になっている箇所を分離する。
+2. `cancelItem` は従来どおり業務ステータス更新として残し、`CONFIG.STATUS.CANCEL` を使うべき箇所を cancel 系のみに限定する。
+3. disable/archive 用の状態表現を既存コードから再利用できるならそれを使い、なければ `01_config.gs` に無効化用の定数を追加する。業務ステータス列を cancel に変えるのではなく、表示・管理上の無効化を表す列または既存管理フラグへ反映する実装にする。
+4. `bulkDisableNetshopRecords` / `api_bulkDisableNetshop` を、名称どおり無効化処理を行う API として実装し直す。必要なら内部ヘルパーを追加し、複数 ID の処理結果を返せるよう整理する。
+5. 存在しない ID、更新対象が見つからない ID は、安全に失敗として返す。既存レスポンス形式がある場合はそれに合わせて `success/failed` や件数、対象 ID を返す。
+6. 既存の cancel API と disable API の意味がコード上で読み取れるよう、関数名・内部コメント・返却項目名を最小限整理する。ただし外部互換を壊す不要なリネームは避ける。
+7. 変更後の処理が物理削除を行っていないこと、disable 系が `CONFIG.STATUS.CANCEL` 直設定で終わっていないことを確認する。
 
 ## 完了条件
-- `20_api_netshop.gs` に実コード差分がある
-- `cancelItem` が業務上のキャンセル処理として分離されている
-- `archiveItem` または `disableItem` が運用上の無効化処理として分離されている
-- `bulkDisableNetshopRecords` が `cancel` と同義ではなく、無効化処理として動作する
-- API 名、返却値、処理内容の意味が一致している
-- 既存データを破壊せず、既存 API 基盤を壊していない
-- `md/json/txt` のみの変更ではなく、実装ファイルが変更されている
+- `20_api_netshop.gs` に実コード差分がある。
+- `cancelItem` が業務キャンセル処理として残っている。
+- `bulkDisableNetshopRecords` / `api_bulkDisableNetshop` が cancel と同義ではなく、無効化専用の処理になっている。
+- disable/archive 系が `CONFIG.STATUS.CANCEL` 直呼びで終わっていない。
+- 存在しない ID を安全に失敗として返す。
+- 物理削除を実装していない。
+- `md/json/txt` だけの変更で終わっていない。
 
 ## 検証
-- `cancelItem` 実行時に、対象レコードの業務ステータスのみが `キャンセル` になり、無効化状態は変更されないことを確認する
-- `archiveItem` または `disableItem` 実行時に、対象レコードが運用上無効化されるが、業務ステータスは変更されないことを確認する
-- `bulkDisableNetshopRecords` 実行時に、複数レコードが無効化されても `キャンセル` ステータスへ変更されないことを確認する
-- 既存の API レスポンス生成処理がある場合、成功/失敗レスポンスが各 API の意味に整合していることを確認する
-- 影響範囲として、既存の `cancel` 利用箇所が無効化処理に依存していないことをコード上で確認する
+- `cancelItem` 実行時に、対象レコードが業務ステータス `CANCEL` 相当に更新されることを確認する。
+- `bulkDisableNetshopRecords` / `api_bulkDisableNetshop` 実行時に、対象レコードが cancel ではなく無効化状態になることを確認する。
+- disable API 実行後も、業務ステータスが不要に `CANCEL` へ変更されていないことを確認する。
+- 存在しない ID を含む入力で、処理全体が異常終了せず、該当 ID が失敗として返ることを確認する。
+- 既存の API 呼び出し経路で実行エラーが発生しないことを確認する。

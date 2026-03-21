@@ -100,6 +100,20 @@ const CONFIG = Object.freeze({
     'キャンセル'
   ]),
 
+  OPERATIONAL_DISABLE: Object.freeze({
+    MEMO_PREFIX: '[運用無効]',
+    HEADER_CANDIDATES: Object.freeze([
+      '運用無効',
+      '無効化',
+      '無効',
+      '表示無効',
+      'アーカイブ',
+      'アーカイブ済み',
+      '削除フラグ',
+      '削除済み'
+    ])
+  }),
+
   NETSHOP_MASTERS: Object.freeze({
     STATUS: Object.freeze([
       '商品登録',

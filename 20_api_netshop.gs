@@ -1024,18 +1024,29 @@ function applyStatusUpdateToRowValues_(rowValues, status, memo, headerResolution
   return nextRow;
 }
 
-var OPERATIONAL_DISABLE_HEADER_CANDIDATES = Object.freeze([
-  '運用無効',
-  '無効化',
-  '無効',
-  '表示無効',
-  'アーカイブ',
-  'アーカイブ済み',
-  '削除フラグ',
-  '削除済み'
-]);
+var OPERATIONAL_DISABLE_HEADER_CANDIDATES = Object.freeze(
+  (typeof CONFIG !== 'undefined' &&
+    CONFIG.OPERATIONAL_DISABLE &&
+    CONFIG.OPERATIONAL_DISABLE.HEADER_CANDIDATES)
+    ? CONFIG.OPERATIONAL_DISABLE.HEADER_CANDIDATES.slice()
+    : [
+      '運用無効',
+      '無効化',
+      '無効',
+      '表示無効',
+      'アーカイブ',
+      'アーカイブ済み',
+      '削除フラグ',
+      '削除済み'
+    ]
+);
 
-var OPERATIONAL_DISABLE_MEMO_PREFIX = '[運用無効]';
+var OPERATIONAL_DISABLE_MEMO_PREFIX =
+  (typeof CONFIG !== 'undefined' &&
+    CONFIG.OPERATIONAL_DISABLE &&
+    CONFIG.OPERATIONAL_DISABLE.MEMO_PREFIX)
+    ? CONFIG.OPERATIONAL_DISABLE.MEMO_PREFIX
+    : '[運用無効]';
 
 function resolveOperationalDisableHeader_(headerResolution) {
   var candidates = OPERATIONAL_DISABLE_HEADER_CANDIDATES;
@@ -1629,8 +1640,9 @@ function parseItemIdsInput_(input) {
 function uniqueNormalizedIds_(itemIds) {
   var seen = {};
   var result = [];
+  var normalizedList = parseItemIdsInput_(itemIds);
 
-  (itemIds || []).forEach(function(itemId) {
+  normalizedList.forEach(function(itemId) {
     var normalized = String(itemId || '').trim();
     if (!normalized || seen[normalized]) return;
     seen[normalized] = true;
@@ -1772,7 +1784,9 @@ function bulkDisableNetshopRecords(itemIds, memo) {
 
   return buildBulkDisableResponse_(
     failedItemIds.length === 0,
-    failedItemIds.length ? 'partial success (operational disable)' : 'success (operational disable)',
+    failedItemIds.length
+      ? (disabledItemIds.length ? 'partial success (operational disable)' : 'failed (operational disable)')
+      : 'success (operational disable)',
     disabledItemIds,
     failedItemIds
   );
