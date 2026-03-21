@@ -1,5 +1,5 @@
 {
-  "issue_title": "feat: [11] 月別集計API を実装する",
+  "issue_title": "[12] プラットフォーム別集計API を実装対象 再投稿",
   "changed_files": [
     "20_api_netshop.gs",
     "codex_instruction.md",

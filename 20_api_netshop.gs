@@ -450,6 +450,80 @@ function getMonthlySummaryForApi() {
   return getMonthlySummaryRows_();
 }
 
+function getPlatformSummaryRows_() {
+  var sheet = getManagementSheet_();
+  if (!sheet) return [];
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return [];
+
+  var rows = sheet.getRange(2, 1, lastRow - 1, CONFIG.COLS.MEMO).getValues();
+  var col = CONFIG.COLS;
+  var platformMap = {};
+
+  rows.forEach(function(row) {
+    var status = row[col.STATUS - 1];
+    if (CONFIG.CALC_TARGETS.indexOf(status) === -1) return;
+
+    var shop = String(row[col.SHOP - 1] || '').trim();
+    if (!shop) return;
+
+    if (!platformMap[shop]) {
+      platformMap[shop] = {
+        shop: shop,
+        count: 0,
+        sales: 0,
+        fee: 0,
+        shipping: 0,
+        cost: 0,
+        profit: 0
+      };
+    }
+
+    var entry = platformMap[shop];
+    entry.count += 1;
+    entry.sales += parseAmountOrNull_(row[col.PRICE_FINAL - 1]) || 0;
+    entry.fee += parseAmountOrNull_(row[col.FEE - 1]) || 0;
+    entry.shipping += parseAmountOrNull_(row[col.SHIPPING - 1]) || 0;
+    entry.cost += parseAmountOrNull_(row[col.COST - 1]) || 0;
+
+    var profit = parseAmountOrNull_(row[col.PROFIT - 1]);
+    if (profit === null) {
+      profit = calculateProfitFromRowValues_(row);
+    }
+    entry.profit += profit;
+  });
+
+  return Object.keys(platformMap).sort().map(function(key) {
+    return platformMap[key];
+  });
+}
+
+function getPlatformSummaryForApi() {
+  return getPlatformSummaryRows_();
+}
+
+function api_getPlatformSummary() {
+  try {
+    var platforms = getPlatformSummaryForApi();
+    return {
+      ok: true,
+      platforms: platforms
+    };
+  } catch (error) {
+    Logger.log('api_getPlatformSummary error: ' + error);
+    return {
+      ok: false,
+      error: String(error),
+      platforms: []
+    };
+  }
+}
+
+function api_platformSummary() {
+  return api_getPlatformSummary();
+}
+
 function api_getMonthlySummary() {
   try {
     var monthly = getMonthlySummaryForApi();
@@ -479,6 +553,11 @@ function api_dispatchAction(payload) {
     case 'getMonthlySummary':
     case 'monthlySummary':
       return api_getMonthlySummary();
+    case 'getPlatformSummary':
+    case 'platformSummary':
+    case 'getShopSummary':
+    case 'shopSummary':
+      return api_getPlatformSummary();
     default:
       return {
         ok: false,
