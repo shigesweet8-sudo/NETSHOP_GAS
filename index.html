@@ -145,6 +145,20 @@
         color: var(--muted);
       }
 
+      .view-context {
+        margin-bottom: 14px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .layout-app.is-loading {
+        cursor: progress;
+      }
+
+      .layout-app.is-loading .card {
+        opacity: 0.95;
+      }
+
       .items-toolbar {
         display: flex;
         flex-wrap: wrap;
@@ -363,7 +377,7 @@
     </style>
   </head>
   <body>
-    <div class="layout-app">
+    <div class="layout-app" id="app-root">
       <header class="page-header">
         <div>
           <h1 class="page-title">WAVE</h1>
@@ -376,6 +390,7 @@
       </header>
 
       <div id="global-banner" class="state-banner" aria-live="polite"></div>
+      <div id="view-context" class="view-context" aria-live="polite"></div>
 
       <section id="list-section" class="card">
         <h2 class="card-title">商品一覧</h2>
@@ -558,6 +573,23 @@
         el.textContent = message;
       }
 
+      function showOperationMessage(kind, actionLabel, err, options) {
+        var opts = options && typeof options === "object" ? options : {};
+        var suffix = opts.suffix ? " " + String(opts.suffix) : "";
+        var message = "";
+        if (kind === "success") {
+          message = actionLabel + "が完了しました。" + suffix;
+        } else if (kind === "error") {
+          message = actionLabel + "に失敗しました: " + resolveErrorMessage(err);
+        } else {
+          message = actionLabel + "を実行しています。";
+        }
+        setBanner(kind, message);
+        if (opts.inlineId) {
+          setInlineMessageById(opts.inlineId, kind, message);
+        }
+      }
+
       function normalizeExecutionError(err) {
         if (typeof err === "string") {
           return {
@@ -697,10 +729,58 @@
         editLoading: false,
         editSubmitting: false,
         createSubmitting: false,
+        detailNavigating: false,
         mastersLoaded: false,
         masterStatusOptions: [],
         masterShopOptions: []
       };
+
+      function refreshUiLocks() {
+        var globalBusy = !!(state.loading || state.createSubmitting || state.editLoading || state.editSubmitting || state.detailLoading || state.detailNavigating);
+        var appRoot = document.getElementById("app-root");
+        if (appRoot) {
+          appRoot.classList.toggle("is-loading", globalBusy);
+          appRoot.setAttribute("aria-busy", globalBusy ? "true" : "false");
+        }
+        var backToList = document.getElementById("back-to-list");
+        if (backToList) backToList.disabled = globalBusy;
+        var createBackToList = document.getElementById("create-back-to-list");
+        if (createBackToList) createBackToList.disabled = globalBusy || state.createSubmitting;
+        var editBackToDetail = document.getElementById("edit-back-to-detail");
+        if (editBackToDetail) editBackToDetail.disabled = globalBusy || state.editSubmitting;
+      }
+
+      function updateViewContext() {
+        var el = document.getElementById("view-context");
+        if (!el) return;
+        var mode = state.viewMode;
+        var context = "現在地: ダッシュボード / 商品一覧";
+        if (mode === "detail") {
+          context = "現在地: ダッシュボード / 商品一覧 > 商品詳細" + (state.detailItemId ? " (管理ID: " + state.detailItemId + ")" : "");
+        } else if (mode === "create") {
+          context = "現在地: ダッシュボード / 商品一覧 > 新規商品登録";
+        } else if (mode === "edit") {
+          context = "現在地: ダッシュボード / 商品一覧 > 商品詳細 > 商品編集" + (state.editItemId ? " (管理ID: " + state.editItemId + ")" : "");
+        }
+        el.textContent = context;
+      }
+
+      function hasCreateDraft() {
+        var payload = collectCreatePayload();
+        return Object.keys(payload).some(function(key) {
+          return String(payload[key] || "").trim() !== "";
+        });
+      }
+
+      function hasEditDraftChanges() {
+        if (!state.editInitialValues) return false;
+        var payload = collectEditPayload();
+        return Object.keys(payload).some(function(key) {
+          var current = String(payload[key] || "").trim();
+          var initial = String(state.editInitialValues[key] || "").trim();
+          return current !== initial;
+        });
+      }
 
       function getCurrentHeaders(items) {
         if (!items || !items.length) return [];
@@ -851,6 +931,7 @@
         document.getElementById("create-save-item").disabled = !!flag;
         document.getElementById("create-reset-form").disabled = !!flag;
         document.getElementById("create-back-to-list").disabled = !!flag;
+        refreshUiLocks();
       }
 
       function refreshEditButtons() {
@@ -858,6 +939,7 @@
         document.getElementById("edit-save-item").disabled = disabled;
         document.getElementById("edit-reset-form").disabled = disabled;
         document.getElementById("edit-back-to-detail").disabled = !!state.editSubmitting;
+        refreshUiLocks();
       }
 
       function setEditLoading(flag) {
@@ -957,19 +1039,20 @@
       function saveNewItem() {
         if (state.createSubmitting) return;
         setCreateSubmitting(true);
-        setInlineMessage("info", "保存しています...");
+        showOperationMessage("info", "新規商品登録", null, { inlineId: "create-message" });
         var payload = collectCreatePayload();
 
         callWrappedApi("api_createItem", [payload]).then(function(response) {
           var createdId = response && response.data && response.data.id ? String(response.data.id) : "";
-          setInlineMessage("success", "保存に成功しました" + (createdId ? " (管理ID: " + createdId + ")" : "") + "。");
-          setBanner("success", "新規商品を登録しました。");
+          showOperationMessage("success", "新規商品登録", null, {
+            inlineId: "create-message",
+            suffix: createdId ? "(管理ID: " + createdId + ")" : ""
+          });
           resetCreateForm();
           switchScreen("list");
           loadItemsWithCurrentSort({ forceBaseLoad: true });
         }).catch(function(err) {
-          setInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
-          setBanner("error", "新規商品の保存に失敗しました。");
+          showOperationMessage("error", "新規商品登録", err, { inlineId: "create-message" });
         }).finally(function() {
           setCreateSubmitting(false);
         });
@@ -999,6 +1082,8 @@
         detailSection.classList.toggle("screen-hidden", state.viewMode !== "detail");
         createSection.classList.toggle("screen-hidden", state.viewMode !== "create");
         editSection.classList.toggle("screen-hidden", state.viewMode !== "edit");
+        updateViewContext();
+        refreshUiLocks();
       }
 
       function findFirstValue(item, keys) {
@@ -1145,7 +1230,7 @@
         setEditInlineMessage("", "");
         switchScreen("edit");
         setEditLoading(true);
-        setEditInlineMessage("info", "編集データを取得しています...");
+        showOperationMessage("info", "編集データ取得", null, { inlineId: "edit-message" });
 
         var mastersPromise = loadCreateMastersIfNeeded(false, "edit-message").catch(function() {
           return null;
@@ -1161,8 +1246,7 @@
         Promise.all([mastersPromise, detailPromise]).then(function() {
           resetEditFormToInitial();
         }).catch(function(err) {
-          setEditInlineMessage("error", "編集データの取得に失敗しました: " + resolveErrorMessage(err));
-          setBanner("error", "編集画面の初期化に失敗しました。");
+          showOperationMessage("error", "編集データ取得", err, { inlineId: "edit-message" });
         }).finally(function() {
           setEditLoading(false);
         });
@@ -1177,16 +1261,14 @@
         }
 
         setEditSubmitting(true);
-        setEditInlineMessage("info", "保存しています...");
+        showOperationMessage("info", "商品更新", null, { inlineId: "edit-message" });
         var payload = collectEditPayload();
 
         callWrappedApi("api_updateItem", [itemId, payload]).then(function() {
-          setEditInlineMessage("success", "保存に成功しました。");
-          setBanner("success", "商品を更新しました。");
+          showOperationMessage("success", "商品更新", null, { inlineId: "edit-message" });
           openDetailById(itemId, { silentSuccessBanner: true });
         }).catch(function(err) {
-          setEditInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
-          setBanner("error", "商品の更新に失敗しました。");
+          showOperationMessage("error", "商品更新", err, { inlineId: "edit-message" });
         }).finally(function() {
           setEditSubmitting(false);
         });
@@ -1204,8 +1286,10 @@
         state.detailLoading = true;
         state.detailItem = null;
         state.detailErrorMessage = "";
+        state.detailNavigating = true;
         switchScreen("detail");
         renderDetailContent();
+        refreshUiLocks();
 
         return callWrappedApi("getItem", [normalizedId]).then(function(response) {
           state.detailItem = response && response.data ? response.data : null;
@@ -1219,7 +1303,10 @@
           setBanner("error", "商品詳細の取得に失敗しました: " + resolveErrorMessage(err));
         }).finally(function() {
           state.detailLoading = false;
+          state.detailNavigating = false;
           renderDetailContent();
+          updateViewContext();
+          refreshUiLocks();
         });
       }
 
@@ -1245,7 +1332,7 @@
         state.viewItems.forEach(function(item) {
           var itemId = resolveItemId(item);
           var checked = itemId && state.selectedById[itemId] ? " checked" : "";
-          var disabled = itemId ? "" : " disabled";
+          var disabled = itemId && !state.loading && !state.detailLoading ? "" : " disabled";
           html += "<tr>";
           html += "<td class=\"select-cell\"><input class=\"row-select\" type=\"checkbox\" data-item-id=\"" + escapeHtml(itemId) + "\"" + checked + disabled + " aria-label=\"行選択\"></td>";
           html += "<td class=\"action-cell\"><button class=\"btn btn-secondary btn-small row-detail-open\" type=\"button\" data-item-id=\"" + escapeHtml(itemId) + "\"" + disabled + ">詳細</button></td>";
@@ -1280,6 +1367,7 @@
           document.getElementById("items-status").textContent = message;
         }
         updateBulkUiState();
+        refreshUiLocks();
       }
 
       function loadItemsWithCurrentSort(options) {
@@ -1301,11 +1389,11 @@
           state.selectedById = {};
           updateToolbarOptions(state.allItems);
           applyAndRenderCurrentView();
-          setBanner("success", "商品一覧を取得しました。");
+          showOperationMessage("success", "商品一覧取得");
         }).catch(function(err) {
           document.getElementById("items-status").textContent = "エラー";
           document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(err)) + "</span>";
-          setBanner("error", "商品一覧の取得に失敗しました。");
+          showOperationMessage("error", "商品一覧取得", err);
         }).finally(function() {
           setLoading(false);
         });
@@ -1335,12 +1423,19 @@
           : action === "recalculate"
             ? "一括再計算"
             : "一括無効化";
-        if (!window.confirm(actionLabel + "を " + selectedIds.length + " 件に実行します。よろしいですか？")) {
+        var confirmMessage = actionLabel + "を " + selectedIds.length + " 件に実行します。";
+        if (action === "updateStatus") {
+          confirmMessage += "\n変更後ステータス: " + statusValue;
+        } else if (action === "disable") {
+          confirmMessage += "\n対象を無効化します。必要に応じて管理IDで再確認してください。";
+        }
+        confirmMessage += "\nよろしいですか？";
+        if (!window.confirm(confirmMessage)) {
           return;
         }
 
         setLoading(true, "一括処理中...");
-        setBanner("info", actionLabel + "を実行しています。");
+        showOperationMessage("info", actionLabel);
 
         var apiName = "";
         var payload = { itemIds: selectedIds };
@@ -1354,10 +1449,10 @@
         }
 
         callWrappedApi(apiName, [payload]).then(function() {
-          setBanner("success", actionLabel + "が完了しました。");
+          showOperationMessage("success", actionLabel);
           return loadItemsWithCurrentSort({ forceBaseLoad: false });
         }).catch(function(err) {
-          setBanner("error", actionLabel + "に失敗しました: " + resolveErrorMessage(err));
+          showOperationMessage("error", actionLabel, err);
         }).finally(function() {
           setLoading(false);
           updateBulkUiState();
@@ -1410,6 +1505,7 @@
       });
 
       document.getElementById("back-to-list").addEventListener("click", function() {
+        if (state.detailLoading || state.detailNavigating) return;
         switchScreen("list");
       });
 
@@ -1418,6 +1514,10 @@
       });
 
       document.getElementById("create-back-to-list").addEventListener("click", function() {
+        if (state.createSubmitting) return;
+        if (hasCreateDraft() && !window.confirm("入力中の内容は保存されません。一覧へ戻りますか？")) {
+          return;
+        }
         switchScreen("list");
       });
 
@@ -1426,11 +1526,18 @@
       });
 
       document.getElementById("create-reset-form").addEventListener("click", function() {
+        if (hasCreateDraft() && !window.confirm("入力内容をすべてクリアします。よろしいですか？")) {
+          return;
+        }
         resetCreateForm();
         setInlineMessage("", "");
       });
 
       document.getElementById("edit-back-to-detail").addEventListener("click", function() {
+        if (state.editSubmitting || state.editLoading) return;
+        if (hasEditDraftChanges() && !window.confirm("編集中の変更は破棄されます。詳細画面へ戻りますか？")) {
+          return;
+        }
         if (!state.editItemId) {
           switchScreen("list");
           return;
@@ -1443,11 +1550,15 @@
       });
 
       document.getElementById("edit-reset-form").addEventListener("click", function() {
+        if (hasEditDraftChanges() && !window.confirm("編集内容を初期値に戻します。よろしいですか？")) {
+          return;
+        }
         resetEditFormToInitial();
         setEditInlineMessage("", "");
       });
 
       document.getElementById("content").addEventListener("change", function(event) {
+        if (state.loading) return;
         var target = event.target;
         if (!target) return;
 
@@ -1474,6 +1585,7 @@
       });
 
       document.getElementById("content").addEventListener("click", function(event) {
+        if (state.loading || state.detailLoading || state.detailNavigating) return;
         var target = event.target;
         if (!target) return;
         if (target.classList.contains("row-detail-open")) {
@@ -1484,6 +1596,8 @@
 
       updateBulkUiState();
       switchScreen("list");
+      updateViewContext();
+      refreshUiLocks();
       loadItemsWithCurrentSort({ forceBaseLoad: true });
     </script>
   </body>
