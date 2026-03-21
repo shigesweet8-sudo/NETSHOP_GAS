@@ -1,5 +1,3 @@
-1. 20_api_netshop.gs に一括ステータス更新APIを追加する。
-2. 複数の管理IDを受け取り、同一ステータスへ一括更新できるようにする。
-3. 更新時は既存の単体更新と同じ業務ルールを守る。
-4. 返却値は、成功件数・失敗件数・対象ID一覧が分かる最小限のJSON形式にする。
-5. 既存の単体 updateItemStatus を壊さないようにする。
+1. `20_api_netshop.gs` に UI 向け共通レスポンス生成ヘルパーを追加し、成功 / 失敗の標準フォーマット（`ok`, `error`, `data`）と互換維持用の戻り値ルールを実装する
+2. 対象 API（`listItems`, `getItem`, `createItem`, `updateItem`, `updateItemStatus`, `bulkUpdateStatus`, `recalculateItemProfit`, `bulkRecalculateProfit`）の返却値を共通レスポンスヘルパー経由へ置き換え、配列直返し・文字列直返し・生オブジェクト返しを解消する
+3. 対象 API（`getMonthlySummary`, `getPlatformSummary`, `getDashboardSummary`, `getMasters`, `validateVariation`, `exportCsv`, 郵便番号補完 API, disable / archive / cancel 系 API）の返却値と例外処理を共通レスポンス形式へ統一し、既存呼び出し互換に配慮した最終調整を行う

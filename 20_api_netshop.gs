@@ -88,6 +88,55 @@ function convertFilterKeysToApi_(filter) {
   return converted;
 }
 
+function buildApiErrorObject_(message, code, details) {
+  var error = {
+    message: String(message || 'unexpected error')
+  };
+  if (code) error.code = String(code);
+  if (details !== undefined) error.details = details;
+  return error;
+}
+
+function shallowCopyFields_(target, source) {
+  if (!source || typeof source !== 'object') return target;
+  Object.keys(source).forEach(function(key) {
+    if (key === 'ok' || key === 'error' || key === 'data') return;
+    target[key] = source[key];
+  });
+  return target;
+}
+
+function buildApiSuccessResponse_(data, compatibility) {
+  var response = {
+    ok: true,
+    error: null,
+    data: data === undefined ? null : data
+  };
+
+  var options = compatibility && typeof compatibility === 'object' ? compatibility : {};
+  if (options.copyDataToTopLevel && data && typeof data === 'object') {
+    shallowCopyFields_(response, data);
+  }
+  if (options.extra && typeof options.extra === 'object') {
+    shallowCopyFields_(response, options.extra);
+  }
+
+  return response;
+}
+
+function buildApiErrorResponse_(message, code, details, compatibility) {
+  var response = {
+    ok: false,
+    error: buildApiErrorObject_(message, code, details),
+    data: null
+  };
+  var options = compatibility && typeof compatibility === 'object' ? compatibility : {};
+  if (options.extra && typeof options.extra === 'object') {
+    shallowCopyFields_(response, options.extra);
+  }
+  return response;
+}
+
 function getManagementSheet_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) return null;
@@ -224,7 +273,7 @@ function applyFilter_(items, filter) {
  * @param {Object=} filter
  * @returns {Object[]}
  */
-function listItems(filter) {
+function listItemsRaw_(filter) {
   try {
     var snapshot = getSheetSnapshot_();
     if (!snapshot) return [];
@@ -235,6 +284,25 @@ function listItems(filter) {
   } catch (error) {
     Logger.log('listItems error: ' + error);
     return [];
+  }
+}
+
+function listItems(filter) {
+  try {
+    var items = listItemsRaw_(filter);
+    return buildApiSuccessResponse_(items, {
+      extra: {
+        items: items
+      }
+    });
+  } catch (error) {
+    Logger.log('listItems response error: ' + error);
+    return buildApiErrorResponse_(
+      normalizeUiApiErrorMessage_(error),
+      'LIST_ITEMS_FAILED',
+      undefined,
+      { extra: { items: [] } }
+    );
   }
 }
 
@@ -385,7 +453,7 @@ function sortItemsByKey_(items, sortKey, order) {
 }
 
 function listItemsSorted(filter, sortKey, order) {
-  var items = listItems(filter);
+  var items = listItemsRaw_(filter);
   return sortItemsByKey_(items, sortKey, order);
 }
 
@@ -424,10 +492,20 @@ function api_listItemsSorted(filterOrPayload, sortKey, order) {
       if (sortOrder === undefined) sortOrder = filterOrPayload.direction;
     }
 
-    return listItemsSorted(filter, key, sortOrder);
+    var items = listItemsSorted(filter, key, sortOrder);
+    return buildApiSuccessResponse_(items, {
+      extra: {
+        items: items
+      }
+    });
   } catch (error) {
     Logger.log('api_listItemsSorted error: ' + error);
-    return [];
+    return buildApiErrorResponse_(
+      normalizeUiApiErrorMessage_(error),
+      'LIST_ITEMS_SORTED_FAILED',
+      undefined,
+      { extra: { items: [] } }
+    );
   }
 }
 
@@ -446,7 +524,7 @@ function api_debugContext() {
  * @param {string} itemId
  * @returns {Object|null}
  */
-function getItem(itemId) {
+function getItemRaw_(itemId) {
   if (!itemId) return null;
 
   var snapshot = getSheetSnapshot_();
@@ -456,6 +534,31 @@ function getItem(itemId) {
   if (rowIndex === -1) return null;
 
   return buildPublicItemFromRow_(snapshot.headers, snapshot.rows[rowIndex]);
+}
+
+function getItem(itemId) {
+  try {
+    if (!itemId) {
+      return buildApiErrorResponse_('itemId is required', 'ITEM_ID_REQUIRED');
+    }
+    var item = getItemRaw_(itemId);
+    if (!item) {
+      return buildApiErrorResponse_('ID not found: ' + itemId, 'ITEM_NOT_FOUND', undefined, {
+        extra: {
+          itemId: String(itemId || '')
+        }
+      });
+    }
+    return buildApiSuccessResponse_(item, {
+      extra: {
+        item: item,
+        itemId: String(itemId || '')
+      }
+    });
+  } catch (error) {
+    Logger.log('getItem error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'GET_ITEM_FAILED');
+  }
 }
 
 function buildRowFromPayload_(payload, headerResolution) {
@@ -491,7 +594,7 @@ function buildRowFromPayload_(payload, headerResolution) {
  * @param {Object} input
  * @returns {Object|null}
  */
-function createItem(input) {
+function createItemRaw_(input) {
   var payload = input && typeof input === 'object' ? input : {};
   var sheet = getManagementSheet_();
   if (!sheet) return null;
@@ -510,28 +613,25 @@ function createItem(input) {
     id: created.itemId,
     row: nextRow,
     status: created.statusValue,
-    item: getItem(created.itemId)
+    item: getItemRaw_(created.itemId)
   };
 }
 
-function api_createItem(payload) {
+function createItem(input) {
   try {
-    var created = createItem(payload);
-    if (!created) throw new Error('createItem failed');
-    return {
-      ok: true,
-      id: created.id,
-      status: created.status,
-      row: created.row,
-      item: created.item
-    };
+    var created = createItemRaw_(input);
+    if (!created) {
+      return buildApiErrorResponse_('createItem failed', 'CREATE_ITEM_FAILED');
+    }
+    return buildApiSuccessResponse_(created, { copyDataToTopLevel: true });
   } catch (error) {
-    Logger.log('api_createItem error: ' + error);
-    return {
-      ok: false,
-      error: String(error)
-    };
+    Logger.log('createItem error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'CREATE_ITEM_FAILED');
   }
+}
+
+function api_createItem(payload) {
+  return createItem(payload);
 }
 
 /**
@@ -540,7 +640,7 @@ function api_createItem(payload) {
  * @param {Object} input
  * @returns {Object|null}
  */
-function updateItem(itemId, input) {
+function updateItemRaw_(itemId, input) {
   if (!itemId) return null;
 
   var snapshot = getSheetSnapshot_();
@@ -570,24 +670,31 @@ function updateItem(itemId, input) {
     snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
   }
 
-  return getItem(itemId);
+  return getItemRaw_(itemId);
+}
+
+function updateItem(itemId, input) {
+  try {
+    if (!itemId) {
+      return buildApiErrorResponse_('itemId is required', 'ITEM_ID_REQUIRED');
+    }
+    var updatedItem = updateItemRaw_(itemId, input);
+    if (!updatedItem) {
+      return buildApiErrorResponse_('ID not found: ' + itemId, 'ITEM_NOT_FOUND', undefined, {
+        extra: { itemId: String(itemId || '') }
+      });
+    }
+    return buildApiSuccessResponse_({ item: updatedItem, itemId: String(itemId || '') }, {
+      copyDataToTopLevel: true
+    });
+  } catch (error) {
+    Logger.log('updateItem error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'UPDATE_ITEM_FAILED');
+  }
 }
 
 function api_updateItem(id, payload) {
-  try {
-    var updatedItem = updateItem(id, payload);
-    if (!updatedItem) throw new Error('ID not found: ' + id);
-    return {
-      ok: true,
-      item: updatedItem
-    };
-  } catch (error) {
-    Logger.log('api_updateItem error: ' + error);
-    return {
-      ok: false,
-      error: String(error)
-    };
-  }
+  return updateItem(id, payload);
 }
 
 function getStatusList_() {
@@ -774,7 +881,7 @@ function parseRequestedMasterTypes_(payload) {
   };
 }
 
-function getMasters(payload) {
+function getMastersRaw_(payload) {
   var requested = parseRequestedMasterTypes_(payload);
   var masters = {};
 
@@ -790,21 +897,25 @@ function getMasters(payload) {
   };
 }
 
-function api_getMasters(payload) {
+function getMasters(payload) {
   try {
-    var result = getMasters(payload);
-    return {
-      ok: true,
-      masters: result.masters
-    };
+    var result = getMastersRaw_(payload);
+    return buildApiSuccessResponse_(result, {
+      copyDataToTopLevel: true
+    });
   } catch (error) {
-    Logger.log('api_getMasters error: ' + error);
-    return {
-      ok: false,
-      error: String(error),
-      masters: {}
-    };
+    Logger.log('getMasters error: ' + error);
+    return buildApiErrorResponse_(
+      normalizeUiApiErrorMessage_(error),
+      'GET_MASTERS_FAILED',
+      undefined,
+      { extra: { masters: {} } }
+    );
   }
+}
+
+function api_getMasters(payload) {
+  return getMasters(payload);
 }
 
 function api_masters(payload) {
@@ -861,7 +972,7 @@ function normalizeNumberish_(value) {
   return isNaN(parsed) ? NaN : parsed;
 }
 
-function validateVariationPayload_(payload) {
+function validateVariationPayloadRaw_(payload) {
   var normalized = normalizeValidationPayload_(payload);
   var item = normalized.item && typeof normalized.item === 'object' ? normalized.item : {};
   var issues = {
@@ -977,23 +1088,46 @@ function validateVariationPayload_(payload) {
 
 function api_validateVariation(payload) {
   try {
-    return validateVariationPayload_(payload);
+    var result = validateVariationPayloadRaw_(payload);
+    if (!result.ok) {
+      return buildApiErrorResponse_(
+        'validation failed',
+        'VALIDATION_FAILED',
+        result,
+        {
+          extra: {
+            mode: result.mode,
+            errors: result.errors || [],
+            warnings: result.warnings || []
+          }
+        }
+      );
+    }
+    return buildApiSuccessResponse_(result, {
+      copyDataToTopLevel: true
+    });
   } catch (error) {
     Logger.log('api_validateVariation error: ' + error);
-    return {
-      ok: false,
-      errors: [{
-        code: 'INTERNAL_ERROR',
-        field: '',
-        message: String(error)
-      }],
-      warnings: []
-    };
+    return buildApiErrorResponse_(
+      normalizeUiApiErrorMessage_(error),
+      'VALIDATION_INTERNAL_ERROR',
+      undefined,
+      {
+        extra: {
+          errors: [{
+            code: 'INTERNAL_ERROR',
+            field: '',
+            message: String(error)
+          }],
+          warnings: []
+        }
+      }
+    );
   }
 }
 
 function validateVariation(payload) {
-  return validateVariationPayload_(payload);
+  return api_validateVariation(payload);
 }
 
 function applyStatusUpdateToRowValues_(rowValues, status, memo, headerResolution) {
@@ -1317,7 +1451,22 @@ function getMonthlySummaryForApi() {
 }
 
 function getMonthlySummary() {
-  return getMonthlySummaryForApi();
+  try {
+    var monthly = getMonthlySummaryForApi();
+    return buildApiSuccessResponse_(monthly, {
+      extra: {
+        monthly: monthly
+      }
+    });
+  } catch (error) {
+    Logger.log('getMonthlySummary error: ' + error);
+    return buildApiErrorResponse_(
+      normalizeUiApiErrorMessage_(error),
+      'GET_MONTHLY_SUMMARY_FAILED',
+      undefined,
+      { extra: { monthly: [] } }
+    );
+  }
 }
 
 function getPlatformSummaryRows_() {
@@ -1374,24 +1523,26 @@ function getPlatformSummaryForApi() {
 }
 
 function getPlatformSummary() {
-  return getPlatformSummaryForApi();
+  try {
+    var platforms = getPlatformSummaryForApi();
+    return buildApiSuccessResponse_(platforms, {
+      extra: {
+        platforms: platforms
+      }
+    });
+  } catch (error) {
+    Logger.log('getPlatformSummary error: ' + error);
+    return buildApiErrorResponse_(
+      normalizeUiApiErrorMessage_(error),
+      'GET_PLATFORM_SUMMARY_FAILED',
+      undefined,
+      { extra: { platforms: [] } }
+    );
+  }
 }
 
 function api_getPlatformSummary() {
-  try {
-    var platforms = getPlatformSummaryForApi();
-    return {
-      ok: true,
-      platforms: platforms
-    };
-  } catch (error) {
-    Logger.log('api_getPlatformSummary error: ' + error);
-    return {
-      ok: false,
-      error: String(error),
-      platforms: []
-    };
-  }
+  return getPlatformSummary();
 }
 
 function api_platformSummary() {
@@ -1399,20 +1550,7 @@ function api_platformSummary() {
 }
 
 function api_getMonthlySummary() {
-  try {
-    var monthly = getMonthlySummaryForApi();
-    return {
-      ok: true,
-      monthly: monthly
-    };
-  } catch (error) {
-    Logger.log('api_getMonthlySummary error: ' + error);
-    return {
-      ok: false,
-      error: String(error),
-      monthly: []
-    };
-  }
+  return getMonthlySummary();
 }
 
 function api_monthlySummary() {
@@ -1420,23 +1558,11 @@ function api_monthlySummary() {
 }
 
 function buildUiApiSuccessResponse_(data) {
-  return {
-    ok: true,
-    data: data
-  };
+  return buildApiSuccessResponse_(data);
 }
 
-function buildUiApiErrorResponse_(message, details) {
-  var error = {
-    message: String(message || 'unexpected error')
-  };
-  if (details !== undefined) {
-    error.details = details;
-  }
-  return {
-    ok: false,
-    error: error
-  };
+function buildUiApiErrorResponse_(message, details, code) {
+  return buildApiErrorResponse_(message, code, details);
 }
 
 function normalizeUiApiErrorMessage_(error) {
@@ -1473,21 +1599,21 @@ function api_uiLookupZip(payload) {
   try {
     var zipInput = resolveZipCodeFromPayload_(payload);
     if (!zipInput) {
-      return buildUiApiErrorResponse_('zip is required');
+      return buildUiApiErrorResponse_('zip is required', undefined, 'ZIP_REQUIRED');
     }
 
     var normalizedZip = zipInput.replace(/[-\s]/g, '');
     if (!/^\d{7}$/.test(normalizedZip)) {
-      return buildUiApiErrorResponse_('zip must be 7 digits');
+      return buildUiApiErrorResponse_('zip must be 7 digits', undefined, 'ZIP_INVALID_FORMAT');
     }
 
     if (typeof lookupAddressByZip !== 'function') {
-      return buildUiApiErrorResponse_('lookupAddressByZip is not available');
+      return buildUiApiErrorResponse_('lookupAddressByZip is not available', undefined, 'ZIP_LOOKUP_UNAVAILABLE');
     }
 
     var address = lookupAddressByZip(normalizedZip);
     if (!address) {
-      return buildUiApiErrorResponse_('address not found');
+      return buildUiApiErrorResponse_('address not found', undefined, 'ZIP_NOT_FOUND');
     }
 
     return buildUiApiSuccessResponse_({
@@ -1499,23 +1625,23 @@ function api_uiLookupZip(payload) {
     });
   } catch (error) {
     Logger.log('api_uiLookupZip error: ' + error);
-    return buildUiApiErrorResponse_(normalizeUiApiErrorMessage_(error));
+    return buildUiApiErrorResponse_(normalizeUiApiErrorMessage_(error), undefined, 'ZIP_LOOKUP_FAILED');
   }
 }
 
 function api_uiDashboardKpi(payload) {
   try {
-    var summary = getDashboardSummary(extractUiFilterPayload_(payload));
+    var summary = getDashboardSummaryRaw_(extractUiFilterPayload_(payload));
     return buildUiApiSuccessResponse_(summary);
   } catch (error) {
     Logger.log('api_uiDashboardKpi error: ' + error);
-    return buildUiApiErrorResponse_(normalizeUiApiErrorMessage_(error));
+    return buildUiApiErrorResponse_(normalizeUiApiErrorMessage_(error), undefined, 'DASHBOARD_KPI_FAILED');
   }
 }
 
 function api_uiExportCsv(payload) {
   try {
-    var csv = exportCsv(extractUiFilterPayload_(payload));
+    var csv = exportCsvRaw_(extractUiFilterPayload_(payload));
     var csvText = String(csv || '');
     var body = csvText.replace(/^\uFEFF/, '');
     var lineCount = body ? body.split(/\r\n|\n|\r/).length : 0;
@@ -1529,7 +1655,7 @@ function api_uiExportCsv(payload) {
     });
   } catch (error) {
     Logger.log('api_uiExportCsv error: ' + error);
-    return buildUiApiErrorResponse_(normalizeUiApiErrorMessage_(error));
+    return buildUiApiErrorResponse_(normalizeUiApiErrorMessage_(error), undefined, 'EXPORT_CSV_FAILED');
   }
 }
 
@@ -1587,10 +1713,10 @@ function api_dispatchAction(payload) {
     case 'bulkDisable':
       return api_bulkDisableNetshop(payload);
     default:
-      return {
-        ok: false,
-        error: action ? ('unknown action: ' + action) : 'action is required'
-      };
+      return buildApiErrorResponse_(
+        action ? ('unknown action: ' + action) : 'action is required',
+        'UNKNOWN_ACTION'
+      );
   }
 }
 
@@ -1635,7 +1761,7 @@ function buildBulkRecalculateProfitResponse_(ok, message, successItemIds, failur
   };
 }
 
-function bulkRecalculateProfit(itemIds) {
+function bulkRecalculateProfitRaw_(itemIds) {
   if (!Array.isArray(itemIds)) {
     return buildBulkRecalculateProfitResponse_(false, 'itemIds must be array', [], []);
   }
@@ -1704,17 +1830,34 @@ function bulkRecalculateProfit(itemIds) {
   );
 }
 
+function bulkRecalculateProfit(itemIds) {
+  try {
+    var result = bulkRecalculateProfitRaw_(itemIds);
+    if (result.ok) {
+      return buildApiSuccessResponse_(result, { copyDataToTopLevel: true });
+    }
+    return buildApiErrorResponse_(result.message || 'bulk recalculate failed', 'BULK_RECALCULATE_FAILED', result, {
+      extra: result
+    });
+  } catch (error) {
+    Logger.log('bulkRecalculateProfit response error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'BULK_RECALCULATE_FAILED');
+  }
+}
+
 function api_bulkRecalculateProfit(payload) {
   try {
     payload = payload && typeof payload === 'object' ? payload : {};
     return bulkRecalculateProfit(payload.itemIds);
   } catch (error) {
     Logger.log('api_bulkRecalculateProfit error: ' + error);
-    return buildBulkRecalculateProfitResponse_(false, String(error), [], []);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'BULK_RECALCULATE_FAILED', undefined, {
+      extra: buildBulkRecalculateProfitResponse_(false, String(error), [], [])
+    });
   }
 }
 
-function bulkUpdateStatus(itemIds, status, memo) {
+function bulkUpdateStatusRaw_(itemIds, status, memo) {
   if (!Array.isArray(itemIds)) {
     return buildBulkUpdateResponse_(false, 'itemIds must be array', 0, 0, [], []);
   }
@@ -1792,13 +1935,30 @@ function bulkUpdateStatus(itemIds, status, memo) {
   );
 }
 
+function bulkUpdateStatus(itemIds, status, memo) {
+  try {
+    var result = bulkUpdateStatusRaw_(itemIds, status, memo);
+    if (result.ok) {
+      return buildApiSuccessResponse_(result, { copyDataToTopLevel: true });
+    }
+    return buildApiErrorResponse_(result.message || 'bulk update failed', 'BULK_UPDATE_STATUS_FAILED', result, {
+      extra: result
+    });
+  } catch (error) {
+    Logger.log('bulkUpdateStatus response error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'BULK_UPDATE_STATUS_FAILED');
+  }
+}
+
 function api_bulkUpdateStatus(payload) {
   try {
     payload = payload && typeof payload === 'object' ? payload : {};
     return bulkUpdateStatus(payload.itemIds, payload.status, payload.memo);
   } catch (error) {
     Logger.log('api_bulkUpdateStatus error: ' + error);
-    return buildBulkUpdateResponse_(false, String(error), 0, 0, [], []);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'BULK_UPDATE_STATUS_FAILED', undefined, {
+      extra: buildBulkUpdateResponse_(false, String(error), 0, 0, [], [])
+    });
   }
 }
 
@@ -1854,7 +2014,7 @@ function resolveBulkDisableItemIds_(payload) {
 
 function buildDisableResponse_(ok, message, updatedItem, itemId, actionName) {
   var normalizedAction = String(actionName || 'disableItem').trim() || 'disableItem';
-  return {
+  var payload = {
     ok: ok,
     action: normalizedAction,
     operation: 'operationalDisable',
@@ -1863,11 +2023,17 @@ function buildDisableResponse_(ok, message, updatedItem, itemId, actionName) {
     itemId: itemId || '',
     item: updatedItem || null
   };
+  if (ok) {
+    return buildApiSuccessResponse_(payload, { copyDataToTopLevel: true });
+  }
+  return buildApiErrorResponse_(payload.message || 'disable failed', 'DISABLE_ITEM_FAILED', payload, {
+    extra: payload
+  });
 }
 
 function buildArchiveResponse_(ok, message, updatedItem, itemId, actionName) {
   var normalizedAction = String(actionName || 'archiveItem').trim() || 'archiveItem';
-  return {
+  var payload = {
     ok: ok,
     action: normalizedAction,
     operation: 'archiveStorage',
@@ -1876,12 +2042,18 @@ function buildArchiveResponse_(ok, message, updatedItem, itemId, actionName) {
     itemId: itemId || '',
     item: updatedItem || null
   };
+  if (ok) {
+    return buildApiSuccessResponse_(payload, { copyDataToTopLevel: true });
+  }
+  return buildApiErrorResponse_(payload.message || 'archive failed', 'ARCHIVE_ITEM_FAILED', payload, {
+    extra: payload
+  });
 }
 
 function buildBulkDisableResponse_(ok, message, disabledItemIds, failedItemIds) {
   var successIds = disabledItemIds || [];
   var failureIds = failedItemIds || [];
-  var response = buildBulkUpdateResponse_(
+  var payload = buildBulkUpdateResponse_(
     ok,
     message,
     successIds.length,
@@ -1889,10 +2061,15 @@ function buildBulkDisableResponse_(ok, message, disabledItemIds, failedItemIds) 
     successIds,
     failureIds
   );
-  response.operation = 'operationalDisable';
-  response.disabledItemIds = successIds;
-  response.failedDisableItemIds = failureIds;
-  return response;
+  payload.operation = 'operationalDisable';
+  payload.disabledItemIds = successIds;
+  payload.failedDisableItemIds = failureIds;
+  if (ok) {
+    return buildApiSuccessResponse_(payload, { copyDataToTopLevel: true });
+  }
+  return buildApiErrorResponse_(payload.message || 'bulk disable failed', 'BULK_DISABLE_FAILED', payload, {
+    extra: payload
+  });
 }
 
 function disableItemById(itemId, memo) {
@@ -1915,7 +2092,7 @@ function disableItemById(itemId, memo) {
   );
   snapshot.sheet.getRange(rowIndex + 2, 1, 1, snapshot.rows[rowIndex].length).setValues([snapshot.rows[rowIndex]]);
 
-  return getItem(normalizedId);
+  return getItemRaw_(normalizedId);
 }
 
 function disableItem(itemId, memo) {
@@ -1942,7 +2119,7 @@ function archiveItemById(itemId, memo) {
   );
   snapshot.sheet.getRange(rowIndex + 2, 1, 1, snapshot.rows[rowIndex].length).setValues([snapshot.rows[rowIndex]]);
 
-  return getItem(normalizedId);
+  return getItemRaw_(normalizedId);
 }
 
 function archiveItem(itemId, memo) {
@@ -2018,10 +2195,13 @@ function api_bulkDisableNetshop(payload) {
     if (memo === undefined && payload.reason !== undefined) memo = payload.reason;
     var result = bulkDisableNetshopRecords(itemIds, memo);
     result.action = 'bulkDisableNetshopRecords';
+    if (result.data && typeof result.data === 'object') {
+      result.data.action = 'bulkDisableNetshopRecords';
+    }
     return result;
   } catch (error) {
     Logger.log('api_bulkDisableNetshop error: ' + error);
-    return buildBulkDisableResponse_(false, String(error), [], []);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'BULK_DISABLE_FAILED');
   }
 }
 
@@ -2038,18 +2218,15 @@ function cancelItemById(itemId, memo) {
   if (!normalizedId) return null;
 
   return arguments.length >= 2
-    ? updateItemStatus(normalizedId, CONFIG.STATUS.CANCEL, memo)
-    : updateItemStatus(normalizedId, CONFIG.STATUS.CANCEL);
+    ? updateItemStatusRaw_(normalizedId, CONFIG.STATUS.CANCEL, memo)
+    : updateItemStatusRaw_(normalizedId, CONFIG.STATUS.CANCEL);
 }
 
 function api_cancelItem(payload) {
   try {
     var itemId = resolveItemIdFromPayload_(payload);
     if (!itemId) {
-      return {
-        ok: false,
-        error: 'itemId is required'
-      };
+      return buildApiErrorResponse_('itemId is required', 'ITEM_ID_REQUIRED');
     }
 
     var memo = payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'memo')
@@ -2058,25 +2235,21 @@ function api_cancelItem(payload) {
     var updatedItem = memo === undefined ? cancelItemById(itemId) : cancelItemById(itemId, memo);
 
     if (!updatedItem) {
-      return {
-        ok: false,
-        error: 'ID not found: ' + itemId
-      };
+      return buildApiErrorResponse_('ID not found: ' + itemId, 'ITEM_NOT_FOUND', undefined, {
+        extra: { itemId: itemId }
+      });
     }
 
-    return {
-      ok: true,
+    var result = {
       action: 'cancelItem',
       operation: 'businessCancel',
       canceled: true,
       item: updatedItem
     };
+    return buildApiSuccessResponse_(result, { copyDataToTopLevel: true });
   } catch (error) {
     Logger.log('api_cancelItem error: ' + error);
-    return {
-      ok: false,
-      error: String(error)
-    };
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'CANCEL_ITEM_FAILED');
   }
 }
 
@@ -2133,7 +2306,7 @@ function api_archiveItem(payload) {
  * @param {string=} memo
  * @returns {Object|null}
  */
-function updateItemStatus(itemId, status, memo) {
+function updateItemStatusRaw_(itemId, status, memo) {
   if (!itemId) return null;
   if (CONFIG.STATUS_LIST.indexOf(status) === -1) return null;
 
@@ -2158,7 +2331,30 @@ function updateItemStatus(itemId, status, memo) {
   );
 
   snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
-  return getItem(itemId);
+  return getItemRaw_(itemId);
+}
+
+function updateItemStatus(itemId, status, memo) {
+  try {
+    if (!itemId) {
+      return buildApiErrorResponse_('itemId is required', 'ITEM_ID_REQUIRED');
+    }
+    if (CONFIG.STATUS_LIST.indexOf(status) === -1) {
+      return buildApiErrorResponse_('invalid status', 'INVALID_STATUS', { status: status });
+    }
+    var item = arguments.length >= 3
+      ? updateItemStatusRaw_(itemId, status, memo)
+      : updateItemStatusRaw_(itemId, status);
+    if (!item) {
+      return buildApiErrorResponse_('ID not found: ' + itemId, 'ITEM_NOT_FOUND');
+    }
+    return buildApiSuccessResponse_({ item: item, itemId: String(itemId || ''), status: status }, {
+      copyDataToTopLevel: true
+    });
+  } catch (error) {
+    Logger.log('updateItemStatus error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'UPDATE_STATUS_FAILED');
+  }
 }
 
 /**
@@ -2166,7 +2362,7 @@ function updateItemStatus(itemId, status, memo) {
  * @param {string} itemId
  * @returns {Object|null}
  */
-function recalculateItemProfit(itemId) {
+function recalculateItemProfitRaw_(itemId) {
   if (!itemId) return null;
 
   var snapshot = getSheetSnapshot_();
@@ -2186,24 +2382,29 @@ function recalculateItemProfit(itemId) {
   var rowValues = applyProfitRecalculationToRowValues_(snapshot.rows[rowIndex], headerResolution);
 
   snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
-  return getItem(itemId);
+  return getItemRaw_(itemId);
+}
+
+function recalculateItemProfit(itemId) {
+  try {
+    if (!itemId) {
+      return buildApiErrorResponse_('itemId is required', 'ITEM_ID_REQUIRED');
+    }
+    var item = recalculateItemProfitRaw_(itemId);
+    if (!item) {
+      return buildApiErrorResponse_('ID not found: ' + itemId, 'ITEM_NOT_FOUND');
+    }
+    return buildApiSuccessResponse_({ item: item, itemId: String(itemId || '') }, {
+      copyDataToTopLevel: true
+    });
+  } catch (error) {
+    Logger.log('recalculateItemProfit error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'RECALCULATE_PROFIT_FAILED');
+  }
 }
 
 function api_recalculateItemProfit(id) {
-  try {
-    var updatedItem = recalculateItemProfit(id);
-    if (!updatedItem) throw new Error('ID not found: ' + id);
-    return {
-      ok: true,
-      item: updatedItem
-    };
-  } catch (error) {
-    Logger.log('api_recalculateItemProfit error: ' + error);
-    return {
-      ok: false,
-      error: String(error)
-    };
-  }
+  return recalculateItemProfit(id);
 }
 
 /**
@@ -2211,7 +2412,7 @@ function api_recalculateItemProfit(id) {
  * @param {Object=} filter
  * @returns {{totalCount:number,totalSales:number,totalFee:number,totalShipping:number,totalCost:number,totalProfit:number,profitRate:number}}
  */
-function getDashboardSummary(filter) {
+function getDashboardSummaryRaw_(filter) {
   var emptySummary = {
     totalCount: 0,
     totalSales: 0,
@@ -2231,7 +2432,7 @@ function getDashboardSummary(filter) {
   }
 
   try {
-    var items = listItems(filter);
+    var items = listItemsRaw_(filter);
     if (!items.length) return emptySummary;
 
     var salesKey = toApiFieldKey_(CONFIG.HEADERS[CONFIG.COLS.PRICE_FINAL - 1]);
@@ -2269,13 +2470,23 @@ function getDashboardSummary(filter) {
   }
 }
 
+function getDashboardSummary(filter) {
+  try {
+    var summary = getDashboardSummaryRaw_(filter);
+    return buildApiSuccessResponse_(summary, { copyDataToTopLevel: true });
+  } catch (error) {
+    Logger.log('getDashboardSummary response error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'GET_DASHBOARD_SUMMARY_FAILED');
+  }
+}
+
 /**
  * 商品一覧をCSV文字列として返す（BOM付きUTF-8）。
  * @param {Object=} filter
  * @returns {string}
  */
-function exportCsv(filter) {
-  var items = listItems(filter);
+function exportCsvRaw_(filter) {
+  var items = listItemsRaw_(filter);
   if (!items.length) return '';
 
   var headers = Object.keys(items[0]);
@@ -2293,6 +2504,22 @@ function exportCsv(filter) {
   });
 
   return '\uFEFF' + lines.join('\r\n');
+}
+
+function exportCsv(filter) {
+  try {
+    var csv = exportCsvRaw_(filter);
+    var result = {
+      csv: csv,
+      mimeType: 'text/csv',
+      encoding: 'UTF-8',
+      hasBom: String(csv || '').indexOf('\uFEFF') === 0
+    };
+    return buildApiSuccessResponse_(result, { copyDataToTopLevel: true });
+  } catch (error) {
+    Logger.log('exportCsv error: ' + error);
+    return buildApiErrorResponse_(normalizeUiApiErrorMessage_(error), 'EXPORT_CSV_FAILED');
+  }
 }
 
 function api_testList() {

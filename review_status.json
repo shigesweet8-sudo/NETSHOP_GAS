@@ -1,9 +1,10 @@
 {
-  "issue_title": "UI設計着手前の確１",
+  "issue_title": "phase１最適化",
   "changed_files": [
     "20_api_netshop.gs",
     "codex_instruction.md",
     "issue_body.md",
+    "issue_tasks.md",
     "openai_response.json"
   ],
   "status": "OK",
