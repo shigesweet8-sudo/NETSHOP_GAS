@@ -1,82 +1,53 @@
 ## 目的
-NETSHOP API の公開入出力スキーマを英字キーへ統一し、取得系レスポンスと更新系リクエストで同じキー体系を使えるようにする。`20_api_netshop.gs` に実コード差分を入れ、シート内部の日本語ヘッダは維持したまま API 境界だけを英字キー化する。
+`20_api_netshop.gs` の取得系 API（`listItems` / `getItem`）が返す公開レスポンスを英字キーへ統一し、更新系 API（`createItem` / `updateItem` / `updateItemStatus` / `bulkUpdateStatus` / `recalculateItemProfit` / `bulkRecalculateProfit`）と同じキー体系に揃える。
 
 ## 実装スコープ
-- `20_api_netshop.gs` 内で、公開レスポンスを英字キーへ変換する共通処理を追加する
-- 少なくとも以下の API で、返却データのキーを英字キーへ統一する
-  - `listItems`
-  - `getItem`
-  - `createItem`
-  - `updateItem`
-  - `updateItemStatus`
-  - `bulkUpdateStatus`
-  - `recalculateItemProfit`
-  - `bulkRecalculateProfit`
-  - `getMonthlySummary`
-  - `getPlatformSummary`
-  - `getMasters`
-  - `validateVariation`
-- 更新系 API が既に英字キー前提である場合は、そのキー体系に合わせて取得系レスポンスを揃える
-- シート読み書き時の日本語ヘッダ利用は維持する
-- 既存の個人情報除外ルールを維持する
+- `listItems` の返却データを日本語ヘッダキーではなく英字キーで返すよう修正する
+- `getItem` の返却データを日本語ヘッダキーではなく英字キーで返すよう修正する
+- 既存の更新系 API が利用している公開用キー変換ロジック、または同等の英字キー生成ロジックに合わせる
+- 個人情報除外ルールは維持する
+- 公開レスポンスから日本語ヘッダキーを排除する
 
 ## 対象ファイル
 - 必須: `20_api_netshop.gs`
-- 追加候補: なし（本 Issue の対象ファイルは `20_api_netshop.gs` に限定する）
+- 必要に応じて同ファイル内の補助関数
+- もしキー変換共通処理が別ファイルに既に存在する場合は、その参照先も確認してよいが、主たる実装差分は `20_api_netshop.gs` に入れること
 
 ## 制約
-- 既存の業務値・計算結果・意味を変えないこと
-- 既存 API 基盤やレスポンス全体構造を壊さないこと
-- API 公開面だけを英字キーへ統一し、シート列名変更は行わないこと
-- 英字キー名は、既存の更新系 API が受け取るキー名に一致させること
-- 個人情報除外ロジックが既存で入っている場合、それを迂回・緩和しないこと
-- 情報不足がある場合は、`20_api_netshop.gs` 内の既存更新系マッピング・バリデーション・レスポンス生成箇所を根拠に最小限の整合的なキー定義を行うこと
+- 実装 Issue として対応し、調査メモだけで終わらせないこと
+- 公開レスポンスのキー体系は更新系 API と一致させること
+- 個人情報除外ルールを壊さないこと
+- シート列名の変更はしないこと
+- 情報が不足している場合は、`createItem` / `updateItem` など更新系レスポンスで実際に使っている英字キーを正として揃えること
+- `listItems` / `getItem` の内部で日本語ヘッダ行をそのまま返している場合は、公開直前で英字キーへマッピングすること
 
 ## 非対象
 - UI 実装
 - シート列名変更
-- 他ファイルへの大規模な責務分割
-- API の業務仕様変更
-- ドキュメントのみの更新
+- 取得系 API 以外の仕様変更
+- 無関係なリファクタリング
+- ドキュメントのみの変更
 
 ## 実装ステップ
-1. `20_api_netshop.gs` を確認し、更新系 API が前提としている英字キーと、取得系で現在返している日本語キーの対応関係を整理する。
-2. 日本語ヘッダの内部オブジェクトを API 公開用の英字キーへ変換する共通関数を `20_api_netshop.gs` に実装する。
-   - 単一アイテム変換
-   - 配列変換
-   - 必要に応じてネストしたレスポンス内の対象配列/オブジェクト変換
-   - 個人情報除外後のデータ、または個人情報除外ルールと両立する位置で適用する
-3. 既存の更新系 API で使用している英字キー定義を流用または一本化し、取得系・更新系で同じキー名セットを使うようにする。
-4. 以下の各関数の返却処理を修正し、公開レスポンスが英字キーになるようにする。
-   - `listItems`
-   - `getItem`
-   - `createItem`
-   - `updateItem`
-   - `updateItemStatus`
-   - `bulkUpdateStatus`
-   - `recalculateItemProfit`
-   - `bulkRecalculateProfit`
-   - `getMonthlySummary`
-   - `getPlatformSummary`
-   - `getMasters`
-   - `validateVariation`
-5. 各 API について、返却オブジェクトのメタ情報や `success` / `message` などの共通レスポンス枠が既存である場合は維持し、業務データ部分のみ必要に応じて英字キー化する。
-6. 取得結果をそのまま更新系へ渡しやすい構造になっているかを確認し、`getItem` / `listItems` の item オブジェクトと `createItem` / `updateItem` 周辺の item オブジェクトでキー不一致が残らないように調整する。
-7. 既存ロジックを壊さない範囲で、変換漏れや二重変換を防ぐために共通関数の適用箇所を整理する。
+1. `20_api_netshop.gs` 内で `listItems` / `getItem` のレスポンス生成箇所を特定する。
+2. 同ファイル内の `createItem` / `updateItem` / `updateItemStatus` / `bulkUpdateStatus` / `recalculateItemProfit` / `bulkRecalculateProfit` が返している公開レスポンスの英字キー体系を確認し、取得系でも同じキー名になるよう基準を揃える。
+3. 取得系が日本語ヘッダベースのオブジェクトをそのまま返している場合、公開用の英字キーへ変換する処理を実装する。既存の共通関数があれば再利用し、なければ `20_api_netshop.gs` 内に最小限の共通化を追加する。
+4. 個人情報除外ロジックが既存で入っている場合はその適用順を維持し、英字キー化によって除外漏れや復活が起きないようにする。
+5. `listItems` は配列要素すべてが英字キーのみを持つこと、`getItem` は単体オブジェクトが英字キーのみを持つことを満たすように調整する。
+6. 日本語ヘッダキーがレスポンスに残らないことを確認し、必要なら不要キー除去を追加する。
+7. 影響範囲を最小限に保ちつつ、実装ファイルに実コード差分を入れる。
 
 ## 完了条件
-- `20_api_netshop.gs` に実コード差分が存在する
-- 指定された API の公開レスポンスが英字キーへ統一されている
-- 取得系と更新系で同じキー体系を使用できる
-- シート内部では日本語ヘッダ利用が維持されている
+- `20_api_netshop.gs` に実コード差分がある
+- `listItems` が英字キーのみで返る
+- `getItem` が英字キーのみで返る
+- 取得系と更新系で同じキー体系になっている
 - 個人情報除外ルールが維持されている
-- 既存の業務値・計算値・意味が変わっていない
-- `codex_instruction.md` / `issue_tasks.md` / `openai_response.json` だけを変更して終わらせないこと
+- 公開レスポンスに日本語ヘッダキーが含まれない
+- `codex_instruction.md` / `issue_tasks.md` / `openai_response.json` / `md` / `json` だけの変更で終わらない
 
 ## 検証
-- `20_api_netshop.gs` 内で、各対象 API の返却値生成箇所を確認し、日本語キーのまま公開している箇所が残っていないことを確認する
-- `listItems` と `getItem` の item データが、`createItem` / `updateItem` の入力キー体系と整合していることを確認する
-- `updateItemStatus` / `bulkUpdateStatus` / `recalculateItemProfit` / `bulkRecalculateProfit` の返却データも英字キーに揃っていることを確認する
-- `getMonthlySummary` / `getPlatformSummary` / `getMasters` / `validateVariation` のレスポンス内データも必要な範囲で英字キー化されていることを確認する
-- 個人情報除外対象の項目がレスポンスに混入していないことを確認する
-- 可能なら GAS 上で対象関数のレスポンス例を目視確認し、取得結果を更新系へそのまま渡しやすい構造になっていることを確認する
+- `20_api_netshop.gs` の `listItems` / `getItem` の返却値生成コードを確認し、日本語ヘッダキーを直接返していないことを確認する
+- 更新系 API のレスポンスキー一覧と取得系 API のレスポンスキー一覧を比較し、一致していることを確認する
+- 個人情報に該当する項目が取得系レスポンスに含まれていないことを確認する
+- 配列レスポンス（`listItems`）と単体レスポンス（`getItem`）の双方で、日本語キーが残っていないことを確認する

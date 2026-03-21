@@ -44,6 +44,12 @@ var PERSONAL_INFO_HEADERS = Object.freeze([
   '電話番号'
 ]);
 
+var PERSONAL_INFO_FIELDS = Object.freeze(PERSONAL_INFO_HEADERS.reduce(function(map, header) {
+  var field = ITEM_HEADER_TO_FIELD[header];
+  if (field) map[field] = true;
+  return map;
+}, {}));
+
 function toApiFieldKey_(key) {
   if (key === null || key === undefined) return '';
   var text = String(key);
@@ -193,10 +199,13 @@ function findRowIndexById_(rows, headers, itemId) {
 function buildPublicItemFromRow_(headers, row) {
   var source = {};
   headers.forEach(function(header, index) {
-    if (PERSONAL_INFO_HEADERS.indexOf(header) !== -1) return;
-    source[header] = row[index];
+    var field = toApiFieldKey_(header);
+    if (!field) return;
+    if (!Object.prototype.hasOwnProperty.call(ITEM_FIELD_TO_HEADER, field)) return;
+    if (Object.prototype.hasOwnProperty.call(PERSONAL_INFO_FIELDS, field)) return;
+    source[field] = row[index];
   });
-  return convertValueKeysToApi_(source);
+  return source;
 }
 
 function applyFilter_(items, filter) {
