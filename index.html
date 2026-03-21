@@ -2222,6 +2222,7 @@
       function loadItemsWithCurrentSort(options) {
         var opts = options || {};
         var useSort = !opts.forceBaseLoad && !!state.sortKey;
+        var skipSuccessBanner = !!opts.skipSuccessBanner;
         setLoading(true, "読み込み中...");
         var promise;
         if (useSort) {
@@ -2238,7 +2239,9 @@
           state.selectedById = {};
           updateToolbarOptions(state.allItems);
           applyAndRenderCurrentView();
-          setBanner("success", "商品一覧を取得しました。");
+          if (!skipSuccessBanner) {
+            setBanner("success", "商品一覧を取得しました。");
+          }
         }).catch(function(err) {
           state.allItems = [];
           state.viewItems = [];
@@ -2294,7 +2297,7 @@
 
         callWrappedApi(apiName, [payload]).then(function() {
           setBanner("success", confirmInfo.label + "が完了しました。");
-          return loadItemsWithCurrentSort({ forceBaseLoad: false });
+          return loadItemsWithCurrentSort({ forceBaseLoad: false, skipSuccessBanner: true });
         }).catch(function(err) {
           setBanner("error", confirmInfo.label + "に失敗しました: " + resolveErrorMessage(err));
         }).finally(function() {
