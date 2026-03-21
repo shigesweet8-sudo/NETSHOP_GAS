@@ -1,7 +1,7 @@
 ALTANA AI FACTORY レビュー
 
 Issue
-feat: [6] bulkUpdateStatus API（ステータス一括更新API）を実装する
+[FACTORY]feat: [8] bulkRecalculateProfit API（一括再計算API）を実装する
 
 変更ファイル
 20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
@@ -23,27 +23,32 @@ SEVERITY: WARNING
 ACTION: REVIEW NEEDED
 
 FINDINGS:
-- [WARNING] 20_api_netshop.gs: buildRowIndexMapById_ を追加（新規関数）
-  - なぜ問題か: headers.indexOf(ITEM_FIELD_TO_HEADER.id) を使って ID 列位置を決めていますが、headers 配列の要素と ITEM_FIELD_TO_HEADER.id の文字列が完全一致しないと列が見つからず、以降すべての ID が未検出扱いになります（map が空になる）。
-  - どこが問題か: buildRowIndexMapById_（追加関数）。header 名のマッチングが厳密なので、余白や表記揺れがある場合に機能しません。
+- [WARNING] 20_api_netshop.gs:+352 関数追加: calculateProfitFromRowValues_, applyProfitRecalculationToRowValues_, writeUpdatedProfitValues_, bulkRecalculateProfit, api_bulkRecalculateProfit, api_recalculateItemProfit が追加されています。追加自体は想定通りですが、既存の API ルーティング（doPost 配下や dispatcher）へこれらの新しい api_* エンドポイントを登録する差分がこの diff には含まれていません。diff 上では公開 API として外部から呼び出せるようにルーティングに組み込まれていることが確認できません（呼び出し可能性の欠如は運用上の問題になります）。
+  - なぜ問題か: エンドポイント名をファイル内に追加しても、既存の API ルーティングへ組み込まれていなければ外部から利用できません。
+  - どこが問題か: 20_api_netshop.gs に api_bulkRecalculateProfit / api_recalculateItemProfit を追加している箇所（+352 あたり）。
 
-- [WARNING] 20_api_netshop.gs: findRowIndexById_ から rowIndexMapById lookup に置換（bulkUpdateStatus 内）
-  - なぜ問題か: 既存の findRowIndexById_ の戻り値の意味（0ベースの rows 配列インデックスなのか、シート上の実行時行番号(1ベース)なのか、未検出時は -1 なのか等）が diff から確認できません。新しい buildRowIndexMapById_ は rows 配列のインデックス（0ベース）を返す実装に見えますが、もし下流で expect されている rowIndex が別の基準（1ベースの行番号やヘッダ分オフセットあり等）であれば、書き込み先の行がズレる・最悪更新が別行に書き込まれる恐れがあります。
-  - どこが問題か: bulkUpdateStatus のループで findRowIndexById_ の代わりに rowIndexMapById[itemId] を使っている箇所。下流の書き込み処理（writeUpdatedRows_ 等）がどの形式の index を扱うかの整合性確認が必要です。
+- [WARNING] 20_api_netshop.gs:+352~+607 bulkRecalculateProfit の payload 受け取りには "payload.itemIds" を期待する api_bulkRecalculateProfit が追加されていますが、外部クライアントが配列そのもの（例: itemIds 配列だけ送る）を送るパターンに対応していない可能性があります。api_bulkRecalculateProfit 内で payload が配列の場合の扱いがされていません。
+  - なぜ問題か: API の呼び出し元が既存 API の慣習（オブジェクトラップ or 直接配列）に従わない場合、意図せず itemIds が undefined になり処理されません。
+  - どこが問題か: function api_bulkRecalculateProfit(payload) の冒頭（+579 あたり）。
 
-- [WARNING] 20_api_netshop.gs: buildBulkUpdateResponse_ の戻り値フィールドを拡張（successIds / failureIds を追加）
-  - なぜ問題か: 既存のプロダクトコードやクライアントが updatedItemIds / failedItemIds のみを期待している場合、追加フィールドは安全ですがフィールド名を新旧で二重に返しています。互換性は保たれていますが、レスポンス仕様の意図を明確にしておいたほうが良いです（冗長性の理由、将来的に旧キーを廃止する予定か等）。
-  - どこが問題か: buildBulkUpdateResponse_（変更箇所）。動作破壊ではないが仕様の明示が必要。
+- [WARNING] 20_api_netshop.gs:+352 writeUpdatedProfitValues_ の例外時に bulkRecalculateProfit が catch して返すレスポンスでは、write に失敗した場合に successItemIds を空配列として全件を失敗にして返しています（normalizedIds.slice() を failure に設定）。ただし write 前に successItemIds にいくつか追加されている可能性があるため、現状のエラーハンドリングは「書き込み失敗＝全件失敗」として扱う設計上の判断であることが読み取れます。
+  - なぜ問題か: 部分成功→書き込みで失敗が起きたときの挙動が明確でないと運用で混乱するため、ログ/レスポンスの設計要件（全ロールバック扱いか部分失敗扱いか）を明示する必要がある。
+  - どこが問題か: bulkRecalculateProfit の try/catch 部分（+602 あたり）。
 
-- [WARNING] 20_api_netshop.gs: 入力バリデーションのメッセージ / 挙動が一部変更
-  - なぜ問題か: itemIds が配列でない場合に即時エラーを返すようになりました（以前は空配列化して別ハンドリングだった可能性あり）。API のクライアントが期待するエラーメッセージ / ステータスが変わる可能性があります。
-  - どこが問題か: bulkUpdateStatus の先頭バリデーション。
+- [WARNING] 20_api_netshop.gs:+481 既存の recalculateItemProfit を applyProfitRecalculationToRowValues_ を用いるように改修しています。変更自体は同等処理に見えますが、差分だけでは applyProfitRecalculationToRowValues_ と既存単体再計算ロジックの完全互換（丸め、数値型／文字列型の扱い、空値ハンドリング）が保証されているか確認できません。
+  - なぜ問題か: 単体再計算 API と一括再計算で計算結果が微妙に異なることがあるとデータ不整合を起こすため、既存単体 API と同一ロジックであることを明示的に保証する必要があります。
+  - どこが問題か: recalculateItemProfit の修正箇所（+481 あたり）および applyProfitRecalculationToRowValues_ 定義（+352 あたり）。
+
+- [WARNING] ドキュメント（codex_instruction.md / issue_body.md / openai_response.json）が更新され、目的が「一括再計算API」に変わっています。実コードの追加はされているものの、diff では API ルーティングへの組み込みや既存単体 API との参照整合（既存関数の存在確認や共通化）が明示されていないため、実装の完全性は未確認です。
+  - なぜ問題か: ドキュメントは仕様を反映していますが、実行可能性（expose されるか、既存関数との衝突がないか）が diff だけでは確認できません。
+  - どこが問題か: codex_instruction.md / issue_body.md の変更点（ドキュメントファイル全般）。
 
 OPEN QUESTIONS:
-- findRowIndexById_ の元の戻り値仕様（返す index の基準：rows 配列の 0 ベースインデックスか、シートの 1 ベース行番号か、ヘッダを含めるか等）はどうなっていましたか？新実装の 0 ベース index と下流処理の期待値が一致しますか？
-- ITEM_FIELD_TO_HEADER.id の値（文字列）が snapshot.headers の要素と確実に一致することは保証されていますか（トリムや全角/半角違い、プレフィックス/サフィックスの有無など）？
-- snapshot.rows の構造はヘッダ行を含まない配列ですか（buildRowIndexMapById_ がその前提で動いているか）？
-- buildBulkUpdateResponse_ に successIds / failureIds を追加した意図（旧キーの段階的廃止、別名追加など）はありますか？クライアント互換ポリシーはどうしますか？
+- 既存の API ルーティング（dispatcher/doPost など）に今回追加した api_bulkRecalculateProfit と api_recalculateItemProfit を登録する差分は別のコミットで入れる想定ですか？この diff にルーティング追加は見当たりません。（none ではなく要確認）
+- getSheetSnapshot_、buildRowIndexMapById_、findRowIndexById_、getItem() 等の補助関数はリポジトリ内に既に存在し、この diff の実装と互換性があることを確認済みですか？（diff からは定義箇所が見えません）
+- API の外部仕様: api_bulkRecalculateProfit は payload をオブジェクト（{ itemIds: [...] }）で受ける前提ですが、既存 API 呼び出し者が配列を直接送るケースがあるかどうか。互換性が必要なら入力検証を拡張するべきです。
+- 書き込み失敗時の扱い方（全件失敗で返すのか、部分的に成功した ID を success に残すのか）は運用上どちらが望ましいですか？現在の実装は「書き込み失敗時は全件失敗扱い」に見えます。
+- 単体再計算ロジック（既存の recalculateItemProfit の旧実装）と新しい applyProfitRecalculationToRowValues_ のロジックが計算上完全一致することは確認済みですか？（diff 上は式は同じに見えますが、両者の数値処理や NaN/型扱いに差がないか要確認）
 
 SUMMARY:
-- コード差分は概ね合理的で、行検索をまとめて行うことでパフォーマンス改善が期待できます。ただし、新設した buildRowIndexMapById_ とそれを使う bulkUpdateStatus 内の置換において、index の基準（0/1 ベースやヘッダオフセット）と header 名の厳密一致が正しく整合しているかが不明です。この整合が取れていないと、更新先の行ズレや想定外の未検出が起きる可能性があります。上の OPEN QUESTIONS を確認し、行インデックス基準と header 名の照合を明示的にテスト・確認してください。
+- 一括粗利再計算の本体ロジック（計算関数、行データ更新、バルク処理、API ラッパー）が 20_api_netshop.gs に追加されており、処理の流れ自体は妥当に見えます。ただし、この diff 単体では新 API を外部から呼べるようにするルーティング／公開設定が含まれておらず、実際に利用可能かは未確認です。また単体 API とのロジック整合や入力フォーマット互換性の確認が必要です。上記の OPEN QUESTIONS を確認のうえ、ルーティング追加とクラアント互換（payload 形式）、および書き込み失敗時のレスポンス方針を明確化してください。

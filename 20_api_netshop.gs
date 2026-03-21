@@ -352,6 +352,132 @@ function writeUpdatedRows_(sheet, headersLength, rows, rowIndexes) {
   sheet.getRange(blockStart + 2, 1, blockValues.length, headersLength).setValues(blockValues);
 }
 
+function calculateProfitFromRowValues_(rowValues) {
+  var col = CONFIG.COLS;
+  var cost = parseFloat(rowValues[col.COST - 1]) || 0;
+  var sale = parseFloat(rowValues[col.PRICE_FINAL - 1]) || 0;
+  var fee = parseFloat(rowValues[col.FEE - 1]) || 0;
+  var shipping = parseFloat(rowValues[col.SHIPPING - 1]) || 0;
+  return sale - fee - shipping - cost;
+}
+
+function applyProfitRecalculationToRowValues_(rowValues) {
+  var nextRow = rowValues.slice();
+  nextRow[CONFIG.COLS.PROFIT - 1] = calculateProfitFromRowValues_(nextRow);
+  return nextRow;
+}
+
+function writeUpdatedProfitValues_(sheet, rows, rowIndexes) {
+  if (!rowIndexes.length) return;
+
+  var sortedIndexes = rowIndexes.slice().sort(function(a, b) {
+    return a - b;
+  });
+  var profitCol = CONFIG.COLS.PROFIT;
+  var blockStart = sortedIndexes[0];
+  var blockValues = [[rows[blockStart][profitCol - 1]]];
+
+  for (var i = 1; i < sortedIndexes.length; i++) {
+    var rowIndex = sortedIndexes[i];
+    if (rowIndex === sortedIndexes[i - 1] + 1) {
+      blockValues.push([rows[rowIndex][profitCol - 1]]);
+      continue;
+    }
+
+    sheet.getRange(blockStart + 2, profitCol, blockValues.length, 1).setValues(blockValues);
+    blockStart = rowIndex;
+    blockValues = [[rows[rowIndex][profitCol - 1]]];
+  }
+
+  sheet.getRange(blockStart + 2, profitCol, blockValues.length, 1).setValues(blockValues);
+}
+
+function buildBulkRecalculateProfitResponse_(ok, message, successItemIds, failureItemIds) {
+  var successIds = successItemIds || [];
+  var failureIds = failureItemIds || [];
+  return {
+    ok: ok,
+    message: message || '',
+    successCount: successIds.length,
+    failureCount: failureIds.length,
+    successItemIds: successIds,
+    failureItemIds: failureIds,
+    successIds: successIds,
+    failureIds: failureIds
+  };
+}
+
+function bulkRecalculateProfit(itemIds) {
+  if (!Array.isArray(itemIds)) {
+    return buildBulkRecalculateProfitResponse_(false, 'itemIds must be array', [], []);
+  }
+
+  var normalizedIds = itemIds.map(function(itemId) {
+    return String(itemId || '').trim();
+  }).filter(function(itemId) {
+    return itemId !== '';
+  });
+
+  if (!normalizedIds.length) {
+    return buildBulkRecalculateProfitResponse_(false, 'itemIds is required', [], []);
+  }
+
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot) {
+    return buildBulkRecalculateProfitResponse_(false, 'sheet not found', [], normalizedIds.slice());
+  }
+  if (!snapshot.rows.length) {
+    return buildBulkRecalculateProfitResponse_(false, 'no data rows', [], normalizedIds.slice());
+  }
+
+  var successItemIds = [];
+  var failureItemIds = [];
+  var rowIndexesToUpdate = {};
+  var rowIndexMapById = buildRowIndexMapById_(snapshot.rows, snapshot.headers);
+
+  normalizedIds.forEach(function(itemId) {
+    var rowIndex = rowIndexMapById[itemId];
+    if (rowIndex === undefined) {
+      failureItemIds.push(itemId);
+      return;
+    }
+
+    snapshot.rows[rowIndex] = applyProfitRecalculationToRowValues_(snapshot.rows[rowIndex]);
+    rowIndexesToUpdate[rowIndex] = true;
+    successItemIds.push(itemId);
+  });
+
+  var uniqueRowIndexes = Object.keys(rowIndexesToUpdate).map(function(rowIndex) {
+    return Number(rowIndex);
+  });
+
+  if (uniqueRowIndexes.length) {
+    try {
+      writeUpdatedProfitValues_(snapshot.sheet, snapshot.rows, uniqueRowIndexes);
+    } catch (error) {
+      Logger.log('bulkRecalculateProfit error: ' + error);
+      return buildBulkRecalculateProfitResponse_(false, String(error), [], normalizedIds.slice());
+    }
+  }
+
+  return buildBulkRecalculateProfitResponse_(
+    failureItemIds.length === 0,
+    failureItemIds.length ? 'partial success' : 'success',
+    successItemIds,
+    failureItemIds
+  );
+}
+
+function api_bulkRecalculateProfit(payload) {
+  try {
+    payload = payload && typeof payload === 'object' ? payload : {};
+    return bulkRecalculateProfit(payload.itemIds);
+  } catch (error) {
+    Logger.log('api_bulkRecalculateProfit error: ' + error);
+    return buildBulkRecalculateProfitResponse_(false, String(error), [], []);
+  }
+}
+
 function bulkUpdateStatus(itemIds, status, memo) {
   if (!Array.isArray(itemIds)) {
     return buildBulkUpdateResponse_(false, 'itemIds must be array', 0, 0, [], []);
@@ -481,16 +607,27 @@ function recalculateItemProfit(itemId) {
   var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
   if (rowIndex === -1) return null;
 
-  var rowValues = snapshot.rows[rowIndex].slice();
-  var col = CONFIG.COLS;
-  var cost = parseFloat(rowValues[col.COST - 1]) || 0;
-  var sale = parseFloat(rowValues[col.PRICE_FINAL - 1]) || 0;
-  var fee = parseFloat(rowValues[col.FEE - 1]) || 0;
-  var shipping = parseFloat(rowValues[col.SHIPPING - 1]) || 0;
-  rowValues[col.PROFIT - 1] = sale - fee - shipping - cost;
+  var rowValues = applyProfitRecalculationToRowValues_(snapshot.rows[rowIndex]);
 
   snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
   return getItem(itemId);
+}
+
+function api_recalculateItemProfit(id) {
+  try {
+    var updatedItem = recalculateItemProfit(id);
+    if (!updatedItem) throw new Error('ID not found: ' + id);
+    return {
+      ok: true,
+      item: updatedItem
+    };
+  } catch (error) {
+    Logger.log('api_recalculateItemProfit error: ' + error);
+    return {
+      ok: false,
+      error: String(error)
+    };
+  }
 }
 
 /**
