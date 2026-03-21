@@ -1,5 +1,5 @@
 {
-  "issue_title": "[FACTORY]feat: [8] bulkRecalculateProfit API（一括再計算API）を実装する",
+  "issue_title": "feat: [11] 月別集計API を実装する",
   "changed_files": [
     "20_api_netshop.gs",
     "codex_instruction.md",
