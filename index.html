@@ -261,6 +261,62 @@
         word-break: break-word;
       }
 
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .form-field label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .form-textarea {
+        min-height: 88px;
+        resize: vertical;
+      }
+
+      .form-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+
+      .inline-message {
+        margin-top: 12px;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 13px;
+        display: none;
+      }
+
+      .inline-message.is-visible {
+        display: block;
+      }
+
+      .inline-message.is-success {
+        background: var(--success-soft);
+        color: var(--success);
+      }
+
+      .inline-message.is-error {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .inline-message.is-info {
+        background: var(--primary-soft);
+        color: var(--primary);
+      }
+
       pre {
         margin: 0;
         white-space: pre-wrap;
@@ -314,6 +370,7 @@
           <p class="page-subtitle">商品一覧画面の正式実装に向けた UI 土台画面です。</p>
         </div>
         <div class="page-actions">
+          <button id="open-create-item" class="btn btn-secondary" type="button">新規商品登録</button>
           <button id="reload-items" class="btn btn-primary" type="button">一覧を再取得</button>
         </div>
       </header>
@@ -361,6 +418,56 @@
         </div>
         <div id="detail-status" class="status-line">詳細を読み込みます。</div>
         <div id="detail-content" class="muted">対象商品を選択してください。</div>
+      </section>
+
+      <section id="create-section" class="card screen-hidden" aria-live="polite">
+        <div class="detail-header">
+          <h2 class="card-title">新規商品登録</h2>
+          <button id="create-back-to-list" class="btn btn-secondary" type="button">一覧へ戻る</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="create-status">ステータス</label>
+            <select id="create-status" class="control-select">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="create-shop">ショップ</label>
+            <select id="create-shop" class="control-select">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="create-item-name">商品名</label>
+            <input id="create-item-name" class="control-input" type="text" placeholder="商品名">
+          </div>
+          <div class="form-field">
+            <label for="create-cost">仕入れ値</label>
+            <input id="create-cost" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="create-price-final">決済金額</label>
+            <input id="create-price-final" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="create-fee">サイト利用料</label>
+            <input id="create-fee" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="create-shipping">配送料</label>
+            <input id="create-shipping" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="create-memo">備考</label>
+            <textarea id="create-memo" class="control-input form-textarea" placeholder="備考"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button id="create-save-item" class="btn btn-primary" type="button">保存</button>
+          <button id="create-reset-form" class="btn btn-secondary" type="button">入力をクリア</button>
+        </div>
+        <div id="create-message" class="inline-message" aria-live="polite"></div>
       </section>
     </div>
 
@@ -445,6 +552,35 @@
         return "不明なエラーです。";
       }
 
+      function toOptionObjects(list) {
+        return (Array.isArray(list) ? list : []).map(function(entry) {
+          if (entry && typeof entry === "object") {
+            var value = entry.value != null ? String(entry.value) : "";
+            var label = entry.label != null ? String(entry.label) : value;
+            if (!value) return null;
+            return { value: value, label: label };
+          }
+          var text = String(entry == null ? "" : entry).trim();
+          if (!text) return null;
+          return { value: text, label: text };
+        }).filter(function(entry) {
+          return !!entry;
+        });
+      }
+
+      function extractMasterOptions(response, keys) {
+        var data = response && response.data ? response.data : response;
+        var masters = data && data.masters ? data.masters : (response && response.masters ? response.masters : {});
+        if (!masters || typeof masters !== "object") return [];
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i];
+          if (!Object.prototype.hasOwnProperty.call(masters, key)) continue;
+          var options = toOptionObjects(masters[key]);
+          if (options.length) return options;
+        }
+        return [];
+      }
+
       function runGasApi(apiName, args) {
         return new Promise(function(resolve, reject) {
           var runner = google.script.run
@@ -502,7 +638,9 @@
         detailItemId: "",
         detailLoading: false,
         detailItem: null,
-        detailErrorMessage: ""
+        detailErrorMessage: "",
+        createSubmitting: false,
+        mastersLoaded: false
       };
 
       function getCurrentHeaders(items) {
@@ -628,17 +766,121 @@
           (action === "updateStatus" && !statusSelected);
       }
 
+      function setInlineMessage(kind, message) {
+        var el = document.getElementById("create-message");
+        el.className = "inline-message";
+        if (!message) {
+          el.textContent = "";
+          return;
+        }
+        el.classList.add("is-visible");
+        el.classList.add(kind === "error" ? "is-error" : kind === "success" ? "is-success" : "is-info");
+        el.textContent = message;
+      }
+
+      function setCreateSubmitting(flag) {
+        state.createSubmitting = !!flag;
+        document.getElementById("create-save-item").disabled = !!flag;
+        document.getElementById("create-reset-form").disabled = !!flag;
+        document.getElementById("create-back-to-list").disabled = !!flag;
+      }
+
+      function resetCreateForm() {
+        document.getElementById("create-item-name").value = "";
+        document.getElementById("create-cost").value = "";
+        document.getElementById("create-price-final").value = "";
+        document.getElementById("create-fee").value = "";
+        document.getElementById("create-shipping").value = "";
+        document.getElementById("create-memo").value = "";
+      }
+
+      function populateCreateSelect(selectId, options, placeholder) {
+        var select = document.getElementById(selectId);
+        var previousValue = select.value || "";
+        var list = toOptionObjects(options);
+        select.innerHTML = "<option value=\"\">" + escapeHtml(placeholder || "選択してください") + "</option>" + list.map(function(option) {
+          return "<option value=\"" + escapeHtml(option.value) + "\">" + escapeHtml(option.label) + "</option>";
+        }).join("");
+        select.value = list.some(function(option) { return option.value === previousValue; }) ? previousValue : "";
+      }
+
+      function loadCreateMastersIfNeeded(forceReload) {
+        if (state.mastersLoaded && !forceReload) {
+          return Promise.resolve();
+        }
+
+        setInlineMessage("info", "候補を取得しています...");
+        return callWrappedApi("api_getMasters", [{
+          masterTypes: ["statuses", "shops"]
+        }]).then(function(response) {
+          var statusOptions = extractMasterOptions(response, ["statuses", "status", "ステータス"]);
+          var shopOptions = extractMasterOptions(response, ["shops", "shop", "ショップ"]);
+          populateCreateSelect("create-status", statusOptions, "ステータスを選択");
+          populateCreateSelect("create-shop", shopOptions, "ショップを選択");
+          state.mastersLoaded = true;
+          setInlineMessage("", "");
+        }).catch(function(err) {
+          populateCreateSelect("create-status", [], "ステータスを選択");
+          populateCreateSelect("create-shop", [], "ショップを選択");
+          setInlineMessage("error", "候補取得に失敗しました: " + resolveErrorMessage(err));
+          throw err;
+        });
+      }
+
+      function collectCreatePayload() {
+        return {
+          status: String(document.getElementById("create-status").value || "").trim(),
+          shop: String(document.getElementById("create-shop").value || "").trim(),
+          itemName: String(document.getElementById("create-item-name").value || "").trim(),
+          cost: String(document.getElementById("create-cost").value || "").trim(),
+          priceFinal: String(document.getElementById("create-price-final").value || "").trim(),
+          fee: String(document.getElementById("create-fee").value || "").trim(),
+          shipping: String(document.getElementById("create-shipping").value || "").trim(),
+          memo: String(document.getElementById("create-memo").value || "").trim()
+        };
+      }
+
+      function saveNewItem() {
+        if (state.createSubmitting) return;
+        setCreateSubmitting(true);
+        setInlineMessage("info", "保存しています...");
+        var payload = collectCreatePayload();
+
+        callWrappedApi("api_createItem", [payload]).then(function(response) {
+          var createdId = response && response.data && response.data.id ? String(response.data.id) : "";
+          setInlineMessage("success", "保存に成功しました" + (createdId ? " (管理ID: " + createdId + ")" : "") + "。");
+          setBanner("success", "新規商品を登録しました。");
+          resetCreateForm();
+          switchScreen("list");
+          loadItemsWithCurrentSort({ forceBaseLoad: true });
+        }).catch(function(err) {
+          setInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
+          setBanner("error", "新規商品の保存に失敗しました。");
+        }).finally(function() {
+          setCreateSubmitting(false);
+        });
+      }
+
+      function openCreateScreen() {
+        setInlineMessage("", "");
+        switchScreen("create");
+        loadCreateMastersIfNeeded(false).catch(function() {});
+      }
+
       function switchScreen(mode) {
-        state.viewMode = mode === "detail" ? "detail" : "list";
+        if (mode === "detail") {
+          state.viewMode = "detail";
+        } else if (mode === "create") {
+          state.viewMode = "create";
+        } else {
+          state.viewMode = "list";
+        }
         var listSection = document.getElementById("list-section");
         var detailSection = document.getElementById("detail-section");
-        if (state.viewMode === "detail") {
-          listSection.classList.add("screen-hidden");
-          detailSection.classList.remove("screen-hidden");
-        } else {
-          detailSection.classList.add("screen-hidden");
-          listSection.classList.remove("screen-hidden");
-        }
+        var createSection = document.getElementById("create-section");
+        listSection.classList.toggle("screen-hidden", state.viewMode !== "list");
+        detailSection.classList.toggle("screen-hidden", state.viewMode !== "detail");
+        createSection.classList.toggle("screen-hidden", state.viewMode !== "create");
       }
 
       function findFirstValue(item, keys) {
@@ -794,6 +1036,7 @@
       function setLoading(flag, message) {
         state.loading = !!flag;
         document.getElementById("reload-items").disabled = !!flag;
+        document.getElementById("open-create-item").disabled = !!flag;
         document.getElementById("sort-order-toggle").disabled = !!flag;
         document.getElementById("keyword-search").disabled = !!flag;
         document.getElementById("status-filter").disabled = !!flag;
@@ -891,6 +1134,10 @@
         loadItemsWithCurrentSort({ forceBaseLoad: true });
       });
 
+      document.getElementById("open-create-item").addEventListener("click", function() {
+        openCreateScreen();
+      });
+
       document.getElementById("keyword-search").addEventListener("input", function(event) {
         state.keyword = event.target.value || "";
         applyAndRenderCurrentView();
@@ -929,6 +1176,19 @@
 
       document.getElementById("back-to-list").addEventListener("click", function() {
         switchScreen("list");
+      });
+
+      document.getElementById("create-back-to-list").addEventListener("click", function() {
+        switchScreen("list");
+      });
+
+      document.getElementById("create-save-item").addEventListener("click", function() {
+        saveNewItem();
+      });
+
+      document.getElementById("create-reset-form").addEventListener("click", function() {
+        resetCreateForm();
+        setInlineMessage("", "");
       });
 
       document.getElementById("content").addEventListener("change", function(event) {
