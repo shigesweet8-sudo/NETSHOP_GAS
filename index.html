@@ -107,6 +107,11 @@
         color: var(--text);
       }
 
+      .btn-small {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+
       .state-banner {
         display: none;
         border-radius: 12px;
@@ -186,6 +191,11 @@
         text-align: center;
       }
 
+      .action-cell {
+        width: 84px;
+        text-align: center;
+      }
+
       .table-wrap {
         overflow-x: auto;
       }
@@ -212,6 +222,43 @@
 
       tbody tr:nth-child(even) {
         background: var(--surface-soft);
+      }
+
+      .screen-hidden {
+        display: none;
+      }
+
+      .detail-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+      }
+
+      .detail-item {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface-soft);
+        padding: 10px;
+      }
+
+      .detail-label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+
+      .detail-value {
+        font-size: 14px;
+        color: var(--text);
+        word-break: break-word;
       }
 
       pre {
@@ -273,7 +320,7 @@
 
       <div id="global-banner" class="state-banner" aria-live="polite"></div>
 
-      <section class="card">
+      <section id="list-section" class="card">
         <h2 class="card-title">商品一覧</h2>
         <div class="items-toolbar" id="items-toolbar">
           <div class="toolbar-group">
@@ -305,6 +352,15 @@
         </div>
         <div id="items-status" class="status-line">読み込み中...</div>
         <div id="content" class="muted">データを取得しています。</div>
+      </section>
+
+      <section id="detail-section" class="card screen-hidden" aria-live="polite">
+        <div class="detail-header">
+          <h2 class="card-title">商品詳細</h2>
+          <button id="back-to-list" class="btn btn-secondary" type="button">一覧へ戻る</button>
+        </div>
+        <div id="detail-status" class="status-line">詳細を読み込みます。</div>
+        <div id="detail-content" class="muted">対象商品を選択してください。</div>
       </section>
     </div>
 
@@ -441,7 +497,12 @@
         sortOrder: "asc",
         keyword: "",
         statusFilter: "",
-        loading: false
+        loading: false,
+        viewMode: "list",
+        detailItemId: "",
+        detailLoading: false,
+        detailItem: null,
+        detailErrorMessage: ""
       };
 
       function getCurrentHeaders(items) {
@@ -567,6 +628,124 @@
           (action === "updateStatus" && !statusSelected);
       }
 
+      function switchScreen(mode) {
+        state.viewMode = mode === "detail" ? "detail" : "list";
+        var listSection = document.getElementById("list-section");
+        var detailSection = document.getElementById("detail-section");
+        if (state.viewMode === "detail") {
+          listSection.classList.add("screen-hidden");
+          detailSection.classList.remove("screen-hidden");
+        } else {
+          detailSection.classList.add("screen-hidden");
+          listSection.classList.remove("screen-hidden");
+        }
+      }
+
+      function findFirstValue(item, keys) {
+        if (!item || typeof item !== "object") return "";
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i];
+          if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
+          var value = item[key];
+          if (value == null) continue;
+          if (typeof value === "string" && value.trim() === "") continue;
+          return value;
+        }
+        return "";
+      }
+
+      function toDisplayText(value) {
+        var text = formatStructuredValue(value);
+        return text === "" ? "-" : text;
+      }
+
+      function toDisplayMoney(value) {
+        var text = formatStructuredValue(value);
+        if (text === "") return "-";
+        var normalized = text.replace(/,/g, "").trim();
+        if (/^-?\d+(\.\d+)?$/.test(normalized)) {
+          var num = Number(normalized);
+          if (Number.isFinite(num)) {
+            return num.toLocaleString("ja-JP");
+          }
+        }
+        return text;
+      }
+
+      function renderDetailContent() {
+        var statusEl = document.getElementById("detail-status");
+        var contentEl = document.getElementById("detail-content");
+
+        if (state.detailLoading) {
+          statusEl.textContent = "詳細を読み込み中...";
+          contentEl.innerHTML = "<span class=\"muted\">データを取得しています。</span>";
+          return;
+        }
+
+        if (state.detailErrorMessage) {
+          statusEl.textContent = "詳細取得エラー";
+          contentEl.innerHTML = "<span class=\"muted\">" + escapeHtml(state.detailErrorMessage) + "</span>";
+          return;
+        }
+
+        if (!state.detailItem || typeof state.detailItem !== "object") {
+          statusEl.textContent = "詳細データなし";
+          contentEl.innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+          return;
+        }
+
+        var item = state.detailItem;
+        var fields = [
+          { label: "管理ID", value: toDisplayText(findFirstValue(item, ["id", "管理ID"]) || state.detailItemId) },
+          { label: "ステータス", value: toDisplayText(findFirstValue(item, ["status", "ステータス"])) },
+          { label: "ショップ", value: toDisplayText(findFirstValue(item, ["shop", "ショップ"])) },
+          { label: "商品名", value: toDisplayText(findFirstValue(item, ["itemName", "商品名"])) },
+          { label: "出品金額", value: toDisplayMoney(findFirstValue(item, ["listPrice", "出品金額"])) },
+          { label: "交渉金額", value: toDisplayMoney(findFirstValue(item, ["negotiatedPrice", "交渉金額"])) },
+          { label: "決済金額", value: toDisplayMoney(findFirstValue(item, ["priceFinal", "決済金額"])) },
+          { label: "仕入れ値", value: toDisplayMoney(findFirstValue(item, ["cost", "仕入れ値"])) },
+          { label: "配送料", value: toDisplayMoney(findFirstValue(item, ["shipping", "配送料"])) },
+          { label: "サイト利用料", value: toDisplayMoney(findFirstValue(item, ["fee", "サイト利用料"])) },
+          { label: "粗利", value: toDisplayMoney(findFirstValue(item, ["profit", "粗利(原価引)"])) },
+          { label: "備考", value: toDisplayText(findFirstValue(item, ["memo", "備考"])) }
+        ];
+
+        var html = "<div class=\"detail-grid\">" + fields.map(function(field) {
+          return "<div class=\"detail-item\"><div class=\"detail-label\">" + escapeHtml(field.label) + "</div><div class=\"detail-value\">" + escapeHtml(field.value) + "</div></div>";
+        }).join("") + "</div>";
+
+        statusEl.textContent = "管理ID: " + toDisplayText(findFirstValue(item, ["id", "管理ID"]) || state.detailItemId);
+        contentEl.innerHTML = html;
+      }
+
+      function openDetailById(itemId) {
+        var normalizedId = String(itemId || "").trim();
+        if (!normalizedId) {
+          setBanner("error", "管理IDを特定できないため詳細を開けません。");
+          return;
+        }
+
+        state.detailItemId = normalizedId;
+        state.detailLoading = true;
+        state.detailItem = null;
+        state.detailErrorMessage = "";
+        switchScreen("detail");
+        renderDetailContent();
+
+        callWrappedApi("getItem", [normalizedId]).then(function(response) {
+          state.detailItem = response && response.data ? response.data : null;
+          state.detailErrorMessage = "";
+          setBanner("info", "商品詳細を表示しました。");
+        }).catch(function(err) {
+          state.detailItem = null;
+          state.detailErrorMessage = resolveErrorMessage(err);
+          setBanner("error", "商品詳細の取得に失敗しました: " + resolveErrorMessage(err));
+        }).finally(function() {
+          state.detailLoading = false;
+          renderDetailContent();
+        });
+      }
+
       function renderItemsTable(items) {
         state.viewItems = items || [];
         if (!state.viewItems.length) {
@@ -580,6 +759,7 @@
         var headers = getCurrentHeaders(state.viewItems);
         var html = "<div class=\"table-wrap\"><table><thead><tr>";
         html += "<th class=\"select-cell\"><input id=\"select-all-rows\" type=\"checkbox\" aria-label=\"全選択\"></th>";
+        html += "<th class=\"action-cell\">詳細</th>";
         headers.forEach(function(header) {
           html += "<th>" + escapeHtml(header) + "</th>";
         });
@@ -591,6 +771,7 @@
           var disabled = itemId ? "" : " disabled";
           html += "<tr>";
           html += "<td class=\"select-cell\"><input class=\"row-select\" type=\"checkbox\" data-item-id=\"" + escapeHtml(itemId) + "\"" + checked + disabled + " aria-label=\"行選択\"></td>";
+          html += "<td class=\"action-cell\"><button class=\"btn btn-secondary btn-small row-detail-open\" type=\"button\" data-item-id=\"" + escapeHtml(itemId) + "\"" + disabled + ">詳細</button></td>";
           headers.forEach(function(header) {
             html += "<td>" + escapeHtml(formatStructuredValue(item[header])) + "</td>";
           });
@@ -746,6 +927,10 @@
         executeBulkAction();
       });
 
+      document.getElementById("back-to-list").addEventListener("click", function() {
+        switchScreen("list");
+      });
+
       document.getElementById("content").addEventListener("change", function(event) {
         var target = event.target;
         if (!target) return;
@@ -772,7 +957,17 @@
         }
       });
 
+      document.getElementById("content").addEventListener("click", function(event) {
+        var target = event.target;
+        if (!target) return;
+        if (target.classList.contains("row-detail-open")) {
+          var itemId = target.getAttribute("data-item-id");
+          openDetailById(itemId);
+        }
+      });
+
       updateBulkUiState();
+      switchScreen("list");
       loadItemsWithCurrentSort({ forceBaseLoad: true });
     </script>
   </body>
