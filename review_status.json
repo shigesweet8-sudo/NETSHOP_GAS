@@ -1,5 +1,5 @@
 {
-  "issue_title": "[15] キャンセル処理API を実装対象とします。",
+  "issue_title": "[16] 一括削除 / 無効化API を実装対象とします。",
   "changed_files": [
     "20_api_netshop.gs",
     "codex_instruction.md",
