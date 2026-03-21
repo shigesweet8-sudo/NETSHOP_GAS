@@ -75,8 +75,40 @@
       }
 
       .card-title {
-        margin: 0 0 12px;
+        margin: 0;
         font-size: 16px;
+        font-weight: 700;
+      }
+
+      .list-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-start;
+        margin-bottom: 10px;
+      }
+
+      .list-description {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .list-toolbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .count-chip {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--text);
+        padding: 6px 10px;
+        font-size: 12px;
         font-weight: 700;
       }
 
@@ -140,6 +172,14 @@
         color: var(--muted);
       }
 
+      .table-empty {
+        padding: 16px;
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        color: var(--muted);
+        background: var(--surface-soft);
+      }
+
       .table-wrap {
         overflow-x: auto;
       }
@@ -200,19 +240,27 @@
       <header class="page-header">
         <div>
           <h1 class="page-title">WAVE</h1>
-          <p class="page-subtitle">商品一覧画面の正式実装に向けた UI 土台画面です。</p>
-        </div>
-        <div class="page-actions">
-          <button id="reload-items" class="btn btn-primary" type="button">一覧を再取得</button>
+          <p class="page-subtitle">商品一覧</p>
         </div>
       </header>
 
       <div id="global-banner" class="state-banner" aria-live="polite"></div>
 
       <section class="card">
-        <h2 class="card-title">商品一覧</h2>
+        <div class="list-header">
+          <div>
+            <h2 class="card-title">商品一覧</h2>
+            <p class="list-description">検索・並び替え・一括操作の拡張を見据えた一覧表示エリアです。</p>
+          </div>
+        </div>
+        <div class="list-toolbar">
+          <div id="items-count" class="count-chip">0 件</div>
+          <div class="page-actions">
+            <button id="reload-items" class="btn btn-primary" type="button">再取得</button>
+          </div>
+        </div>
         <div id="items-status" class="status-line">読み込み中...</div>
-        <div id="content" class="muted">データを取得しています。</div>
+        <div id="items-table-region" class="muted">データを取得しています。</div>
       </section>
     </div>
 
@@ -341,42 +389,84 @@
         return [];
       }
 
+      var LIST_COLUMNS = [
+        { key: "status", label: "ステータス" },
+        { key: "id", label: "管理ID" },
+        { key: "date", label: "日にち" },
+        { key: "shop", label: "ショップ" },
+        { key: "itemName", label: "商品名" },
+        { key: "qty", label: "個数" },
+        { key: "cost", label: "仕入れ値" },
+        { key: "priceFinal", label: "決済金額" },
+        { key: "profit", label: "粗利(原価引)" },
+        { key: "memo", label: "備考" }
+      ];
+
+      function toItemArray(rawItems) {
+        if (!Array.isArray(rawItems)) return [];
+        return rawItems.filter(function(item) {
+          return item && typeof item === "object" && !Array.isArray(item);
+        });
+      }
+
+      function updateItemsCount(count) {
+        document.getElementById("items-count").textContent = count + " 件";
+      }
+
       function renderItemsTable(items) {
-        if (!items || !items.length) {
+        var normalizedItems = toItemArray(items);
+        var regionEl = document.getElementById("items-table-region");
+        updateItemsCount(normalizedItems.length);
+
+        if (!normalizedItems.length) {
           document.getElementById("items-status").textContent = "データなし";
-          document.getElementById("content").innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+          regionEl.innerHTML = "<div class=\"table-empty\">表示できる商品データがありません。</div>";
           return;
         }
 
-        var headers = Object.keys(items[0]);
+        var headers = LIST_COLUMNS.filter(function(column) {
+          return normalizedItems.some(function(item) {
+            return Object.prototype.hasOwnProperty.call(item, column.key);
+          });
+        });
+
+        if (!headers.length) {
+          headers = Object.keys(normalizedItems[0]).map(function(key) {
+            return { key: key, label: key };
+          });
+        }
+
         var html = "<div class=\"table-wrap\"><table><thead><tr>";
         headers.forEach(function(header) {
-          html += "<th>" + escapeHtml(header) + "</th>";
+          html += "<th>" + escapeHtml(header.label) + "</th>";
         });
         html += "</tr></thead><tbody>";
 
-        items.forEach(function(item) {
+        normalizedItems.forEach(function(item) {
           html += "<tr>";
           headers.forEach(function(header) {
-            html += "<td>" + escapeHtml(formatStructuredValue(item[header])) + "</td>";
+            html += "<td>" + escapeHtml(formatStructuredValue(item[header.key])) + "</td>";
           });
           html += "</tr>";
         });
 
         html += "</tbody></table></div>";
         document.getElementById("items-status").textContent = "読み込み完了";
-        document.getElementById("content").innerHTML = html;
+        regionEl.innerHTML = html;
       }
 
       function loadItems() {
         document.getElementById("items-status").textContent = "読み込み中...";
+        document.getElementById("items-table-region").innerHTML = "<span class=\"muted\">データを取得しています。</span>";
+        updateItemsCount(0);
         return callWrappedApi("api_listItems").then(function(response) {
           var items = extractListItemsFromResponse(response);
           renderItemsTable(items);
           setBanner("success", "商品一覧を取得しました。");
         }).catch(function(err) {
           document.getElementById("items-status").textContent = "エラー";
-          document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(err)) + "</span>";
+          document.getElementById("items-table-region").innerHTML = "<div class=\"table-empty\">" + escapeHtml(resolveErrorMessage(err)) + "</div>";
+          updateItemsCount(0);
           setBanner("error", "商品一覧の取得に失敗しました。");
         });
       }
