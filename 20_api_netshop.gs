@@ -45,6 +45,73 @@ function getManagementSheet_() {
   return ss.getSheetByName(CONFIG.SHEET_NAME);
 }
 
+var SHEET_HEADER_RESOLUTION_CACHE_ = {};
+
+function createSheetHeaderResolution_(sheet) {
+  if (!sheet) {
+    throw new Error('Sheet not found: ' + CONFIG.SHEET_NAME);
+  }
+
+  var maxColumn = Math.max(sheet.getLastColumn(), CONFIG.HEADERS.length);
+  if (maxColumn < 1) {
+    throw new Error('Sheet header row is empty: ' + CONFIG.SHEET_NAME);
+  }
+
+  var headerRow = sheet.getRange(1, 1, 1, maxColumn).getValues()[0].map(function(header) {
+    return String(header || '').trim();
+  });
+
+  var colByHeader = {};
+  var indexByHeader = {};
+  for (var i = 0; i < headerRow.length; i++) {
+    var header = headerRow[i];
+    if (!header) continue;
+    if (colByHeader[header] !== undefined) continue;
+    colByHeader[header] = i + 1;
+    indexByHeader[header] = i;
+  }
+
+  var missingConfigHeaders = CONFIG.HEADERS.filter(function(header) {
+    return colByHeader[header] === undefined;
+  });
+  if (missingConfigHeaders.length) {
+    throw new Error('Missing sheet headers: ' + missingConfigHeaders.join(', '));
+  }
+
+  var requiredColumnCount = CONFIG.HEADERS.reduce(function(maxValue, header) {
+    return Math.max(maxValue, colByHeader[header] || 0);
+  }, 0);
+
+  return {
+    headers: headerRow,
+    colByHeader: colByHeader,
+    indexByHeader: indexByHeader,
+    requiredColumnCount: requiredColumnCount
+  };
+}
+
+function getSheetHeaderResolution_(sheet, requiredHeaders) {
+  if (!sheet) {
+    throw new Error('Sheet not found: ' + CONFIG.SHEET_NAME);
+  }
+
+  var cacheKey = String(sheet.getSheetId()) + ':' + String(sheet.getName());
+  if (!SHEET_HEADER_RESOLUTION_CACHE_[cacheKey]) {
+    SHEET_HEADER_RESOLUTION_CACHE_[cacheKey] = createSheetHeaderResolution_(sheet);
+  }
+
+  var resolution = SHEET_HEADER_RESOLUTION_CACHE_[cacheKey];
+  var required = Array.isArray(requiredHeaders) ? requiredHeaders : [];
+  var missingRequiredHeaders = required.filter(function(header) {
+    return resolution.colByHeader[header] === undefined;
+  });
+  if (missingRequiredHeaders.length) {
+    throw new Error('Missing required headers: ' + missingRequiredHeaders.join(', '));
+  }
+
+  return resolution;
+}
+
 function getSheetSnapshot_() {
   var sheet = getManagementSheet_();
   if (!sheet) return null;
@@ -333,24 +400,24 @@ function getItem(itemId) {
   return buildPublicItemFromRow_(snapshot.headers, snapshot.rows[rowIndex]);
 }
 
-function buildRowFromPayload_(payload) {
-  var rowData = new Array(CONFIG.HEADERS.length).fill('');
-  var col = CONFIG.COLS;
+function buildRowFromPayload_(payload, headerResolution) {
+  var rowData = new Array(headerResolution.requiredColumnCount).fill('');
   var now = new Date();
   var shopValue = payload.shop || '';
   var itemId = generateId_(shopValue);
   var statusValue = payload.status || CONFIG.STATUS.LISTING;
 
-  rowData[col.ID - 1] = itemId;
-  rowData[col.STATUS - 1] = statusValue;
-  rowData[col.DATE - 1] = payload.date || now;
-  rowData[col.PRODUCT_REG_DATE - 1] = payload.productRegDate || (statusValue === CONFIG.STATUS.LISTING ? now : '');
+  rowData[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.id]] = itemId;
+  rowData[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.status]] = statusValue;
+  rowData[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.date]] = payload.date || now;
+  rowData[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.productRegDate]] =
+    payload.productRegDate || (statusValue === CONFIG.STATUS.LISTING ? now : '');
 
   Object.keys(ITEM_FIELD_TO_HEADER).forEach(function(field) {
     if (field === 'id' || field === 'status' || field === 'date' || field === 'productRegDate') return;
     var header = ITEM_FIELD_TO_HEADER[field];
-    var index = CONFIG.HEADERS.indexOf(header);
-    if (index === -1) return;
+    var index = headerResolution.indexByHeader[header];
+    if (index === undefined) return;
     rowData[index] = payload[field] !== undefined ? payload[field] : rowData[index];
   });
 
@@ -371,9 +438,15 @@ function createItem(input) {
   var sheet = getManagementSheet_();
   if (!sheet) return null;
 
-  var created = buildRowFromPayload_(payload);
+  var headerResolution = getSheetHeaderResolution_(sheet, [
+    ITEM_FIELD_TO_HEADER.id,
+    ITEM_FIELD_TO_HEADER.status,
+    ITEM_FIELD_TO_HEADER.date,
+    ITEM_FIELD_TO_HEADER.productRegDate
+  ]);
+  var created = buildRowFromPayload_(payload, headerResolution);
   var nextRow = Math.max(sheet.getLastRow() + 1, 2);
-  sheet.getRange(nextRow, 1, 1, CONFIG.HEADERS.length).setValues([created.rowData]);
+  sheet.getRange(nextRow, 1, 1, created.rowData.length).setValues([created.rowData]);
 
   return {
     id: created.itemId,
@@ -414,6 +487,7 @@ function updateItem(itemId, input) {
 
   var snapshot = getSheetSnapshot_();
   if (!snapshot || !snapshot.rows.length) return null;
+  var headerResolution = getSheetHeaderResolution_(snapshot.sheet, [ITEM_FIELD_TO_HEADER.id]);
 
   var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
   if (rowIndex === -1) return null;
@@ -427,8 +501,8 @@ function updateItem(itemId, input) {
     var header = ITEM_FIELD_TO_HEADER[field];
     if (!header) return;
 
-    var headerIndex = snapshot.headers.indexOf(header);
-    if (headerIndex === -1) return;
+    var headerIndex = headerResolution.indexByHeader[header];
+    if (headerIndex === undefined) return;
 
     rowValues[headerIndex] = payload[field];
     changed = true;
@@ -852,18 +926,21 @@ function api_validateVariation(payload) {
   }
 }
 
-function applyStatusUpdateToRowValues_(rowValues, status, memo) {
+function applyStatusUpdateToRowValues_(rowValues, status, memo, headerResolution) {
   var nextRow = rowValues.slice();
   var now = new Date();
-  var col = CONFIG.COLS;
+  var statusIndex = headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.status];
+  var dateIndex = headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.date];
+  var productRegDateIndex = headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.productRegDate];
+  var memoIndex = headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.memo];
 
-  nextRow[col.STATUS - 1] = status;
-  nextRow[col.DATE - 1] = now;
-  if (status === CONFIG.STATUS.LISTING && !nextRow[col.PRODUCT_REG_DATE - 1]) {
-    nextRow[col.PRODUCT_REG_DATE - 1] = now;
+  nextRow[statusIndex] = status;
+  nextRow[dateIndex] = now;
+  if (status === CONFIG.STATUS.LISTING && !nextRow[productRegDateIndex]) {
+    nextRow[productRegDateIndex] = now;
   }
   if (memo !== undefined) {
-    nextRow[col.MEMO - 1] = memo;
+    nextRow[memoIndex] = memo;
   }
   return nextRow;
 }
@@ -920,18 +997,29 @@ function writeUpdatedRows_(sheet, headersLength, rows, rowIndexes) {
   sheet.getRange(blockStart + 2, 1, blockValues.length, headersLength).setValues(blockValues);
 }
 
-function calculateProfitFromRowValues_(rowValues) {
-  var col = CONFIG.COLS;
-  var cost = parseFloat(rowValues[col.COST - 1]) || 0;
-  var sale = parseFloat(rowValues[col.PRICE_FINAL - 1]) || 0;
-  var fee = parseFloat(rowValues[col.FEE - 1]) || 0;
-  var shipping = parseFloat(rowValues[col.SHIPPING - 1]) || 0;
+function calculateProfitFromRowValues_(rowValues, headerResolution) {
+  if (!headerResolution || !headerResolution.indexByHeader) {
+    var fallbackIndexByHeader = {};
+    CONFIG.HEADERS.forEach(function(header, index) {
+      fallbackIndexByHeader[header] = index;
+    });
+    var fallbackCost = parseFloat(rowValues[fallbackIndexByHeader[ITEM_FIELD_TO_HEADER.cost]]) || 0;
+    var fallbackSale = parseFloat(rowValues[fallbackIndexByHeader[ITEM_FIELD_TO_HEADER.priceFinal]]) || 0;
+    var fallbackFee = parseFloat(rowValues[fallbackIndexByHeader[ITEM_FIELD_TO_HEADER.fee]]) || 0;
+    var fallbackShipping = parseFloat(rowValues[fallbackIndexByHeader[ITEM_FIELD_TO_HEADER.shipping]]) || 0;
+    return fallbackSale - fallbackFee - fallbackShipping - fallbackCost;
+  }
+
+  var cost = parseFloat(rowValues[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.cost]]) || 0;
+  var sale = parseFloat(rowValues[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.priceFinal]]) || 0;
+  var fee = parseFloat(rowValues[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.fee]]) || 0;
+  var shipping = parseFloat(rowValues[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.shipping]]) || 0;
   return sale - fee - shipping - cost;
 }
 
-function applyProfitRecalculationToRowValues_(rowValues) {
+function applyProfitRecalculationToRowValues_(rowValues, headerResolution) {
   var nextRow = rowValues.slice();
-  nextRow[CONFIG.COLS.PROFIT - 1] = calculateProfitFromRowValues_(nextRow);
+  nextRow[headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.profit]] = calculateProfitFromRowValues_(nextRow, headerResolution);
   return nextRow;
 }
 
@@ -1157,26 +1245,27 @@ function api_dispatchAction(payload) {
   }
 }
 
-function writeUpdatedProfitValues_(sheet, rows, rowIndexes) {
+function writeUpdatedProfitValues_(sheet, rows, rowIndexes, headerResolution) {
   if (!rowIndexes.length) return;
 
   var sortedIndexes = rowIndexes.slice().sort(function(a, b) {
     return a - b;
   });
-  var profitCol = CONFIG.COLS.PROFIT;
+  var profitCol = headerResolution.colByHeader[ITEM_FIELD_TO_HEADER.profit];
+  var profitIndex = headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.profit];
   var blockStart = sortedIndexes[0];
-  var blockValues = [[rows[blockStart][profitCol - 1]]];
+  var blockValues = [[rows[blockStart][profitIndex]]];
 
   for (var i = 1; i < sortedIndexes.length; i++) {
     var rowIndex = sortedIndexes[i];
     if (rowIndex === sortedIndexes[i - 1] + 1) {
-      blockValues.push([rows[rowIndex][profitCol - 1]]);
+      blockValues.push([rows[rowIndex][profitIndex]]);
       continue;
     }
 
     sheet.getRange(blockStart + 2, profitCol, blockValues.length, 1).setValues(blockValues);
     blockStart = rowIndex;
-    blockValues = [[rows[rowIndex][profitCol - 1]]];
+    blockValues = [[rows[rowIndex][profitIndex]]];
   }
 
   sheet.getRange(blockStart + 2, profitCol, blockValues.length, 1).setValues(blockValues);
@@ -1219,6 +1308,14 @@ function bulkRecalculateProfit(itemIds) {
   if (!snapshot.rows.length) {
     return buildBulkRecalculateProfitResponse_(false, 'no data rows', [], normalizedIds.slice());
   }
+  var headerResolution = getSheetHeaderResolution_(snapshot.sheet, [
+    ITEM_FIELD_TO_HEADER.id,
+    ITEM_FIELD_TO_HEADER.cost,
+    ITEM_FIELD_TO_HEADER.priceFinal,
+    ITEM_FIELD_TO_HEADER.fee,
+    ITEM_FIELD_TO_HEADER.shipping,
+    ITEM_FIELD_TO_HEADER.profit
+  ]);
 
   var successItemIds = [];
   var failureItemIds = [];
@@ -1232,7 +1329,7 @@ function bulkRecalculateProfit(itemIds) {
       return;
     }
 
-    snapshot.rows[rowIndex] = applyProfitRecalculationToRowValues_(snapshot.rows[rowIndex]);
+    snapshot.rows[rowIndex] = applyProfitRecalculationToRowValues_(snapshot.rows[rowIndex], headerResolution);
     rowIndexesToUpdate[rowIndex] = true;
     successItemIds.push(itemId);
   });
@@ -1243,7 +1340,7 @@ function bulkRecalculateProfit(itemIds) {
 
   if (uniqueRowIndexes.length) {
     try {
-      writeUpdatedProfitValues_(snapshot.sheet, snapshot.rows, uniqueRowIndexes);
+      writeUpdatedProfitValues_(snapshot.sheet, snapshot.rows, uniqueRowIndexes, headerResolution);
     } catch (error) {
       Logger.log('bulkRecalculateProfit error: ' + error);
       return buildBulkRecalculateProfitResponse_(false, String(error), [], normalizedIds.slice());
@@ -1299,6 +1396,13 @@ function bulkUpdateStatus(itemIds, status, memo) {
   if (!snapshot.rows.length) {
     return buildBulkUpdateResponse_(false, 'no data rows', 0, normalizedIds.length, [], normalizedIds.slice());
   }
+  var headerResolution = getSheetHeaderResolution_(snapshot.sheet, [
+    ITEM_FIELD_TO_HEADER.id,
+    ITEM_FIELD_TO_HEADER.status,
+    ITEM_FIELD_TO_HEADER.date,
+    ITEM_FIELD_TO_HEADER.productRegDate,
+    ITEM_FIELD_TO_HEADER.memo
+  ]);
 
   var updatedItemIds = [];
   var failedItemIds = [];
@@ -1311,7 +1415,7 @@ function bulkUpdateStatus(itemIds, status, memo) {
       failedItemIds.push(itemId);
       return;
     }
-    snapshot.rows[rowIndex] = applyStatusUpdateToRowValues_(snapshot.rows[rowIndex], status, memo);
+    snapshot.rows[rowIndex] = applyStatusUpdateToRowValues_(snapshot.rows[rowIndex], status, memo, headerResolution);
     rowIndexesToUpdate[rowIndex] = true;
     updatedItemIds.push(itemId);
   });
@@ -1484,6 +1588,13 @@ function updateItemStatus(itemId, status, memo) {
 
   var snapshot = getSheetSnapshot_();
   if (!snapshot || !snapshot.rows.length) return null;
+  var headerResolution = getSheetHeaderResolution_(snapshot.sheet, [
+    ITEM_FIELD_TO_HEADER.id,
+    ITEM_FIELD_TO_HEADER.status,
+    ITEM_FIELD_TO_HEADER.date,
+    ITEM_FIELD_TO_HEADER.productRegDate,
+    ITEM_FIELD_TO_HEADER.memo
+  ]);
 
   var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
   if (rowIndex === -1) return null;
@@ -1491,7 +1602,8 @@ function updateItemStatus(itemId, status, memo) {
   var rowValues = applyStatusUpdateToRowValues_(
     snapshot.rows[rowIndex],
     status,
-    arguments.length >= 3 ? memo : undefined
+    arguments.length >= 3 ? memo : undefined,
+    headerResolution
   );
 
   snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
@@ -1508,11 +1620,19 @@ function recalculateItemProfit(itemId) {
 
   var snapshot = getSheetSnapshot_();
   if (!snapshot || !snapshot.rows.length) return null;
+  var headerResolution = getSheetHeaderResolution_(snapshot.sheet, [
+    ITEM_FIELD_TO_HEADER.id,
+    ITEM_FIELD_TO_HEADER.cost,
+    ITEM_FIELD_TO_HEADER.priceFinal,
+    ITEM_FIELD_TO_HEADER.fee,
+    ITEM_FIELD_TO_HEADER.shipping,
+    ITEM_FIELD_TO_HEADER.profit
+  ]);
 
   var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, itemId);
   if (rowIndex === -1) return null;
 
-  var rowValues = applyProfitRecalculationToRowValues_(snapshot.rows[rowIndex]);
+  var rowValues = applyProfitRecalculationToRowValues_(snapshot.rows[rowIndex], headerResolution);
 
   snapshot.sheet.getRange(rowIndex + 2, 1, 1, rowValues.length).setValues([rowValues]);
   return getItem(itemId);
