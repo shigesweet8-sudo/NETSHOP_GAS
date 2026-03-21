@@ -1,7 +1,6 @@
 {
-  "issue_title": "APIチューニング完了",
+  "issue_title": "UI設計着手前の確１",
   "changed_files": [
-    "01_config.gs",
     "20_api_netshop.gs",
     "codex_instruction.md",
     "issue_body.md",
@@ -12,7 +11,6 @@
   "reason": "実装ファイル差分があり、重大な指摘は検出されませんでした。",
   "implementation_present": true,
   "implementation_files": [
-    "01_config.gs",
     "20_api_netshop.gs"
   ],
   "meta_only": false,
