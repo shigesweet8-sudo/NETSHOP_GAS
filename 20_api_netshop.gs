@@ -122,6 +122,190 @@ function api_listItems(filter) {
   return listItems(filter);
 }
 
+function normalizeSortOrder_(order) {
+  var normalized = String(order || '').trim().toLowerCase();
+  if (!normalized) return 'asc';
+  if (normalized === 'desc' || normalized === 'descending' || normalized === '-1') return 'desc';
+  return 'asc';
+}
+
+function resolveSortKey_(items, sortKey) {
+  var key = String(sortKey || '').trim();
+  if (!key) return '';
+  if (!items.length) return key;
+
+  if (Object.prototype.hasOwnProperty.call(items[0], key)) {
+    return key;
+  }
+
+  var headerKey = ITEM_FIELD_TO_HEADER[key];
+  if (headerKey && Object.prototype.hasOwnProperty.call(items[0], headerKey)) {
+    return headerKey;
+  }
+
+  return '';
+}
+
+function normalizeComparableValue_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    return {
+      type: 'number',
+      value: isNaN(value.getTime()) ? null : value.getTime(),
+      raw: ''
+    };
+  }
+
+  if (typeof value === 'number') {
+    return {
+      type: isFinite(value) ? 'number' : 'empty',
+      value: isFinite(value) ? value : null,
+      raw: ''
+    };
+  }
+
+  if (typeof value === 'boolean') {
+    return {
+      type: 'number',
+      value: value ? 1 : 0,
+      raw: ''
+    };
+  }
+
+  if (value === null || value === undefined) {
+    return {
+      type: 'empty',
+      value: null,
+      raw: ''
+    };
+  }
+
+  var text = String(value).trim();
+  if (!text) {
+    return {
+      type: 'empty',
+      value: null,
+      raw: ''
+    };
+  }
+
+  var numericText = text.replace(/[\s,，￥¥]/g, '');
+  var numericValue = Number(numericText);
+  if (!isNaN(numericValue) && numericText !== '') {
+    return {
+      type: 'number',
+      value: numericValue,
+      raw: text
+    };
+  }
+
+  var dateValue = new Date(text);
+  if (!isNaN(dateValue.getTime())) {
+    return {
+      type: 'number',
+      value: dateValue.getTime(),
+      raw: text
+    };
+  }
+
+  return {
+    type: 'string',
+    value: text.toLowerCase(),
+    raw: text
+  };
+}
+
+function compareComparableValues_(left, right) {
+  if (left.type === 'empty' && right.type === 'empty') return 0;
+  if (left.type === 'empty') return 1;
+  if (right.type === 'empty') return -1;
+
+  if (left.type === right.type) {
+    if (left.value < right.value) return -1;
+    if (left.value > right.value) return 1;
+    return 0;
+  }
+
+  var leftText = String(left.raw || left.value);
+  var rightText = String(right.raw || right.value);
+  if (leftText < rightText) return -1;
+  if (leftText > rightText) return 1;
+  return 0;
+}
+
+function sortItemsByKey_(items, sortKey, order) {
+  var list = Array.isArray(items) ? items : [];
+  if (!list.length) return [];
+
+  var resolvedKey = resolveSortKey_(list, sortKey);
+  if (!resolvedKey) return list.slice();
+
+  var direction = normalizeSortOrder_(order) === 'desc' ? -1 : 1;
+  var decorated = list.map(function(item, index) {
+    return {
+      index: index,
+      item: item,
+      sortValue: normalizeComparableValue_(item[resolvedKey])
+    };
+  });
+
+  decorated.sort(function(a, b) {
+    var compared = compareComparableValues_(a.sortValue, b.sortValue);
+    if (compared !== 0) return compared * direction;
+    return a.index - b.index;
+  });
+
+  return decorated.map(function(entry) {
+    return entry.item;
+  });
+}
+
+function listItemsSorted(filter, sortKey, order) {
+  var items = listItems(filter);
+  return sortItemsByKey_(items, sortKey, order);
+}
+
+function api_listItemsSorted(filterOrPayload, sortKey, order) {
+  try {
+    var filter = filterOrPayload;
+    var key = sortKey;
+    var sortOrder = order;
+
+    if (
+      arguments.length === 1 &&
+      filterOrPayload &&
+      typeof filterOrPayload === 'object' &&
+      !Array.isArray(filterOrPayload) &&
+      (
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'filter') ||
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'sortKey') ||
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'key') ||
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'sort') ||
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'orderBy') ||
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'order') ||
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'sortOrder') ||
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'direction') ||
+        Object.prototype.hasOwnProperty.call(filterOrPayload, 'action')
+      )
+    ) {
+      filter = filterOrPayload.filter && typeof filterOrPayload.filter === 'object'
+        ? filterOrPayload.filter
+        : {};
+      key = filterOrPayload.sortKey;
+      if (key === undefined) key = filterOrPayload.key;
+      if (key === undefined) key = filterOrPayload.sort;
+      if (key === undefined) key = filterOrPayload.orderBy;
+      sortOrder = filterOrPayload.order;
+      if (sortOrder === undefined) sortOrder = filterOrPayload.sortOrder;
+      if (sortOrder === undefined) sortOrder = filterOrPayload.direction;
+    }
+
+    return listItemsSorted(filter, key, sortOrder);
+  } catch (error) {
+    Logger.log('api_listItemsSorted error: ' + error);
+    return [];
+  }
+}
+
 function api_debugContext() {
   var sheet = getManagementSheet_();
   return {
@@ -951,6 +1135,10 @@ function api_dispatchAction(payload) {
     case 'getMaster':
     case 'master':
       return api_getMasters(payload);
+    case 'listItemsSorted':
+    case 'sortedItems':
+    case 'getSortedItems':
+      return api_listItemsSorted(payload);
     default:
       return {
         ok: false,
