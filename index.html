@@ -140,6 +140,52 @@
         color: var(--muted);
       }
 
+      .items-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+        align-items: center;
+      }
+
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .toolbar-spacer {
+        flex: 1 1 auto;
+      }
+
+      .control-input,
+      .control-select {
+        height: 36px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font: inherit;
+        font-size: 13px;
+        min-width: 120px;
+        background: #fff;
+      }
+
+      .control-input {
+        min-width: 220px;
+      }
+
+      .selected-count {
+        font-size: 13px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .select-cell {
+        width: 44px;
+        text-align: center;
+      }
+
       .table-wrap {
         overflow-x: auto;
       }
@@ -192,6 +238,24 @@
         .btn {
           width: 100%;
         }
+
+        .items-toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .toolbar-group {
+          width: 100%;
+        }
+
+        .control-input,
+        .control-select {
+          width: 100%;
+        }
+
+        .toolbar-spacer {
+          display: none;
+        }
       }
     </style>
   </head>
@@ -211,6 +275,34 @@
 
       <section class="card">
         <h2 class="card-title">商品一覧</h2>
+        <div class="items-toolbar" id="items-toolbar">
+          <div class="toolbar-group">
+            <input id="keyword-search" class="control-input" type="search" placeholder="キーワード検索">
+            <select id="status-filter" class="control-select" aria-label="ステータス絞り込み">
+              <option value="">すべてのステータス</option>
+            </select>
+          </div>
+          <div class="toolbar-group">
+            <select id="sort-key" class="control-select" aria-label="並び替え項目">
+              <option value="">並び替えなし</option>
+            </select>
+            <button id="sort-order-toggle" class="btn btn-secondary" type="button">昇順</button>
+          </div>
+          <div class="toolbar-group">
+            <select id="bulk-action" class="control-select" aria-label="一括操作">
+              <option value="">一括操作を選択</option>
+              <option value="updateStatus">一括ステータス変更</option>
+              <option value="recalculate">一括再計算</option>
+              <option value="disable">一括無効化</option>
+            </select>
+            <select id="bulk-status" class="control-select" aria-label="変更後ステータス" style="display: none;">
+              <option value="">変更後ステータス</option>
+            </select>
+            <button id="bulk-execute" class="btn btn-secondary" type="button">実行</button>
+          </div>
+          <div class="toolbar-spacer"></div>
+          <div id="selected-count" class="selected-count">選択 0 件</div>
+        </div>
         <div id="items-status" class="status-line">読み込み中...</div>
         <div id="content" class="muted">データを取得しています。</div>
       </section>
@@ -341,22 +433,164 @@
         return [];
       }
 
-      function renderItemsTable(items) {
-        if (!items || !items.length) {
-          document.getElementById("items-status").textContent = "データなし";
-          document.getElementById("content").innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+      var state = {
+        allItems: [],
+        viewItems: [],
+        selectedById: {},
+        sortKey: "",
+        sortOrder: "asc",
+        keyword: "",
+        statusFilter: "",
+        loading: false
+      };
+
+      function getCurrentHeaders(items) {
+        if (!items || !items.length) return [];
+        return Object.keys(items[0]);
+      }
+
+      function resolveItemId(item) {
+        if (!item || typeof item !== "object") return "";
+        if (item.id != null && String(item.id).trim() !== "") return String(item.id).trim();
+        if (item["管理ID"] != null && String(item["管理ID"]).trim() !== "") return String(item["管理ID"]).trim();
+        return "";
+      }
+
+      function buildSearchText(item) {
+        return Object.keys(item || {}).map(function(key) {
+          return formatStructuredValue(item[key]);
+        }).join(" ").toLowerCase();
+      }
+
+      function applyClientFilters(items) {
+        var keyword = String(state.keyword || "").trim().toLowerCase();
+        var statusFilter = String(state.statusFilter || "").trim();
+        return (items || []).filter(function(item) {
+          if (statusFilter) {
+            var itemStatus = item && item.status != null ? String(item.status) : "";
+            if (itemStatus !== statusFilter) return false;
+          }
+          if (!keyword) return true;
+          return buildSearchText(item).indexOf(keyword) !== -1;
+        });
+      }
+
+      function pruneSelectionWithItems(items) {
+        var validIdMap = {};
+        (items || []).forEach(function(item) {
+          var id = resolveItemId(item);
+          if (id) validIdMap[id] = true;
+        });
+        Object.keys(state.selectedById).forEach(function(id) {
+          if (!validIdMap[id]) delete state.selectedById[id];
+        });
+      }
+
+      function getSelectedIds() {
+        return Object.keys(state.selectedById).filter(function(id) {
+          return !!state.selectedById[id];
+        });
+      }
+
+      function updateSelectedCount() {
+        document.getElementById("selected-count").textContent = "選択 " + getSelectedIds().length + " 件";
+      }
+
+      function updateToolbarOptions(items) {
+        var list = items || [];
+        var statusSelect = document.getElementById("status-filter");
+        var bulkStatusSelect = document.getElementById("bulk-status");
+        var sortKeySelect = document.getElementById("sort-key");
+        var previousStatus = state.statusFilter;
+        var previousBulkStatus = bulkStatusSelect.value;
+        var previousSortKey = state.sortKey;
+        var headers = getCurrentHeaders(list);
+        var statusMap = {};
+
+        list.forEach(function(item) {
+          if (item && item.status != null && String(item.status).trim()) {
+            statusMap[String(item.status)] = true;
+          }
+        });
+
+        var statuses = Object.keys(statusMap).sort();
+        statusSelect.innerHTML = "<option value=\"\">すべてのステータス</option>" + statuses.map(function(status) {
+          return "<option value=\"" + escapeHtml(status) + "\">" + escapeHtml(status) + "</option>";
+        }).join("");
+        statusSelect.value = statuses.indexOf(previousStatus) !== -1 ? previousStatus : "";
+        state.statusFilter = statusSelect.value;
+
+        bulkStatusSelect.innerHTML = "<option value=\"\">変更後ステータス</option>" + statuses.map(function(status) {
+          return "<option value=\"" + escapeHtml(status) + "\">" + escapeHtml(status) + "</option>";
+        }).join("");
+        bulkStatusSelect.value = statuses.indexOf(previousBulkStatus) !== -1 ? previousBulkStatus : "";
+
+        sortKeySelect.innerHTML = "<option value=\"\">並び替えなし</option>" + headers.map(function(header) {
+          return "<option value=\"" + escapeHtml(header) + "\">" + escapeHtml(header) + "</option>";
+        }).join("");
+        sortKeySelect.value = headers.indexOf(previousSortKey) !== -1 ? previousSortKey : "";
+        state.sortKey = sortKeySelect.value;
+      }
+
+      function updateSelectAllState() {
+        var selectAllEl = document.getElementById("select-all-rows");
+        if (!selectAllEl) return;
+
+        var selectableIds = state.viewItems.map(resolveItemId).filter(function(id) { return !!id; });
+        var selectedVisibleCount = selectableIds.filter(function(id) {
+          return !!state.selectedById[id];
+        }).length;
+
+        if (!selectableIds.length) {
+          selectAllEl.checked = false;
+          selectAllEl.indeterminate = false;
           return;
         }
 
-        var headers = Object.keys(items[0]);
+        selectAllEl.checked = selectedVisibleCount === selectableIds.length;
+        selectAllEl.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < selectableIds.length;
+      }
+
+      function updateBulkUiState() {
+        var action = document.getElementById("bulk-action").value;
+        var bulkAction = document.getElementById("bulk-action");
+        var bulkStatus = document.getElementById("bulk-status");
+        var executeBtn = document.getElementById("bulk-execute");
+        var selectedCount = getSelectedIds().length;
+        var statusSelected = String(bulkStatus.value || "").trim() !== "";
+        bulkStatus.style.display = action === "updateStatus" ? "" : "none";
+        bulkAction.disabled = state.loading;
+        bulkStatus.disabled = state.loading;
+        executeBtn.disabled = state.loading ||
+          selectedCount === 0 ||
+          !action ||
+          (action === "updateStatus" && !statusSelected);
+      }
+
+      function renderItemsTable(items) {
+        state.viewItems = items || [];
+        if (!state.viewItems.length) {
+          document.getElementById("items-status").textContent = "データなし";
+          document.getElementById("content").innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+          updateSelectedCount();
+          updateBulkUiState();
+          return;
+        }
+
+        var headers = getCurrentHeaders(state.viewItems);
         var html = "<div class=\"table-wrap\"><table><thead><tr>";
+        html += "<th class=\"select-cell\"><input id=\"select-all-rows\" type=\"checkbox\" aria-label=\"全選択\"></th>";
         headers.forEach(function(header) {
           html += "<th>" + escapeHtml(header) + "</th>";
         });
         html += "</tr></thead><tbody>";
 
-        items.forEach(function(item) {
+        state.viewItems.forEach(function(item) {
+          var itemId = resolveItemId(item);
+          var checked = itemId && state.selectedById[itemId] ? " checked" : "";
+          var disabled = itemId ? "" : " disabled";
           html += "<tr>";
+          html += "<td class=\"select-cell\"><input class=\"row-select\" type=\"checkbox\" data-item-id=\"" + escapeHtml(itemId) + "\"" + checked + disabled + " aria-label=\"行選択\"></td>";
           headers.forEach(function(header) {
             html += "<td>" + escapeHtml(formatStructuredValue(item[header])) + "</td>";
           });
@@ -364,29 +598,182 @@
         });
 
         html += "</tbody></table></div>";
-        document.getElementById("items-status").textContent = "読み込み完了";
+        document.getElementById("items-status").textContent = "読み込み完了 " + state.viewItems.length + " 件";
         document.getElementById("content").innerHTML = html;
+        updateSelectAllState();
+        updateSelectedCount();
+        updateBulkUiState();
       }
 
-      function loadItems() {
-        document.getElementById("items-status").textContent = "読み込み中...";
-        return callWrappedApi("api_listItems").then(function(response) {
-          var items = extractListItemsFromResponse(response);
-          renderItemsTable(items);
+      function applyAndRenderCurrentView() {
+        pruneSelectionWithItems(state.allItems);
+        renderItemsTable(applyClientFilters(state.allItems));
+      }
+
+      function setLoading(flag, message) {
+        state.loading = !!flag;
+        document.getElementById("reload-items").disabled = !!flag;
+        document.getElementById("sort-order-toggle").disabled = !!flag;
+        document.getElementById("keyword-search").disabled = !!flag;
+        document.getElementById("status-filter").disabled = !!flag;
+        document.getElementById("sort-key").disabled = !!flag;
+        if (message) {
+          document.getElementById("items-status").textContent = message;
+        }
+        updateBulkUiState();
+      }
+
+      function loadItemsWithCurrentSort(options) {
+        var opts = options || {};
+        var useSort = !opts.forceBaseLoad && !!state.sortKey;
+        setLoading(true, "読み込み中...");
+        var promise;
+        if (useSort) {
+          promise = callWrappedApi("api_listItemsSorted", [{
+            sortKey: state.sortKey,
+            order: state.sortOrder
+          }]);
+        } else {
+          promise = callWrappedApi("api_listItems");
+        }
+
+        return promise.then(function(response) {
+          state.allItems = extractListItemsFromResponse(response);
+          state.selectedById = {};
+          updateToolbarOptions(state.allItems);
+          applyAndRenderCurrentView();
           setBanner("success", "商品一覧を取得しました。");
         }).catch(function(err) {
           document.getElementById("items-status").textContent = "エラー";
           document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(err)) + "</span>";
           setBanner("error", "商品一覧の取得に失敗しました。");
+        }).finally(function() {
+          setLoading(false);
+        });
+      }
+
+      function executeBulkAction() {
+        var selectedIds = getSelectedIds();
+        var action = document.getElementById("bulk-action").value;
+        var statusValue = document.getElementById("bulk-status").value;
+
+        if (!selectedIds.length) {
+          setBanner("error", "一括操作する行を選択してください。");
+          updateBulkUiState();
+          return;
+        }
+        if (!action) {
+          setBanner("error", "一括操作を選択してください。");
+          return;
+        }
+        if (action === "updateStatus" && !statusValue) {
+          setBanner("error", "変更後ステータスを選択してください。");
+          return;
+        }
+
+        var actionLabel = action === "updateStatus"
+          ? "一括ステータス変更"
+          : action === "recalculate"
+            ? "一括再計算"
+            : "一括無効化";
+        if (!window.confirm(actionLabel + "を " + selectedIds.length + " 件に実行します。よろしいですか？")) {
+          return;
+        }
+
+        setLoading(true, "一括処理中...");
+        setBanner("info", actionLabel + "を実行しています。");
+
+        var apiName = "";
+        var payload = { itemIds: selectedIds };
+        if (action === "updateStatus") {
+          apiName = "api_bulkUpdateStatus";
+          payload.status = statusValue;
+        } else if (action === "recalculate") {
+          apiName = "api_bulkRecalculateProfit";
+        } else {
+          apiName = "api_bulkDisableNetshop";
+        }
+
+        callWrappedApi(apiName, [payload]).then(function() {
+          setBanner("success", actionLabel + "が完了しました。");
+          return loadItemsWithCurrentSort({ forceBaseLoad: false });
+        }).catch(function(err) {
+          setBanner("error", actionLabel + "に失敗しました: " + resolveErrorMessage(err));
+        }).finally(function() {
+          setLoading(false);
+          updateBulkUiState();
         });
       }
 
       document.getElementById("reload-items").addEventListener("click", function() {
         setBanner("info", "商品一覧を再取得しています。");
-        loadItems();
+        loadItemsWithCurrentSort({ forceBaseLoad: true });
       });
 
-      loadItems();
+      document.getElementById("keyword-search").addEventListener("input", function(event) {
+        state.keyword = event.target.value || "";
+        applyAndRenderCurrentView();
+      });
+
+      document.getElementById("status-filter").addEventListener("change", function(event) {
+        state.statusFilter = event.target.value || "";
+        applyAndRenderCurrentView();
+      });
+
+      document.getElementById("sort-key").addEventListener("change", function(event) {
+        state.sortKey = event.target.value || "";
+        if (!state.sortKey) {
+          applyAndRenderCurrentView();
+          return;
+        }
+        setBanner("info", "並び替えで再取得しています。");
+        loadItemsWithCurrentSort({ forceBaseLoad: false });
+      });
+
+      document.getElementById("sort-order-toggle").addEventListener("click", function() {
+        state.sortOrder = state.sortOrder === "asc" ? "desc" : "asc";
+        this.textContent = state.sortOrder === "asc" ? "昇順" : "降順";
+        if (!state.sortKey) return;
+        setBanner("info", "並び順を変更して再取得しています。");
+        loadItemsWithCurrentSort({ forceBaseLoad: false });
+      });
+
+      document.getElementById("bulk-action").addEventListener("change", function() {
+        updateBulkUiState();
+      });
+
+      document.getElementById("bulk-execute").addEventListener("click", function() {
+        executeBulkAction();
+      });
+
+      document.getElementById("content").addEventListener("change", function(event) {
+        var target = event.target;
+        if (!target) return;
+
+        if (target.id === "select-all-rows") {
+          var checked = !!target.checked;
+          state.viewItems.forEach(function(item) {
+            var itemId = resolveItemId(item);
+            if (!itemId) return;
+            state.selectedById[itemId] = checked;
+          });
+          renderItemsTable(state.viewItems);
+          return;
+        }
+
+        if (target.classList.contains("row-select")) {
+          var itemId = target.getAttribute("data-item-id");
+          if (itemId) {
+            state.selectedById[itemId] = !!target.checked;
+          }
+          updateSelectAllState();
+          updateSelectedCount();
+          updateBulkUiState();
+        }
+      });
+
+      updateBulkUiState();
+      loadItemsWithCurrentSort({ forceBaseLoad: true });
     </script>
   </body>
 </html>
