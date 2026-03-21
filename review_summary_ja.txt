@@ -1,7 +1,7 @@
 ALTANA AI FACTORY レビュー
 
 Issue
-[12] プラットフォーム別集計API を実装対象 再投稿
+[17] マスター取得API を実装対象とします。
 
 変更ファイル
 20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
@@ -23,19 +23,20 @@ SEVERITY: WARNING
 ACTION: REVIEW NEEDED
 
 FINDINGS:
-- [warning] 20_api_netshop.gs:452- getPlatformSummaryRows_ が追加されていますが、getRange の列幅に CONFIG.COLS.MEMO を使っています。なぜ問題か：必要な列（PRICE_FINAL, FEE, SHIPPING, COST, PROFIT など）が MEMO の範囲に含まれている前提になっているため、もし MEMO が期待する最終列より小さいとこれらの列が読み込めず undefined/範囲外アクセスの原因になります。どこが問題か：この部分 → getRange(2, 1, lastRow - 1, CONFIG.COLS.MEMO).getValues();
-- [warning] 20_api_netshop.gs:462- row の列参照が CONFIG.COLS を使っていますが、diff だけでは CONFIG.COLS.SHOP が実際に F列（Issue 要件）を指しているか確認できません。なぜ問題か：要件では SHOP は F列基準と明記されているため、列定義の不一致があると誤った列で集計されます。どこが問題か：COLS.SHOP を参照する箇所（row[col.SHOP - 1]）。
-- [warning] 20_api_netshop.gs:487- 利益算出で parseAmountOrNull_ が null を返した場合に calculateProfitFromRowValues_ を呼んでいますが、その戻り値が数値である保証が diff 上で確認できません。なぜ問題か：calculateProfitFromRowValues_ が null/undefined を返すと entry.profit += profit により NaN になる可能性があり、集計結果が破損します。どこが問題か：profit の取得 → if (profit === null) { profit = calculateProfitFromRowValues_(row); } entry.profit += profit;
-- [warning] 20_api_netshop.gs:472- 数値加算時の型安全性が十分でない箇所があります（parseAmountOrNull_(...) || 0 を利用していますが、parseAmountOrNull_ の返り値仕様に依存）。なぜ問題か：parseAmountOrNull_ が例えば NaN や undefined を返す場合、期待通り 0 にならないケースがあり得ます。どこが問題か：entry.sales += parseAmountOrNull_(...) || 0; entry.fee / shipping / cost といった行。
-- [warning] 20_api_netshop.gs:533- api_getPlatformSummary / api_platformSummary のレスポンスボディが {ok:..., platforms: [...] } になっていますが、既存 API の命名規約やキー名と整合性があるか diff からは確認できません。なぜ問題か：既存クライアントが異なるキー名（例: shops, data 等）を期待していると互換性が壊れます。どこが問題か：api_getPlatformSummary の return { ok: true, platforms: platforms }。
-- [warning] codex_instruction.md / issue_body.md の文面が月別集計からプラットフォーム（SHOP）集計へ仕様変更されており、ドキュメントと実装の設計意図が変わっています。なぜ問題か：仕様変更に伴うレビューや関係者合意が必要なはずですが、diff にその合意や移行対応の記述がなく混乱を招く可能性があります。どこが問題か：codex_instruction.md と issue_body.md の該当箇所。
+- [WARNING] 20_api_netshop.gs:285-330 uniqueStringList_ の挙動 — 非プリミティブ値を String() で変換しているため、オブジェクト値が来た場合に "[object Object]" のような文字列が混入する可能性があります。なぜ問題か: UI に表示するラベルや一意化の基準として期待しない値が入ると、ユーザ表示や重複排除が不適切になるため。どこが問題か: uniqueStringList_ の先頭処理（String(value...).trim()）部分。対策案: 値がプリミティブ（string/number）かを確認する、または明示的に扱える型のみを許容する/フィルタする。
+- [WARNING] 20_api_netshop.gs:330-360 getValidationCandidatesByColumn_ の rowCount 計算と getRange 呼び出し — rowCount = Math.max(sheet.getLastRow() - 1, 1) としているため、シートにヘッダのみ（getLastRow() === 1）や空シートのときでも rowCount=1 で row 2 を取得しに行きます。なぜ問題か: 存在しない行を取得する呼び出しが無駄に行われる/返却データが空セルを含む可能性があるため、意図しない DataValidation 配列を扱うことになる可能性がある。どこが問題か: rowCount の計算とその後の getRange(2, columnIndex, rowCount, 1)。対策案: rowCount を Math.max(sheet.getLastRow() - 1, 0) とし、rowCount === 0 の場合は早期 return [] する。
+- [WARNING] 20_api_netshop.gs:360-420 extractValidationListFromRule_ — getCriteriaValues の戻り値の取り扱いは概ね良いですが、Array.isArray と getValues-check の順序で処理しており、CriteriaValues に複数パターンが混在した場合は最初にヒットした候補のみを返します（意図的かもしれません）。なぜ問題か: 同一セルに複数の候補ソースがある場合、最適な候補源を選ばないと想定外の空配列や誤った候補を返す可能性がある。どこが問題か: extractValidationListFromRule_ がループ内で最初に見つけた候補で即 return している箇所。対策案: 複数ソースをマージする意図があるならマージ処理にする、無ければ仕様コメントを追加する。
+- [WARNING] 20_api_netshop.gs:420-520 parseRequestedMasterTypes_ の正規化/重複排除 — seenRaw は分割後の name をトリムするが大文字小文字正規化を行っていません（重複防止は後段の seenCanonical で行われるため機能はする）。なぜ問題か: 入力側で "shops, Shops" のようなバリエーションがあると rawTypes に重複が入り余分な処理が発生します。どこが問題か: pushRawType 内での seenRaw のキー付け。対策案: seenRaw に格納する前に小文字化するなど軽微な最適化を推奨。
+- [WARNING] 20_api_netshop.gs:512-540 api_getMasters の例外ハンドリング — catch 節で Logger.log('api_getMasters error: ' + error) としていますが、可能なら error.stack など詳細をログに残したほうがデバッグしやすいです。なぜ問題か: ログがエラー文字列のみだと原因特定に時間がかかるため。どこが問題か: api_getMasters catch 節のログ出力。
+- [WARNING] 20_api_netshop.gs:760 api_dispatchAction にルーティング追加 — 'getMasters','masters','getMaster','master' を追加しているのは仕様通りですが、既存のルーティング規約（action 名の一貫性）に完全に合致しているかは未確認です。なぜ問題か: API 名のバリエーションを増やすと将来の保守で混乱する可能性があるため。どこが問題か: api_dispatchAction の switch-case 追加箇所。対策案: 既存のルーティング慣例に合わせること（単一の canonical 名にするなど）。
+- [WARNING] codex_instruction.md / issue_body.md / openai_response.json の更新 — ドキュメントは実装に合わせて更新されていますが、変更内容に API の公開範囲や認可要件に関する記載がありません。なぜ問題か: マスターAPI を UI に公開する場合、権限や情報公開ポリシーの確認が必要なため。どこが問題か: codex_instruction.md / issue_body.md の「制約」や「検証」に認可・公開に関する項目がない点。対策案: 公開対象と認証要否の明示を追加する。
 
 OPEN QUESTIONS:
-- (none) ただし以下は未確認点として要確認です:
-  - CONFIG.COLS.MEMO の値は統合売上データの最終列（PROFIT 等を含む）をカバーしていますか？
-  - CONFIG.COLS.SHOP が F列（Issue の要件）に対応していますか？
-  - parseAmountOrNull_ と calculateProfitFromRowValues_ は常に数値か null を返す仕様ですか？未確認の場合は数値化（Number()）やフォールバックの追加を検討してください。
-  - 既存 API レスポンスのキー名（platforms）が既存クライアント実装と互換かを確認してください。
+- getManagementSheet_, getSheetSnapshot_, CONFIG, getStatusList_ など、この差分で参照されている関数/定数は既存ファイル内で確実に定義されているか（この diff からは確認できません）。(none)とはせず確認を推奨。
+- マスター候補の出力形式 { value, label } は既存 API の慣例に合致していますか？既存のフロント側がシンプルな文字列配列を期待している可能性はありませんか？
+- public API として外部に公開される想定でしょうか（認証／認可の要否）？差分に認可チェックは含まれていません。
+- extractValidationListFromRule_ が最初に見つけた候補セットだけを返す仕様で問題ないか（複数ルールのマージを期待するかどうか）。
+- CONFIG.COLS.* の値が 1 始まりで columnIndex として使えることが保証されていますか？
 
 SUMMARY:
-- 実装自体は適切な箇所にプラットフォーム（SHOP）単位の集計ロジックと API 入口を追加しており、エラー処理（try/catch）も用意されています。ただし列範囲指定（CONFIG.COLS.MEMO）や列インデックス（COLS.SHOP）が要件どおりであるかが diff だけでは確認できないため慎重な検証が必要です。また利益・金額の型保証が不十分で、数値変換のフォールバックを入れるべき箇所があります。これら確認・修正を行った上でマージしてください。
+- 20_api_netshop.gs に「マスター取得API」関連の実装（uniqueStringList_, toOptionList_, 列/validation から候補を抽出する関数群、parseRequestedMasterTypes_, getMasters, api_getMasters、ルーティング追加）が追加されています。コード全体として目的に沿った実装に見え、例外処理も用意されています。ただし既存ユーティリティ（getManagementSheet_, getSheetSnapshot_, CONFIG 等）との整合性や、空シート時の getRange 呼び出し、非文字列値の扱いなど運用・境界ケースに関する注意点があります。上記の点について確認・軽微修正を行えばマージ可能と判断します。
