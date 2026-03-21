@@ -683,17 +683,25 @@ function getValidationOrDistinctCandidates_(columnIndex) {
 }
 
 function getMasterValueListByType_(type) {
+  var fixedMasters = CONFIG.NETSHOP_MASTERS || {};
   switch (type) {
     case 'statuses':
+      if (Array.isArray(fixedMasters.STATUS) && fixedMasters.STATUS.length) {
+        return fixedMasters.STATUS.slice();
+      }
       return getStatusList_();
     case 'shops':
-      return getValidationOrDistinctCandidates_(CONFIG.COLS.SHOP);
+      if (Array.isArray(fixedMasters.SHOP)) return fixedMasters.SHOP.slice();
+      return [];
     case 'staffs':
-      return getValidationOrDistinctCandidates_(CONFIG.COLS.STAFF);
+      if (Array.isArray(fixedMasters.ASSIGNEE)) return fixedMasters.ASSIGNEE.slice();
+      return [];
     case 'shipFroms':
-      return getValidationOrDistinctCandidates_(CONFIG.COLS.SHIP_FROM);
+      if (Array.isArray(fixedMasters.SHIPPING_FROM)) return fixedMasters.SHIPPING_FROM.slice();
+      return [];
     case 'carriers':
-      return getValidationOrDistinctCandidates_(CONFIG.COLS.CARRIER);
+      if (Array.isArray(fixedMasters.CARRIER)) return fixedMasters.CARRIER.slice();
+      return [];
     default:
       return [];
   }
@@ -705,8 +713,8 @@ function normalizeMasterType_(masterType) {
 
   if (key === 'status' || key === 'statuses' || key === 'ステータス') return 'statuses';
   if (key === 'shop' || key === 'shops' || key === 'ショップ') return 'shops';
-  if (key === 'staff' || key === 'staffs' || key === 'assignees' || key === '担当者' || key === '商品担当者') return 'staffs';
-  if (key === 'shipfrom' || key === 'ship_from' || key === 'shippingfrom' || key === '配送元') return 'shipFroms';
+  if (key === 'staff' || key === 'staffs' || key === 'assignee' || key === 'assignees' || key === '担当者' || key === '商品担当者') return 'staffs';
+  if (key === 'shipfrom' || key === 'ship_from' || key === 'shippingfrom' || key === 'shipping_from' || key === '配送元') return 'shipFroms';
   if (key === 'carrier' || key === 'carriers' || key === '配送業者') return 'carriers';
 
   return '';
