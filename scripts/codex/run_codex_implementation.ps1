@@ -3,6 +3,17 @@ param(
     [string]$Step
 )
 
+$generatedArtifacts = @(
+    'codex_instruction.md',
+    'issue_body.md',
+    'issue_tasks.md',
+    'openai_response.json',
+    'review_result.json',
+    'review_summary_ja.txt',
+    'review_status.json',
+    'retry_issue_body.md'
+)
+
 switch ($Step) {
     "create-work-branch" {
         git config user.name "github-actions[bot]"
@@ -29,6 +40,12 @@ switch ($Step) {
     }
     "generate-implementation-diff" {
         git add -A
+        foreach ($artifact in $generatedArtifacts) {
+            git restore --staged -- $artifact 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                $LASTEXITCODE = 0
+            }
+        }
         $diffPath = Join-Path $env:RUNNER_TEMP "implementation.diff"
         git diff --cached --binary --no-color | Out-File -FilePath $diffPath -Encoding utf8NoBOM
         "diff_path=$diffPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8NoBOM
