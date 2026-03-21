@@ -1,7 +1,7 @@
 ALTANA AI FACTORY レビュー
 
 Issue
-修正１
+修正②
 
 変更ファイル
 20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
@@ -23,24 +23,18 @@ SEVERITY: WARNING
 ACTION: REVIEW NEEDED
 
 FINDINGS:
-- [WARNING] 20_api_netshop.gs:+45..+118 createSheetHeaderResolution_ / getSheetHeaderResolution_ を追加  
-  なぜ問題か: ヘッダ解決ロジックとキャッシュは良いですが、キャッシュをプロセス内で無条件に再利用するため、同一実行内でシートヘッダが変更された場合に stale なマッピングを返す可能性があります。どこが問題か: SHEET_HEADER_RESOLUTION_CACHE_ に一度入れた値を更新・破棄するロジックが無く、キャッシュキーは sheetId:sheetName のみ（ヘッダ内容のバージョンを含めていない）になっています。
-- [WARNING] 20_api_netshop.gs:~400 buildRowFromPayload_ のシグネチャ変更（payload → payload, headerResolution）  
-  なぜ問題か: createItem 側は buildRowFromPayload_ の戻り値として created.rowData / created.itemId を期待しているため、buildRowFromPayload_ の戻り構造が以前と同じであることを確実にする必要があります。どこが問題か: diff では buildRowFromPayload_ の先頭と中盤の修正のみが見え、関数終了部で以前と同じオブジェクト { rowData, itemId } を返しているかが差分から確定できません（未確認）。※未確認点は OPEN QUESTIONS に記載します。
-- [WARNING] 20_api_netshop.gs:applyStatusUpdateToRowValues_ / 呼び出し箇所（bulkUpdateStatus, updateItemStatus 等）  
-  なぜ問題か: applyStatusUpdateToRowValues_ は headerResolution を使って memo や status 等のインデックスを決めて書き込んでいます。どこが問題か: 呼び出し元で getSheetHeaderResolution_ に必須ヘッダ（例えば memo を使う可能性があるなら memo を含める）が渡されていることが前提ですが、すべての呼び出しで必要ヘッダが確実に要求されているかが diff だけでは全関数網羅的に確認できません。headerResolution が memo を含まない場合、memoIndex が undefined になり書き込みが不正になります。
-- [WARNING] 20_api_netshop.gs:calculateProfitFromRowValues_ のフォールバック処理（変更箇所）  
-  なぜ問題か: headerResolution が渡されないケースのためにフォールバックを用意しているのは良いですが、フォールバックで使うインデックス生成は CONFIG.HEADERS の配列 index をそのまま使い、存在しないヘッダに対する扱いが暗黙的に parseFloat(undefined) → NaN → 0 に落ちる実装です。どこが問題か: 必須ヘッダ欠落時に明示的に失敗（例外）させたい設計になっている意図と矛盾する可能性があり、結果的に黙って 0 を使って計算してしまう挙動になる点は注意が必要です。
-- [WARNING] 20_api_netshop.gs:writeUpdatedProfitValues_（変更箇所）  
-  なぜ問題か: profit 列の 1-based 列番号（profitCol）と行配列内の 0-based index（profitIndex）を分離して扱っていますが、呼び出し元が headerResolution に profit を必須で含めることを保証していない場合、sheet.getRange(..., profitCol, ...) でエラーになります。どこが問題か: getSheetHeaderResolution_ を呼ぶ際に profit を必須ヘッダに含めている箇所（bulkRecalculateProfit 等）は修正済みですが、他の呼び出し経路がある場合は同様の確認が必要です。
-- [WARNING] 20_api_netshop.gs:全体（差分範囲） 固定列参照が本当に全て置換済みか不明  
-  なぜ問題か: この PR は固定列番号依存の除去が目的ですが、diff が一部の関数のみを示しているため、ファイル内／プロジェクト内の他の箇所にまだ CONFIG.COLS や固定インデックス参照が残っていないかを確認する必要があります。どこが問題か: 変更漏れがあるとシート列順が変わった際に一部のみが誤更新のまま残るリスクがあります。
+- [WARNING] 20_api_netshop.gs:+44 関数 toApiFieldKey_ が key === null/undefined の場合に空文字列 ('') を返す実装になっています。convertValueKeysToApi_ / convertFilterKeysToApi_ でこの戻り値をオブジェクトのキーとして使うため、null/undefined のキーが存在すると空キー ('') が生成されてしまい、意図しないキー衝突や不正なレスポンスを生む可能性があります。null/undefined の扱いはスキップするか、呼び出し元で検証する方が安全です。
+- [WARNING] 20_api_netshop.gs:+52 convertValueKeysToApi_ はネストした配列／オブジェクトを再帰的に変換しますが、convertFilterKeysToApi_（+86）はトップレベルのキーのみ変換しており、フィルタの値がネストオブジェクト（例: 条件式や演算子を含む構造）の場合に変換漏れが発生します。フィルタ仕様にネストがあるなら再帰変換が必要です。
+- [WARNING] 20_api_netshop.gs:+191 buildPublicItemFromRow_ が作る source オブジェクトのキーを convertValueKeysToApi_ で一括変換していますが、行ヘッダ header の値が undefined/null のケース（ヘッダ行不整合や読み取りエラー）があると上記の空文字キー問題に繋がります。ヘッダの存在チェック（空文字や falsy のスキップ）を入れることを推奨します。
+- [WARNING] 20_api_netshop.gs:+254 resolveSortKey_ において items[0] を参照して存在確認を行っています（既存挙動に合わせた実装）。items が空配列の場合は既存コード同様に問題がありますが、この差分で早期 return がなくなっている箇所があるため、空配列ガード（items.length===0）を入れると安全です。
+- [WARNING] 20_api_netshop.gs:+769 / +975 / +1159 新たに validateVariation(), getMonthlySummary(), getPlatformSummary() といったラッパー関数が追加されています。既に同名関数が別箇所で定義されていると意図しない上書き（影響範囲の変更）になるため、既存定義の有無を確認してください。diff だけでは既存存在が確認できないため要確認です。
+- [WARNING] codex_instruction.md / issue_body.md の変更で「対象 API の公開レスポンスを英字キーへ統一する」ことが明記されていますが、実コード差分はファイル全体の一部に留まっており（例: createItem/updateItem 等の戻り値生成箇所の変換が diff に見えない）、ドキュメントで列挙されている全 API が実際に英字キー化されているかは diff だけでは確認できません。未変換箇所が残っていると API スキーマの不整合を生みます。該当する各 API の返却箇所の差分を確認してください。
 
 OPEN QUESTIONS:
-- buildRowFromPayload_ が以前と同じ戻り値構造（少なくとも { rowData, itemId }）を返しているか確認できますか？（diff では関数終端の return が表示されていません）
-- ファイル内（20_api_netshop.gs）やプロジェクト内で、今回変更していないが更新系の処理で固定列参照（CONFIG.COLS● - 1、直接の数値使用、row[indexOfHeader] を indexOf を使わず直書き等）が残っている箇所はありますか？自動検索で CONFIG.COLS や数値リテラルを含む更新箇所の全件確認を推奨します。
-- キャッシュ（SHEET_HEADER_RESOLUTION_CACHE_）のライフサイクル設計について方針を決めてください。同一実行内でヘッダ変更がありうる運用を想定するか、否か。必要ならヘッダのハッシュや最終更新列数/行数をキーに含める、あるいはキャッシュを常に再読みにする等の対策が必要です。
-- applyStatusUpdateToRowValues_ を使う全呼び出しで memo を更新する可能性がある場合、getSheetHeaderResolution_ の requiredHeaders に memo を含めているかを全箇所で確認できますか？
+- validateVariation(), getMonthlySummary(), getPlatformSummary() の新規ラッパーは既存の同名関数を置換する意図ですか？それとも外部公開用の別名ラッパーですか？（既存定義の有無を教えてください）
+- フィルタ構造にネスト（例: { price: { $gte: 100 } }）や複雑な演算子が使われますか？使われる場合は convertFilterKeysToApi_ の再帰対応が必要ですか？
+- ヘッダ読み取り時に header が null/undefined となるケース（シートの先頭行が期待と異なる等）に対する運用方針は「明示的に失敗（例外）」でしたか？現在の実装では部分的に空キーを生成するリスクがあります。
+- API 全体で「英字キー化」を完了させるスコープはこの PR に完全に含まれていますか？（例: createItem/updateItem/recalculate... 等の全ての返却箇所が変換済みか確認したいです）
 
 SUMMARY:
-- 目的どおり「ヘッダ名→列位置解決」方式の共通化と、更新処理での index 解決導入は差分から概ね正しく実装されています。関数シグネチャの更新や headerResolution の注入は一貫しており、主要な更新経路（createItem / bulkRecalculateProfit / bulkUpdateStatus / updateItemStatus / recalculateItemProfit 等）が修正されています。一方、キャッシュ無効化・必須ヘッダの保証・関数戻り値の形など、差分だけでは確定できない点が残っているため、上記の OPEN QUESTIONS を解消のうえで追加のスモークテスト（ヘッダが入れ替わった状態での end-to-end テスト、必須ヘッダ欠落時の明示的失敗確認）を実行してください。
+- 追加された変換ユーティリティ（toApiFieldKey_, convertValueKeysToApi_, convertFilterKeysToApi_）は API 側キー統一の方向性に沿っており概ね適切です。ただし、null/undefined キーの扱いやフィルタのネスト対応、既存関数名の衝突など運用上の穴が残っています。ドキュメントで列挙された全 API が実際に変換済みかを含め、上記の点を確認・修正してください。

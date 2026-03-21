@@ -1,14 +1,14 @@
 {
-  "id": "chatcmpl-DLgputRr53BWKfdUe8DW5cWjuXhqQ",
+  "id": "chatcmpl-DLgyAFluKQKK9QJH3h7nDwcwPmy2k",
   "object": "chat.completion",
-  "created": 1774061922,
+  "created": 1774062434,
   "model": "gpt-5.4-2026-03-05",
   "choices": [
     {
       "index": 0,
       "message": {
         "role": "assistant",
-        "content": "MODE: DIRECT\n\nCODEX_INSTRUCTION:\n## 目的\n`20_api_netshop.gs` の更新系 API に残っている固定列番号依存を廃止し、`CONFIG.HEADERS` を基準にヘッダ名から列位置を解決する方式へ統一する。列順が変わっても `統合売上データ` シートで誤更新しない実装に変更する。\n\n## 実装スコープ\n- ヘッダ名から列位置を解決する共通処理を追加する\n- 更新系 API が固定列番号直書きではなく、共通処理で解決した列位置を使うように変更する\n- 少なくとも以下の処理を対象に参照方式を統一する\n  - `createItem`\n  - `updateItem`\n  - `updateItemStatus`\n  - `bulkUpdateStatus`\n  - `recalculateItemProfit`\n  - `bulkRecalculateProfit`\n  - `cancelItem`\n  - `bulkDisableNetshopRecords`\n- 必要に応じて `01_config.gs` の `CONFIG.HEADERS` 参照まわりを補強する\n- 既存 API の業務ロジック・入出力・公開スキーマは維持する\n\n## 対象ファイル\n- 主対象: `20_api_netshop.gs`\n- 必要に応じて: `01_config.gs`\n\n## 制約\n- シート名は `統合売上データ` を前提とする\n- シートヘッダは `CONFIG.HEADERS` と整合している前提で実装する\n- ただし、必要ヘッダが見つからない場合は静かに誤更新せず、明示的に失敗させる\n- 既存の読み取り系ロジックや UI は変更しない\n- 固定列番号の直書きを更新処理に残さない\n- `md/json/txt` のみを変更して完了してはならない。必ず実装ファイルを変更すること\n\n## 非対象\n- UI 実装\n- API 公開スキーマ変更\n- シート構造そのものの変更\n- issue整理、設計メモ追加、ドキュメントのみの更新\n\n## 実装ステップ\n1. `20_api_netshop.gs` 内の更新系 API で使われている列参照箇所を洗い出し、固定列番号で `getRange` / `setValue` / `setValues` / 行配列アクセスしている部分を特定する。\n2. `CONFIG.HEADERS` を基準に、ヘッダ名→1始まり列番号、および必要ならヘッダ名→0始まり配列 index を返す共通関数を `20_api_netshop.gs` に追加する。  \n   - 例: シート先頭行から実ヘッダを読み、`CONFIG.HEADERS` と整合確認したうえでマップを返す\n   - 必須ヘッダ不足時は例外を投げる\n   - 同一実行内で再利用できる形にする\n3. `createItem` を修正し、書き込み対象列をヘッダ名で指定して解決した列番号を使って更新する。新規行作成時に行配列を組み立てる場合も、`CONFIG.HEADERS` 順または解決済み index を使って列位置を保証する。\n4. `updateItem` / `updateItemStatus` / `bulkUpdateStatus` を修正し、更新対象列をすべてヘッダ解決ベースへ置換する。複数列更新時も固定番号を使わず、列マップから参照する。\n5. `recalculateItemProfit` / `bulkRecalculateProfit` を修正し、利益再計算で参照・更新する各列をヘッダ名ベースに統一する。既存の計算式や業務ロジックは変えない。\n6. `cancelItem` / `bulkDisableNetshopRecords` を修正し、状態更新・無効化更新・関連列更新をヘッダ解決結果で行うようにする。\n7. 可能であれば重複する更新処理を小さな内部ヘルパーに寄せ、今後も固定列番号へ戻りにくい構造に整理する。\n8. 対象関数内に固定列番号依存が残っていないことを確認し、必要最低限のログまたはエラーメッセージでヘッダ不整合時に原因が追える状態にする。\n\n## 完了条件\n- `20_api_netshop.gs` に実コード差分がある\n- 対象更新系 API が固定列番号直書きではなく、ヘッダ名から解決した列位置を使っている\n- `統合売上データ` の列順が変わっても、ヘッダが一致している限り誤更新しない\n- 必要ヘッダ欠落や不整合時に静かに処理継続せず、明示的に失敗する\n- 既存 API の業務ロジックと公開インターフェースを壊していない\n- `codex_instruction.md` / `issue_tasks.md` / `openai_response.json` だけの変更では終わっていない\n\n## 検証\n- `20_api_netshop.gs` 内で対象関数に固定列番号の直書きが残っていないことを確認する\n- `CONFIG.HEADERS` と同じヘッダ順のケースで既存挙動が維持されることを確認する\n- `統合売上データ` の列順を入れ替えた想定でも、ヘッダ解決により更新対象列が正しく選ばれることをコード上で確認する\n- 必須ヘッダを欠落させた場合に、誤更新ではなく例外や明示エラーになることを確認する",
+        "content": "MODE: DIRECT\n\nCODEX_INSTRUCTION:\n## 目的\nNETSHOP API の公開入出力スキーマを英字キーへ統一し、取得系レスポンスと更新系リクエストで同じキー体系を使えるようにする。`20_api_netshop.gs` に実コード差分を入れ、シート内部の日本語ヘッダは維持したまま API 境界だけを英字キー化する。\n\n## 実装スコープ\n- `20_api_netshop.gs` 内で、公開レスポンスを英字キーへ変換する共通処理を追加する\n- 少なくとも以下の API で、返却データのキーを英字キーへ統一する\n  - `listItems`\n  - `getItem`\n  - `createItem`\n  - `updateItem`\n  - `updateItemStatus`\n  - `bulkUpdateStatus`\n  - `recalculateItemProfit`\n  - `bulkRecalculateProfit`\n  - `getMonthlySummary`\n  - `getPlatformSummary`\n  - `getMasters`\n  - `validateVariation`\n- 更新系 API が既に英字キー前提である場合は、そのキー体系に合わせて取得系レスポンスを揃える\n- シート読み書き時の日本語ヘッダ利用は維持する\n- 既存の個人情報除外ルールを維持する\n\n## 対象ファイル\n- 必須: `20_api_netshop.gs`\n- 追加候補: なし（本 Issue の対象ファイルは `20_api_netshop.gs` に限定する）\n\n## 制約\n- 既存の業務値・計算結果・意味を変えないこと\n- 既存 API 基盤やレスポンス全体構造を壊さないこと\n- API 公開面だけを英字キーへ統一し、シート列名変更は行わないこと\n- 英字キー名は、既存の更新系 API が受け取るキー名に一致させること\n- 個人情報除外ロジックが既存で入っている場合、それを迂回・緩和しないこと\n- 情報不足がある場合は、`20_api_netshop.gs` 内の既存更新系マッピング・バリデーション・レスポンス生成箇所を根拠に最小限の整合的なキー定義を行うこと\n\n## 非対象\n- UI 実装\n- シート列名変更\n- 他ファイルへの大規模な責務分割\n- API の業務仕様変更\n- ドキュメントのみの更新\n\n## 実装ステップ\n1. `20_api_netshop.gs` を確認し、更新系 API が前提としている英字キーと、取得系で現在返している日本語キーの対応関係を整理する。\n2. 日本語ヘッダの内部オブジェクトを API 公開用の英字キーへ変換する共通関数を `20_api_netshop.gs` に実装する。\n   - 単一アイテム変換\n   - 配列変換\n   - 必要に応じてネストしたレスポンス内の対象配列/オブジェクト変換\n   - 個人情報除外後のデータ、または個人情報除外ルールと両立する位置で適用する\n3. 既存の更新系 API で使用している英字キー定義を流用または一本化し、取得系・更新系で同じキー名セットを使うようにする。\n4. 以下の各関数の返却処理を修正し、公開レスポンスが英字キーになるようにする。\n   - `listItems`\n   - `getItem`\n   - `createItem`\n   - `updateItem`\n   - `updateItemStatus`\n   - `bulkUpdateStatus`\n   - `recalculateItemProfit`\n   - `bulkRecalculateProfit`\n   - `getMonthlySummary`\n   - `getPlatformSummary`\n   - `getMasters`\n   - `validateVariation`\n5. 各 API について、返却オブジェクトのメタ情報や `success` / `message` などの共通レスポンス枠が既存である場合は維持し、業務データ部分のみ必要に応じて英字キー化する。\n6. 取得結果をそのまま更新系へ渡しやすい構造になっているかを確認し、`getItem` / `listItems` の item オブジェクトと `createItem` / `updateItem` 周辺の item オブジェクトでキー不一致が残らないように調整する。\n7. 既存ロジックを壊さない範囲で、変換漏れや二重変換を防ぐために共通関数の適用箇所を整理する。\n\n## 完了条件\n- `20_api_netshop.gs` に実コード差分が存在する\n- 指定された API の公開レスポンスが英字キーへ統一されている\n- 取得系と更新系で同じキー体系を使用できる\n- シート内部では日本語ヘッダ利用が維持されている\n- 個人情報除外ルールが維持されている\n- 既存の業務値・計算値・意味が変わっていない\n- `codex_instruction.md` / `issue_tasks.md` / `openai_response.json` だけを変更して終わらせないこと\n\n## 検証\n- `20_api_netshop.gs` 内で、各対象 API の返却値生成箇所を確認し、日本語キーのまま公開している箇所が残っていないことを確認する\n- `listItems` と `getItem` の item データが、`createItem` / `updateItem` の入力キー体系と整合していることを確認する\n- `updateItemStatus` / `bulkUpdateStatus` / `recalculateItemProfit` / `bulkRecalculateProfit` の返却データも英字キーに揃っていることを確認する\n- `getMonthlySummary` / `getPlatformSummary` / `getMasters` / `validateVariation` のレスポンス内データも必要な範囲で英字キー化されていることを確認する\n- 個人情報除外対象の項目がレスポンスに混入していないことを確認する\n- 可能なら GAS 上で対象関数のレスポンス例を目視確認し、取得結果を更新系へそのまま渡しやすい構造になっていることを確認する",
         "refusal": null,
         "annotations": []
       },
@@ -16,9 +16,9 @@
     }
   ],
   "usage": {
-    "prompt_tokens": 898,
-    "completion_tokens": 1385,
-    "total_tokens": 2283,
+    "prompt_tokens": 940,
+    "completion_tokens": 1506,
+    "total_tokens": 2446,
     "prompt_tokens_details": {
       "cached_tokens": 0,
       "audio_tokens": 0
