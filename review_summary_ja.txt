@@ -1,13 +1,49 @@
-ALTANA AI FACTORY REVIEW
+ALTANA AI FACTORY レビュー
 
 Issue
-feat: [6] bulkUpdateStatus API（ステータス一括更新API）追加
+feat: [6] bulkUpdateStatus API（ステータス一括更新API）を実装する
 
-Changed Files
-codex_instruction.md, issue_body.md, issue_tasks.md, openai_response.json
+変更ファイル
+20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
 
-Risk
-SAFE
+実装判定
+実装あり
 
-Action
-MERGE OK
+マージ判定
+マージOK
+
+NG種別
+OK
+
+判定理由
+実装ファイル差分があり、重大な指摘は検出されませんでした。
+
+レビュー結果
+SEVERITY: WARNING
+ACTION: REVIEW NEEDED
+
+FINDINGS:
+- [WARNING] 20_api_netshop.gs: buildRowIndexMapById_ を追加（新規関数）
+  - なぜ問題か: headers.indexOf(ITEM_FIELD_TO_HEADER.id) を使って ID 列位置を決めていますが、headers 配列の要素と ITEM_FIELD_TO_HEADER.id の文字列が完全一致しないと列が見つからず、以降すべての ID が未検出扱いになります（map が空になる）。
+  - どこが問題か: buildRowIndexMapById_（追加関数）。header 名のマッチングが厳密なので、余白や表記揺れがある場合に機能しません。
+
+- [WARNING] 20_api_netshop.gs: findRowIndexById_ から rowIndexMapById lookup に置換（bulkUpdateStatus 内）
+  - なぜ問題か: 既存の findRowIndexById_ の戻り値の意味（0ベースの rows 配列インデックスなのか、シート上の実行時行番号(1ベース)なのか、未検出時は -1 なのか等）が diff から確認できません。新しい buildRowIndexMapById_ は rows 配列のインデックス（0ベース）を返す実装に見えますが、もし下流で expect されている rowIndex が別の基準（1ベースの行番号やヘッダ分オフセットあり等）であれば、書き込み先の行がズレる・最悪更新が別行に書き込まれる恐れがあります。
+  - どこが問題か: bulkUpdateStatus のループで findRowIndexById_ の代わりに rowIndexMapById[itemId] を使っている箇所。下流の書き込み処理（writeUpdatedRows_ 等）がどの形式の index を扱うかの整合性確認が必要です。
+
+- [WARNING] 20_api_netshop.gs: buildBulkUpdateResponse_ の戻り値フィールドを拡張（successIds / failureIds を追加）
+  - なぜ問題か: 既存のプロダクトコードやクライアントが updatedItemIds / failedItemIds のみを期待している場合、追加フィールドは安全ですがフィールド名を新旧で二重に返しています。互換性は保たれていますが、レスポンス仕様の意図を明確にしておいたほうが良いです（冗長性の理由、将来的に旧キーを廃止する予定か等）。
+  - どこが問題か: buildBulkUpdateResponse_（変更箇所）。動作破壊ではないが仕様の明示が必要。
+
+- [WARNING] 20_api_netshop.gs: 入力バリデーションのメッセージ / 挙動が一部変更
+  - なぜ問題か: itemIds が配列でない場合に即時エラーを返すようになりました（以前は空配列化して別ハンドリングだった可能性あり）。API のクライアントが期待するエラーメッセージ / ステータスが変わる可能性があります。
+  - どこが問題か: bulkUpdateStatus の先頭バリデーション。
+
+OPEN QUESTIONS:
+- findRowIndexById_ の元の戻り値仕様（返す index の基準：rows 配列の 0 ベースインデックスか、シートの 1 ベース行番号か、ヘッダを含めるか等）はどうなっていましたか？新実装の 0 ベース index と下流処理の期待値が一致しますか？
+- ITEM_FIELD_TO_HEADER.id の値（文字列）が snapshot.headers の要素と確実に一致することは保証されていますか（トリムや全角/半角違い、プレフィックス/サフィックスの有無など）？
+- snapshot.rows の構造はヘッダ行を含まない配列ですか（buildRowIndexMapById_ がその前提で動いているか）？
+- buildBulkUpdateResponse_ に successIds / failureIds を追加した意図（旧キーの段階的廃止、別名追加など）はありますか？クライアント互換ポリシーはどうしますか？
+
+SUMMARY:
+- コード差分は概ね合理的で、行検索をまとめて行うことでパフォーマンス改善が期待できます。ただし、新設した buildRowIndexMapById_ とそれを使う bulkUpdateStatus 内の置換において、index の基準（0/1 ベースやヘッダオフセット）と header 名の厳密一致が正しく整合しているかが不明です。この整合が取れていないと、更新先の行ズレや想定外の未検出が起きる可能性があります。上の OPEN QUESTIONS を確認し、行インデックス基準と header 名の照合を明示的にテスト・確認してください。
