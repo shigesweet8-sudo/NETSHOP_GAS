@@ -1144,6 +1144,11 @@ function api_dispatchAction(payload) {
     case 'cancelTransaction':
     case 'cancel':
       return api_cancelItem(payload);
+    case 'bulkDisableNetshopRecords':
+    case 'bulkDisableNetshop':
+    case 'bulkDisableItems':
+    case 'bulkDisable':
+      return api_bulkDisableNetshop(payload);
     default:
       return {
         ok: false,
@@ -1340,6 +1345,76 @@ function api_bulkUpdateStatus(payload) {
     return bulkUpdateStatus(payload.itemIds, payload.status, payload.memo);
   } catch (error) {
     Logger.log('api_bulkUpdateStatus error: ' + error);
+    return buildBulkUpdateResponse_(false, String(error), 0, 0, [], []);
+  }
+}
+
+function parseItemIdsInput_(input) {
+  var collected = [];
+
+  if (Array.isArray(input)) {
+    input.forEach(function(value) {
+      collected = collected.concat(parseItemIdsInput_(value));
+    });
+    return collected;
+  }
+
+  if (input === null || input === undefined) return collected;
+
+  String(input).split(',').forEach(function(part) {
+    var normalized = String(part || '').trim();
+    if (!normalized) return;
+    collected.push(normalized);
+  });
+
+  return collected;
+}
+
+function uniqueNormalizedIds_(itemIds) {
+  var seen = {};
+  var result = [];
+
+  (itemIds || []).forEach(function(itemId) {
+    var normalized = String(itemId || '').trim();
+    if (!normalized || seen[normalized]) return;
+    seen[normalized] = true;
+    result.push(normalized);
+  });
+
+  return result;
+}
+
+function resolveBulkDisableItemIds_(payload) {
+  payload = payload && typeof payload === 'object' ? payload : {};
+  var merged = [];
+
+  merged = merged.concat(parseItemIdsInput_(payload.itemIds));
+  merged = merged.concat(parseItemIdsInput_(payload.ids));
+  merged = merged.concat(parseItemIdsInput_(payload.managementIds));
+  merged = merged.concat(parseItemIdsInput_(payload['管理ID']));
+  merged = merged.concat(parseItemIdsInput_(payload.itemId));
+  merged = merged.concat(parseItemIdsInput_(payload.id));
+
+  return uniqueNormalizedIds_(merged);
+}
+
+function bulkDisableNetshopRecords(itemIds, memo) {
+  var normalizedIds = uniqueNormalizedIds_(itemIds);
+  if (!normalizedIds.length) {
+    return buildBulkUpdateResponse_(false, 'itemIds is required', 0, 0, [], []);
+  }
+  return bulkUpdateStatus(normalizedIds, CONFIG.STATUS.CANCEL, memo);
+}
+
+function api_bulkDisableNetshop(payload) {
+  try {
+    payload = payload && typeof payload === 'object' ? payload : {};
+    var itemIds = resolveBulkDisableItemIds_(payload);
+    var memo = payload.memo;
+    if (memo === undefined && payload.reason !== undefined) memo = payload.reason;
+    return bulkDisableNetshopRecords(itemIds, memo);
+  } catch (error) {
+    Logger.log('api_bulkDisableNetshop error: ' + error);
     return buildBulkUpdateResponse_(false, String(error), 0, 0, [], []);
   }
 }
