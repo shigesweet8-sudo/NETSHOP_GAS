@@ -107,10 +107,20 @@ const CONFIG = Object.freeze({
       '無効化',
       '無効',
       '表示無効',
-      'アーカイブ',
-      'アーカイブ済み',
       '削除フラグ',
       '削除済み'
+    ])
+  }),
+
+  ARCHIVE: Object.freeze({
+    MEMO_PREFIX: '[保管]',
+    HEADER_CANDIDATES: Object.freeze([
+      'アーカイブ',
+      'アーカイブ済み',
+      '保管',
+      '保管中',
+      '退避',
+      '退避済み'
     ])
   }),
 

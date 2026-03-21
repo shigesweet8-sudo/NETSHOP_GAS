@@ -1034,8 +1034,6 @@ var OPERATIONAL_DISABLE_HEADER_CANDIDATES = Object.freeze(
       '無効化',
       '無効',
       '表示無効',
-      'アーカイブ',
-      'アーカイブ済み',
       '削除フラグ',
       '削除済み'
     ]
@@ -1048,8 +1046,39 @@ var OPERATIONAL_DISABLE_MEMO_PREFIX =
     ? CONFIG.OPERATIONAL_DISABLE.MEMO_PREFIX
     : '[運用無効]';
 
+var ARCHIVE_HEADER_CANDIDATES = Object.freeze(
+  (typeof CONFIG !== 'undefined' &&
+    CONFIG.ARCHIVE &&
+    CONFIG.ARCHIVE.HEADER_CANDIDATES)
+    ? CONFIG.ARCHIVE.HEADER_CANDIDATES.slice()
+    : [
+      'アーカイブ',
+      'アーカイブ済み',
+      '保管',
+      '保管中',
+      '退避',
+      '退避済み'
+    ]
+);
+
+var ARCHIVE_MEMO_PREFIX =
+  (typeof CONFIG !== 'undefined' &&
+    CONFIG.ARCHIVE &&
+    CONFIG.ARCHIVE.MEMO_PREFIX)
+    ? CONFIG.ARCHIVE.MEMO_PREFIX
+    : '[保管]';
+
 function resolveOperationalDisableHeader_(headerResolution) {
   var candidates = OPERATIONAL_DISABLE_HEADER_CANDIDATES;
+  for (var i = 0; i < candidates.length; i++) {
+    var header = candidates[i];
+    if (headerResolution.indexByHeader[header] !== undefined) return header;
+  }
+  return '';
+}
+
+function resolveArchiveHeader_(headerResolution) {
+  var candidates = ARCHIVE_HEADER_CANDIDATES;
   for (var i = 0; i < candidates.length; i++) {
     var header = candidates[i];
     if (headerResolution.indexByHeader[header] !== undefined) return header;
@@ -1074,6 +1103,18 @@ function appendOperationalDisableMemo_(existingMemo, reason) {
   return segments.join('\n');
 }
 
+function appendArchiveMemo_(existingMemo, reason) {
+  var currentMemo = normalizeMemoText_(existingMemo);
+  var reasonMemo = normalizeMemoText_(reason);
+  var segments = [];
+
+  if (currentMemo) segments.push(currentMemo);
+  if (currentMemo.indexOf(ARCHIVE_MEMO_PREFIX) === -1) segments.push(ARCHIVE_MEMO_PREFIX);
+  if (reasonMemo) segments.push(reasonMemo);
+
+  return segments.join('\n');
+}
+
 function applyOperationalDisableToRowValues_(rowValues, memo, headerResolution) {
   var nextRow = rowValues.slice();
   var disableHeader = resolveOperationalDisableHeader_(headerResolution);
@@ -1089,6 +1130,26 @@ function applyOperationalDisableToRowValues_(rowValues, memo, headerResolution) 
 
   if (memoIndex !== undefined) {
     nextRow[memoIndex] = appendOperationalDisableMemo_(nextRow[memoIndex], memo);
+  }
+
+  return nextRow;
+}
+
+function applyArchiveToRowValues_(rowValues, memo, headerResolution) {
+  var nextRow = rowValues.slice();
+  var archiveHeader = resolveArchiveHeader_(headerResolution);
+  var memoIndex = headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.memo];
+
+  if (archiveHeader) {
+    nextRow[headerResolution.indexByHeader[archiveHeader]] = true;
+    if (memo !== undefined && memoIndex !== undefined) {
+      nextRow[memoIndex] = memo;
+    }
+    return nextRow;
+  }
+
+  if (memoIndex !== undefined) {
+    nextRow[memoIndex] = appendArchiveMemo_(nextRow[memoIndex], memo);
   }
 
   return nextRow;
@@ -1679,6 +1740,19 @@ function buildDisableResponse_(ok, message, updatedItem, itemId, actionName) {
   };
 }
 
+function buildArchiveResponse_(ok, message, updatedItem, itemId, actionName) {
+  var normalizedAction = String(actionName || 'archiveItem').trim() || 'archiveItem';
+  return {
+    ok: ok,
+    action: normalizedAction,
+    operation: 'archiveStorage',
+    archived: ok,
+    message: message || '',
+    itemId: itemId || '',
+    item: updatedItem || null
+  };
+}
+
 function buildBulkDisableResponse_(ok, message, disabledItemIds, failedItemIds) {
   var successIds = disabledItemIds || [];
   var failureIds = failedItemIds || [];
@@ -1724,7 +1798,26 @@ function disableItem(itemId, memo) {
 }
 
 function archiveItemById(itemId, memo) {
-  return arguments.length >= 2 ? disableItemById(itemId, memo) : disableItemById(itemId);
+  var normalizedId = String(itemId || '').trim();
+  if (!normalizedId) return null;
+
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot || !snapshot.rows.length) return null;
+  var headerResolution = getSheetHeaderResolution_(snapshot.sheet, [
+    ITEM_FIELD_TO_HEADER.id,
+    ITEM_FIELD_TO_HEADER.memo
+  ]);
+  var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, normalizedId);
+  if (rowIndex === -1) return null;
+
+  snapshot.rows[rowIndex] = applyArchiveToRowValues_(
+    snapshot.rows[rowIndex],
+    arguments.length >= 2 ? memo : undefined,
+    headerResolution
+  );
+  snapshot.sheet.getRange(rowIndex + 2, 1, 1, snapshot.rows[rowIndex].length).setValues([snapshot.rows[rowIndex]]);
+
+  return getItem(normalizedId);
 }
 
 function archiveItem(itemId, memo) {
@@ -1886,9 +1979,26 @@ function api_disableItem(payload) {
 }
 
 function api_archiveItem(payload) {
-  var result = api_disableItem(payload);
-  result.action = 'archiveItem';
-  return result;
+  try {
+    var itemId = resolveItemIdFromPayload_(payload);
+    if (!itemId) {
+      return buildArchiveResponse_(false, 'itemId is required', null, '', 'archiveItem');
+    }
+
+    var memo = payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'memo')
+      ? payload.memo
+      : undefined;
+    var updatedItem = memo === undefined ? archiveItemById(itemId) : archiveItemById(itemId, memo);
+
+    if (!updatedItem) {
+      return buildArchiveResponse_(false, 'ID not found: ' + itemId, null, itemId, 'archiveItem');
+    }
+
+    return buildArchiveResponse_(true, 'success (archive storage)', updatedItem, itemId, 'archiveItem');
+  } catch (error) {
+    Logger.log('api_archiveItem error: ' + error);
+    return buildArchiveResponse_(false, String(error), null, '', 'archiveItem');
+  }
 }
 
 /**

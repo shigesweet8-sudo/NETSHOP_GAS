@@ -1,5 +1,5 @@
 {
-  "issue_title": "修正ラスト",
+  "issue_title": "APIチューニング完了",
   "changed_files": [
     "01_config.gs",
     "20_api_netshop.gs",
