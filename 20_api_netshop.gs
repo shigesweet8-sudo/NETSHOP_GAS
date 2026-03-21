@@ -284,6 +284,209 @@ function getStatusList_() {
   return [];
 }
 
+function uniqueStringList_(values) {
+  var map = {};
+  var result = [];
+
+  (values || []).forEach(function(value) {
+    var normalized = String(value === null || value === undefined ? '' : value).trim();
+    if (!normalized || map[normalized]) return;
+    map[normalized] = true;
+    result.push(normalized);
+  });
+
+  return result;
+}
+
+function toOptionList_(values) {
+  return uniqueStringList_(values).map(function(value) {
+    return {
+      value: value,
+      label: value
+    };
+  });
+}
+
+function getColumnDistinctValues_(columnIndex) {
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot || !snapshot.rows.length) return [];
+
+  var index = Number(columnIndex) - 1;
+  if (index < 0) return [];
+
+  return uniqueStringList_(snapshot.rows.map(function(row) {
+    return row[index];
+  }));
+}
+
+function extractValidationListFromRule_(rule) {
+  if (!rule || !rule.getCriteriaValues) return [];
+
+  var criteriaValues = rule.getCriteriaValues();
+  if (!criteriaValues || !criteriaValues.length) return [];
+
+  for (var i = 0; i < criteriaValues.length; i++) {
+    var value = criteriaValues[i];
+    if (Array.isArray(value)) {
+      return uniqueStringList_(value);
+    }
+    if (value && typeof value.getValues === 'function') {
+      var rangeValues = value.getValues();
+      var flattened = [];
+      for (var row = 0; row < rangeValues.length; row++) {
+        for (var col = 0; col < rangeValues[row].length; col++) {
+          flattened.push(rangeValues[row][col]);
+        }
+      }
+      return uniqueStringList_(flattened);
+    }
+  }
+
+  return [];
+}
+
+function getValidationCandidatesByColumn_(columnIndex) {
+  var sheet = getManagementSheet_();
+  if (!sheet) return [];
+
+  var rowCount = Math.max(sheet.getLastRow() - 1, 1);
+  var validations = sheet.getRange(2, columnIndex, rowCount, 1).getDataValidations();
+
+  for (var i = 0; i < validations.length; i++) {
+    var candidates = extractValidationListFromRule_(validations[i][0]);
+    if (candidates.length) return candidates;
+  }
+
+  return [];
+}
+
+function getValidationOrDistinctCandidates_(columnIndex) {
+  var validationCandidates = getValidationCandidatesByColumn_(columnIndex);
+  if (validationCandidates.length) return validationCandidates;
+  return getColumnDistinctValues_(columnIndex);
+}
+
+function getMasterValueListByType_(type) {
+  switch (type) {
+    case 'statuses':
+      return getStatusList_();
+    case 'shops':
+      return getValidationOrDistinctCandidates_(CONFIG.COLS.SHOP);
+    case 'staffs':
+      return getValidationOrDistinctCandidates_(CONFIG.COLS.STAFF);
+    case 'shipFroms':
+      return getValidationOrDistinctCandidates_(CONFIG.COLS.SHIP_FROM);
+    case 'carriers':
+      return getValidationOrDistinctCandidates_(CONFIG.COLS.CARRIER);
+    default:
+      return [];
+  }
+}
+
+function normalizeMasterType_(masterType) {
+  var key = String(masterType || '').trim().toLowerCase();
+  if (!key) return '';
+
+  if (key === 'status' || key === 'statuses' || key === 'ステータス') return 'statuses';
+  if (key === 'shop' || key === 'shops' || key === 'ショップ') return 'shops';
+  if (key === 'staff' || key === 'staffs' || key === 'assignees' || key === '担当者' || key === '商品担当者') return 'staffs';
+  if (key === 'shipfrom' || key === 'ship_from' || key === 'shippingfrom' || key === '配送元') return 'shipFroms';
+  if (key === 'carrier' || key === 'carriers' || key === '配送業者') return 'carriers';
+
+  return '';
+}
+
+function parseRequestedMasterTypes_(payload) {
+  var defaultTypes = ['statuses', 'shops', 'staffs', 'shipFroms', 'carriers'];
+  var rawTypes = [];
+  var seenRaw = {};
+
+  function pushRawType(value) {
+    if (value === null || value === undefined) return;
+    String(value).split(',').forEach(function(part) {
+      var name = String(part || '').trim();
+      if (!name || seenRaw[name]) return;
+      seenRaw[name] = true;
+      rawTypes.push(name);
+    });
+  }
+
+  payload = payload && typeof payload === 'object' ? payload : {};
+
+  if (Array.isArray(payload.masterTypes)) {
+    payload.masterTypes.forEach(pushRawType);
+  }
+  if (Array.isArray(payload.masters)) {
+    payload.masters.forEach(pushRawType);
+  }
+  pushRawType(payload.masterType);
+  pushRawType(payload.master);
+  pushRawType(payload.type);
+
+  if (!rawTypes.length) {
+    return {
+      canonicalTypes: defaultTypes.slice(),
+      unknownTypes: []
+    };
+  }
+
+  var canonicalTypes = [];
+  var unknownTypes = [];
+  var seenCanonical = {};
+  rawTypes.forEach(function(type) {
+    var normalized = normalizeMasterType_(type);
+    if (!normalized) {
+      unknownTypes.push(type);
+      return;
+    }
+    if (seenCanonical[normalized]) return;
+    seenCanonical[normalized] = true;
+    canonicalTypes.push(normalized);
+  });
+
+  return {
+    canonicalTypes: canonicalTypes,
+    unknownTypes: unknownTypes
+  };
+}
+
+function getMasters(payload) {
+  var requested = parseRequestedMasterTypes_(payload);
+  var masters = {};
+
+  requested.canonicalTypes.forEach(function(type) {
+    masters[type] = toOptionList_(getMasterValueListByType_(type));
+  });
+  requested.unknownTypes.forEach(function(type) {
+    masters[type] = [];
+  });
+
+  return {
+    masters: masters
+  };
+}
+
+function api_getMasters(payload) {
+  try {
+    var result = getMasters(payload);
+    return {
+      ok: true,
+      masters: result.masters
+    };
+  } catch (error) {
+    Logger.log('api_getMasters error: ' + error);
+    return {
+      ok: false,
+      error: String(error),
+      masters: {}
+    };
+  }
+}
+
+function api_masters(payload) {
+  return api_getMasters(payload);
+}
+
 function applyStatusUpdateToRowValues_(rowValues, status, memo) {
   var nextRow = rowValues.slice();
   var now = new Date();
@@ -558,6 +761,11 @@ function api_dispatchAction(payload) {
     case 'getShopSummary':
     case 'shopSummary':
       return api_getPlatformSummary();
+    case 'getMasters':
+    case 'masters':
+    case 'getMaster':
+    case 'master':
+      return api_getMasters(payload);
     default:
       return {
         ok: false,
