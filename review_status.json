@@ -1,5 +1,5 @@
 {
-  "issue_title": "[17] マスター取得API を実装対象とします。",
+  "issue_title": "[18] バリエーション確認API を実装対象とします。",
   "changed_files": [
     "20_api_netshop.gs",
     "codex_instruction.md",

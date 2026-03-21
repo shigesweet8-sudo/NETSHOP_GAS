@@ -1,7 +1,7 @@
 ALTANA AI FACTORY レビュー
 
 Issue
-[17] マスター取得API を実装対象とします。
+[18] バリエーション確認API を実装対象とします。
 
 変更ファイル
 20_api_netshop.gs, codex_instruction.md, issue_body.md, openai_response.json
@@ -23,20 +23,22 @@ SEVERITY: WARNING
 ACTION: REVIEW NEEDED
 
 FINDINGS:
-- [WARNING] 20_api_netshop.gs:285-330 uniqueStringList_ の挙動 — 非プリミティブ値を String() で変換しているため、オブジェクト値が来た場合に "[object Object]" のような文字列が混入する可能性があります。なぜ問題か: UI に表示するラベルや一意化の基準として期待しない値が入ると、ユーザ表示や重複排除が不適切になるため。どこが問題か: uniqueStringList_ の先頭処理（String(value...).trim()）部分。対策案: 値がプリミティブ（string/number）かを確認する、または明示的に扱える型のみを許容する/フィルタする。
-- [WARNING] 20_api_netshop.gs:330-360 getValidationCandidatesByColumn_ の rowCount 計算と getRange 呼び出し — rowCount = Math.max(sheet.getLastRow() - 1, 1) としているため、シートにヘッダのみ（getLastRow() === 1）や空シートのときでも rowCount=1 で row 2 を取得しに行きます。なぜ問題か: 存在しない行を取得する呼び出しが無駄に行われる/返却データが空セルを含む可能性があるため、意図しない DataValidation 配列を扱うことになる可能性がある。どこが問題か: rowCount の計算とその後の getRange(2, columnIndex, rowCount, 1)。対策案: rowCount を Math.max(sheet.getLastRow() - 1, 0) とし、rowCount === 0 の場合は早期 return [] する。
-- [WARNING] 20_api_netshop.gs:360-420 extractValidationListFromRule_ — getCriteriaValues の戻り値の取り扱いは概ね良いですが、Array.isArray と getValues-check の順序で処理しており、CriteriaValues に複数パターンが混在した場合は最初にヒットした候補のみを返します（意図的かもしれません）。なぜ問題か: 同一セルに複数の候補ソースがある場合、最適な候補源を選ばないと想定外の空配列や誤った候補を返す可能性がある。どこが問題か: extractValidationListFromRule_ がループ内で最初に見つけた候補で即 return している箇所。対策案: 複数ソースをマージする意図があるならマージ処理にする、無ければ仕様コメントを追加する。
-- [WARNING] 20_api_netshop.gs:420-520 parseRequestedMasterTypes_ の正規化/重複排除 — seenRaw は分割後の name をトリムするが大文字小文字正規化を行っていません（重複防止は後段の seenCanonical で行われるため機能はする）。なぜ問題か: 入力側で "shops, Shops" のようなバリエーションがあると rawTypes に重複が入り余分な処理が発生します。どこが問題か: pushRawType 内での seenRaw のキー付け。対策案: seenRaw に格納する前に小文字化するなど軽微な最適化を推奨。
-- [WARNING] 20_api_netshop.gs:512-540 api_getMasters の例外ハンドリング — catch 節で Logger.log('api_getMasters error: ' + error) としていますが、可能なら error.stack など詳細をログに残したほうがデバッグしやすいです。なぜ問題か: ログがエラー文字列のみだと原因特定に時間がかかるため。どこが問題か: api_getMasters catch 節のログ出力。
-- [WARNING] 20_api_netshop.gs:760 api_dispatchAction にルーティング追加 — 'getMasters','masters','getMaster','master' を追加しているのは仕様通りですが、既存のルーティング規約（action 名の一貫性）に完全に合致しているかは未確認です。なぜ問題か: API 名のバリエーションを増やすと将来の保守で混乱する可能性があるため。どこが問題か: api_dispatchAction の switch-case 追加箇所。対策案: 既存のルーティング慣例に合わせること（単一の canonical 名にするなど）。
-- [WARNING] codex_instruction.md / issue_body.md / openai_response.json の更新 — ドキュメントは実装に合わせて更新されていますが、変更内容に API の公開範囲や認可要件に関する記載がありません。なぜ問題か: マスターAPI を UI に公開する場合、権限や情報公開ポリシーの確認が必要なため。どこが問題か: codex_instruction.md / issue_body.md の「制約」や「検証」に認可・公開に関する項目がない点。対策案: 公開対象と認証要否の明示を追加する。
+- [warning] 20_api_netshop.gs:488 isBlankValue_ の実装は null/undefined を "空" と扱い、文字列以外（数値やオブジェクト）は常に非空と判定します。なぜ問題か: 数値 0 や空配列/空オブジェクト等を "空" 扱いする仕様が期待される箇所がある場合に必須チェックがすり抜ける可能性がある（例: 要件上 shop がオブジェクトで渡ることがある等）。どこが問題か: validateVariationPayload_ の必須チェックで使用される箇所（create:update の必須判定）に影響します。
+- [warning] 20_api_netshop.gs:499 normalizeValidationPayload_ で mode 判定に itemSource.id の存在判定を用いていますが、id が数値・0 や空文字以外の型で渡る場合の扱いによる振る舞い差に注意が必要です。なぜ問題か: mode 自動推定ロジックは payload.mode が不正な文字列のときにのみ動くため、payload.mode に微妙な値が入っていると期待通りに create/update が決まらない可能性があります。どこが問題か: mode の決定ロジック（modeRaw の正規化→itemSource.id 判定）。
+- [warning] 20_api_netshop.gs:515 addValidationIssue_ は issues オブジェクトに warnings/errors 配列があることを前提に動作します。なぜ問題か: 呼び出し側で別の形の issues を渡すと例外や無限ループは起きませんが、構造不整合で期待通り格納されない可能性があるため、呼び出し側の初期化に依存しています。どこが問題か: validateVariationPayload_ 内で issues を作成しているので現状問題は小さいが一貫性を確認する必要があります。
+- [warning] 20_api_netshop.gs:537 normalizeNumberish_ は文字列中のカンマや通貨記号を剥がして Number を使ってパースしますが、Intl やロケール依存の書式（小数点がカンマ, 負数の表記など）には非対応です。なぜ問題か: 実際の入力がロケール依存のフォーマットや括弧負数・通貨記号以外の記号を含む場合、意図せず NaN になり誤検知する可能性がある。どこが問題か: 金額項目の検証（amountFields）全般。
+- [warning] 20_api_netshop.gs:555 validateVariationPayload_ 内で getStatusList_(), getMasterValueListByType_('shops'), generateId_(), CONFIG.STATUS.LISTING など外部定義を参照しています。なぜ問題か: これらが存在しない、または返す型（配列の要素がオブジェクト vs プリミティブ）が想定と異なると、実行時エラーや誤判定を招きます。どこが問題か: validateVariationPayload_ のステータス/ショップ検証ロジック（statusList/indexOf, shopMaster.indexOf 等）およびデフォルトメッセージ生成部分。
+- [warning] 20_api_netshop.gs:575 shopMaster の検証で indexOf を使って shopValue を検索していますが、getMasterValueListByType_ が配列の要素をオブジェクト（{value,label} 等）で返す場合、期待した一致判定にならず正しく不一致判定が出る可能性があります。なぜ問題か: マスター取得の返却形（プリミティブ配列かオブジェクト配列か）に依存しており、型不整合で誤検知を生むため。どこが問題か: validateVariationPayload_ の shop 値検証部分。
+- [warning] 20_api_netshop.gs:594 validateVariationPayload_ 内で CONFIG.STATUS.LISTING を文字列連結に使っています（警告メッセージ作成）。なぜ問題か: global 変数 CONFIG が未定義の場合、参照時に ReferenceError が発生して例外になり、api_validateVariation の try/catch により内部エラーとして返却されるが、意図しない内部エラーを起こすリスクがある。どこが問題か: mode==='create' && status empty の分岐でのメッセージ生成。
+- [warning] 20_api_netshop.gs:615 金額フィールド検証で isBlankValue_ を使って空判定を行っていますが、isBlankValue_ は文字列以外を常に非空扱いするため、null/undefined は空扱いされる一方で空の配列やオブジェクトは非空として検証される点に留意が必要です。なぜ問題か: 空オブジェクト等が渡った場合に「数値でない」と判定されエラーになる可能性がある。どこが問題か: amountFields の forEach 検証処理。
+- [warning] 20_api_netshop.gs:734 api_validateVariation の catch 範囲で Logger.log を使用していますが、既存の API のログ/エラーハンドリングポリシー（共通レスポンスラッパーの使用など）に合わせられているか不明です。なぜ問題か: 他 API とレスポンス形式が揃っていないとクライアント側での扱いが不統一になる可能性がある。どこが問題か: api_validateVariation のエラー時の返却形（生の {ok:false, errors:[...], warnings:[] } を返している点）。
 
 OPEN QUESTIONS:
-- getManagementSheet_, getSheetSnapshot_, CONFIG, getStatusList_ など、この差分で参照されている関数/定数は既存ファイル内で確実に定義されているか（この diff からは確認できません）。(none)とはせず確認を推奨。
-- マスター候補の出力形式 { value, label } は既存 API の慣例に合致していますか？既存のフロント側がシンプルな文字列配列を期待している可能性はありませんか？
-- public API として外部に公開される想定でしょうか（認証／認可の要否）？差分に認可チェックは含まれていません。
-- extractValidationListFromRule_ が最初に見つけた候補セットだけを返す仕様で問題ないか（複数ルールのマージを期待するかどうか）。
-- CONFIG.COLS.* の値が 1 始まりで columnIndex として使えることが保証されていますか？
+- getStatusList_(), getMasterValueListByType_(), generateId_(), CONFIG（および CONFIG.STATUS.LISTING）はこのファイル内またはプロジェクト内で定義済みですか？（未確認のため、返却型や副作用が不明です）
+- getMasterValueListByType_('shops') が返す配列はプリミティブ文字列の配列ですか？それとも {value,label} のようなオブジェクト配列ですか？（indexOf を使用しているため重要）
+- 既存 API 基盤にはレスポンスラッパーや標準的な成功/失敗フォーマットがありますか？もしある場合、api_validateVariation の返却形式（ok/errors/warnings）で互換が取れていますか？
+- createItem / updateItem が検証対象とするフィールド名（status, shop, cost, listPrice, negotiatedPrice, priceFinal, fee, shipping 等）はこの実装の対象と一致しますか？
+- action 名（'validateVariation','variationValidation','checkVariation'）が既存のルーティングと衝突しないことは確認済みですか？
 
 SUMMARY:
-- 20_api_netshop.gs に「マスター取得API」関連の実装（uniqueStringList_, toOptionList_, 列/validation から候補を抽出する関数群、parseRequestedMasterTypes_, getMasters, api_getMasters、ルーティング追加）が追加されています。コード全体として目的に沿った実装に見え、例外処理も用意されています。ただし既存ユーティリティ（getManagementSheet_, getSheetSnapshot_, CONFIG 等）との整合性や、空シート時の getRange 呼び出し、非文字列値の扱いなど運用・境界ケースに関する注意点があります。上記の点について確認・軽微修正を行えばマージ可能と判断します。
+- バリエーション検証 API とそれを呼ぶディスパッチの分岐が実装されており、入力正規化・必須チェック・ステータス/ショップ/金額項目の検証・エラー/警告の収集を返す仕組みが整っています。実装自体に致命的な構文エラーは見つかりませんでしたが、外部依存（getStatusList_, getMasterValueListByType_, generateId_, CONFIG 等）の有無と返却データ形状に強く依存しているため、実行環境での動作確認が必要です。特にマスター配列の要素がオブジェクトの場合の一致判定や、CONFIG の未定義参照によるランタイム例外に注意してください。上記の点確認・必要に応じた型変換（例: master 配列がオブジェクトなら value を抽出して比較）と、既存のレスポンスラッパーへの合わせ込みを推奨します。
