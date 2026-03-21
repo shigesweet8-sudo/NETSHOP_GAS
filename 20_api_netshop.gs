@@ -1010,8 +1010,76 @@ function applyStatusUpdateToRowValues_(rowValues, status, memo, headerResolution
     nextRow[productRegDateIndex] = now;
   }
   if (memo !== undefined) {
-    nextRow[memoIndex] = memo;
+    var currentMemo = normalizeMemoText_(nextRow[memoIndex]);
+    var nextMemo = memo;
+    if (
+      currentMemo.indexOf(OPERATIONAL_DISABLE_MEMO_PREFIX) !== -1 &&
+      normalizeMemoText_(nextMemo).indexOf(OPERATIONAL_DISABLE_MEMO_PREFIX) === -1
+    ) {
+      var memoWithMarker = normalizeMemoText_(nextMemo);
+      nextMemo = memoWithMarker ? (memoWithMarker + '\n' + OPERATIONAL_DISABLE_MEMO_PREFIX) : OPERATIONAL_DISABLE_MEMO_PREFIX;
+    }
+    nextRow[memoIndex] = nextMemo;
   }
+  return nextRow;
+}
+
+var OPERATIONAL_DISABLE_HEADER_CANDIDATES = Object.freeze([
+  '運用無効',
+  '無効化',
+  '無効',
+  '表示無効',
+  'アーカイブ',
+  'アーカイブ済み',
+  '削除フラグ',
+  '削除済み'
+]);
+
+var OPERATIONAL_DISABLE_MEMO_PREFIX = '[運用無効]';
+
+function resolveOperationalDisableHeader_(headerResolution) {
+  var candidates = OPERATIONAL_DISABLE_HEADER_CANDIDATES;
+  for (var i = 0; i < candidates.length; i++) {
+    var header = candidates[i];
+    if (headerResolution.indexByHeader[header] !== undefined) return header;
+  }
+  return '';
+}
+
+function normalizeMemoText_(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).trim();
+}
+
+function appendOperationalDisableMemo_(existingMemo, reason) {
+  var currentMemo = normalizeMemoText_(existingMemo);
+  var reasonMemo = normalizeMemoText_(reason);
+  var segments = [];
+
+  if (currentMemo) segments.push(currentMemo);
+  if (currentMemo.indexOf(OPERATIONAL_DISABLE_MEMO_PREFIX) === -1) segments.push(OPERATIONAL_DISABLE_MEMO_PREFIX);
+  if (reasonMemo) segments.push(reasonMemo);
+
+  return segments.join('\n');
+}
+
+function applyOperationalDisableToRowValues_(rowValues, memo, headerResolution) {
+  var nextRow = rowValues.slice();
+  var disableHeader = resolveOperationalDisableHeader_(headerResolution);
+  var memoIndex = headerResolution.indexByHeader[ITEM_FIELD_TO_HEADER.memo];
+
+  if (disableHeader) {
+    nextRow[headerResolution.indexByHeader[disableHeader]] = true;
+    if (memo !== undefined && memoIndex !== undefined) {
+      nextRow[memoIndex] = memo;
+    }
+    return nextRow;
+  }
+
+  if (memoIndex !== undefined) {
+    nextRow[memoIndex] = appendOperationalDisableMemo_(nextRow[memoIndex], memo);
+  }
+
   return nextRow;
 }
 
@@ -1310,6 +1378,12 @@ function api_dispatchAction(payload) {
     case 'cancelTransaction':
     case 'cancel':
       return api_cancelItem(payload);
+    case 'disableItem':
+    case 'disable':
+      return api_disableItem(payload);
+    case 'archiveItem':
+    case 'archive':
+      return api_archiveItem(payload);
     case 'bulkDisableNetshopRecords':
     case 'bulkDisableNetshop':
     case 'bulkDisableItems':
@@ -1580,12 +1654,128 @@ function resolveBulkDisableItemIds_(payload) {
   return uniqueNormalizedIds_(merged);
 }
 
+function buildDisableResponse_(ok, message, updatedItem, itemId, actionName) {
+  var normalizedAction = String(actionName || 'disableItem').trim() || 'disableItem';
+  return {
+    ok: ok,
+    action: normalizedAction,
+    operation: 'operationalDisable',
+    disabled: ok,
+    message: message || '',
+    itemId: itemId || '',
+    item: updatedItem || null
+  };
+}
+
+function buildBulkDisableResponse_(ok, message, disabledItemIds, failedItemIds) {
+  var successIds = disabledItemIds || [];
+  var failureIds = failedItemIds || [];
+  var response = buildBulkUpdateResponse_(
+    ok,
+    message,
+    successIds.length,
+    failureIds.length,
+    successIds,
+    failureIds
+  );
+  response.operation = 'operationalDisable';
+  response.disabledItemIds = successIds;
+  response.failedDisableItemIds = failureIds;
+  return response;
+}
+
+function disableItemById(itemId, memo) {
+  var normalizedId = String(itemId || '').trim();
+  if (!normalizedId) return null;
+
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot || !snapshot.rows.length) return null;
+  var headerResolution = getSheetHeaderResolution_(snapshot.sheet, [
+    ITEM_FIELD_TO_HEADER.id,
+    ITEM_FIELD_TO_HEADER.memo
+  ]);
+  var rowIndex = findRowIndexById_(snapshot.rows, snapshot.headers, normalizedId);
+  if (rowIndex === -1) return null;
+
+  snapshot.rows[rowIndex] = applyOperationalDisableToRowValues_(
+    snapshot.rows[rowIndex],
+    arguments.length >= 2 ? memo : undefined,
+    headerResolution
+  );
+  snapshot.sheet.getRange(rowIndex + 2, 1, 1, snapshot.rows[rowIndex].length).setValues([snapshot.rows[rowIndex]]);
+
+  return getItem(normalizedId);
+}
+
+function disableItem(itemId, memo) {
+  return arguments.length >= 2 ? disableItemById(itemId, memo) : disableItemById(itemId);
+}
+
+function archiveItemById(itemId, memo) {
+  return arguments.length >= 2 ? disableItemById(itemId, memo) : disableItemById(itemId);
+}
+
+function archiveItem(itemId, memo) {
+  return arguments.length >= 2 ? archiveItemById(itemId, memo) : archiveItemById(itemId);
+}
+
 function bulkDisableNetshopRecords(itemIds, memo) {
   var normalizedIds = uniqueNormalizedIds_(itemIds);
   if (!normalizedIds.length) {
-    return buildBulkUpdateResponse_(false, 'itemIds is required', 0, 0, [], []);
+    return buildBulkDisableResponse_(false, 'itemIds is required', [], []);
   }
-  return bulkUpdateStatus(normalizedIds, CONFIG.STATUS.CANCEL, memo);
+
+  var snapshot = getSheetSnapshot_();
+  if (!snapshot) {
+    return buildBulkDisableResponse_(false, 'sheet not found', [], normalizedIds.slice());
+  }
+  if (!snapshot.rows.length) {
+    return buildBulkDisableResponse_(false, 'no data rows', [], normalizedIds.slice());
+  }
+  var headerResolution = getSheetHeaderResolution_(snapshot.sheet, [
+    ITEM_FIELD_TO_HEADER.id,
+    ITEM_FIELD_TO_HEADER.memo
+  ]);
+
+  var disabledItemIds = [];
+  var failedItemIds = [];
+  var rowIndexesToUpdate = {};
+  var rowIndexMapById = buildRowIndexMapById_(snapshot.rows, snapshot.headers);
+
+  normalizedIds.forEach(function(itemId) {
+    var rowIndex = rowIndexMapById[itemId];
+    if (rowIndex === undefined) {
+      failedItemIds.push(itemId);
+      return;
+    }
+    snapshot.rows[rowIndex] = applyOperationalDisableToRowValues_(
+      snapshot.rows[rowIndex],
+      memo,
+      headerResolution
+    );
+    rowIndexesToUpdate[rowIndex] = true;
+    disabledItemIds.push(itemId);
+  });
+
+  var uniqueRowIndexes = Object.keys(rowIndexesToUpdate).map(function(rowIndex) {
+    return Number(rowIndex);
+  });
+
+  if (uniqueRowIndexes.length) {
+    try {
+      writeUpdatedRows_(snapshot.sheet, snapshot.headers.length, snapshot.rows, uniqueRowIndexes);
+    } catch (error) {
+      Logger.log('bulkDisableNetshopRecords error: ' + error);
+      return buildBulkDisableResponse_(false, String(error), [], normalizedIds.slice());
+    }
+  }
+
+  return buildBulkDisableResponse_(
+    failedItemIds.length === 0,
+    failedItemIds.length ? 'partial success (operational disable)' : 'success (operational disable)',
+    disabledItemIds,
+    failedItemIds
+  );
 }
 
 function api_bulkDisableNetshop(payload) {
@@ -1594,10 +1784,12 @@ function api_bulkDisableNetshop(payload) {
     var itemIds = resolveBulkDisableItemIds_(payload);
     var memo = payload.memo;
     if (memo === undefined && payload.reason !== undefined) memo = payload.reason;
-    return bulkDisableNetshopRecords(itemIds, memo);
+    var result = bulkDisableNetshopRecords(itemIds, memo);
+    result.action = 'bulkDisableNetshopRecords';
+    return result;
   } catch (error) {
     Logger.log('api_bulkDisableNetshop error: ' + error);
-    return buildBulkUpdateResponse_(false, String(error), 0, 0, [], []);
+    return buildBulkDisableResponse_(false, String(error), [], []);
   }
 }
 
@@ -1642,6 +1834,9 @@ function api_cancelItem(payload) {
 
     return {
       ok: true,
+      action: 'cancelItem',
+      operation: 'businessCancel',
+      canceled: true,
       item: updatedItem
     };
   } catch (error) {
@@ -1651,6 +1846,35 @@ function api_cancelItem(payload) {
       error: String(error)
     };
   }
+}
+
+function api_disableItem(payload) {
+  try {
+    var itemId = resolveItemIdFromPayload_(payload);
+    if (!itemId) {
+      return buildDisableResponse_(false, 'itemId is required', null, '', 'disableItem');
+    }
+
+    var memo = payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'memo')
+      ? payload.memo
+      : undefined;
+    var updatedItem = memo === undefined ? disableItemById(itemId) : disableItemById(itemId, memo);
+
+    if (!updatedItem) {
+      return buildDisableResponse_(false, 'ID not found: ' + itemId, null, itemId, 'disableItem');
+    }
+
+    return buildDisableResponse_(true, 'success (operational disable)', updatedItem, itemId, 'disableItem');
+  } catch (error) {
+    Logger.log('api_disableItem error: ' + error);
+    return buildDisableResponse_(false, String(error), null, '', 'disableItem');
+  }
+}
+
+function api_archiveItem(payload) {
+  var result = api_disableItem(payload);
+  result.action = 'archiveItem';
+  return result;
 }
 
 /**
