@@ -94,7 +94,7 @@ jobs:
 
           data = json.loads(pathlib.Path("review_status.json").read_text(encoding="utf-8"))
           print(json.dumps(data, ensure_ascii=False, indent=2))
-          if data["status"] != "OK":
+          if data["status"] not in {"OK", "SPEC_OK"}:
               sys.exit(1)
           PY
       - name: Send review summary to Slack

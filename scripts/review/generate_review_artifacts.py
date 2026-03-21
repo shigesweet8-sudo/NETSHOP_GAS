@@ -14,6 +14,18 @@ META_ONLY_NAMES = {
     'retry_issue_body.md',
     'review_status.json',
 }
+DOC_PATH_PREFIXES = ('docs/',)
+SPEC_KEYWORDS = (
+    '仕様整理',
+    'ui設計',
+    '画面設計',
+    '業務仕様',
+    '要件整理',
+    '仕様固定',
+    'spec',
+    'docs-only',
+    'doc-only',
+)
 
 
 def extract_changed_files(diff_text: str) -> list[str]:
@@ -26,10 +38,22 @@ def extract_changed_files(diff_text: str) -> list[str]:
     return changed_files
 
 
-def classify_review(content: str, changed_files: list[str]) -> dict:
+def is_spec_issue(issue_title: str, issue_body: str, changed_files: list[str]) -> bool:
+    normalized_text = f'{issue_title}\n{issue_body}'.lower()
+    has_spec_keyword = any(keyword in normalized_text for keyword in SPEC_KEYWORDS)
+    non_meta_files = [p for p in changed_files if pathlib.Path(p).name not in META_ONLY_NAMES]
+    has_docs_changes = any(p.startswith(DOC_PATH_PREFIXES) for p in non_meta_files)
+    docs_only = bool(non_meta_files) and all(p.startswith(DOC_PATH_PREFIXES) for p in non_meta_files)
+    return has_spec_keyword or has_docs_changes or docs_only
+
+
+def classify_review(content: str, changed_files: list[str], issue_title: str, issue_body: str) -> dict:
     content = content.lstrip('\ufeff')
     implementation_files = [p for p in changed_files if p.endswith(IMPLEMENTATION_SUFFIXES)]
     meta_only = bool(changed_files) and all(pathlib.Path(p).name in META_ONLY_NAMES for p in changed_files)
+    spec_issue = is_spec_issue(issue_title, issue_body, changed_files)
+    non_meta_files = [p for p in changed_files if pathlib.Path(p).name not in META_ONLY_NAMES]
+    docs_only = bool(non_meta_files) and all(p.startswith(DOC_PATH_PREFIXES) for p in non_meta_files)
     severity_match = re.search(r'^SEVERITY:\s*(SAFE|WARNING|HIGH|CRITICAL)\s*$', content, re.MULTILINE | re.IGNORECASE)
     severity = severity_match.group(1).upper() if severity_match else ''
     has_critical = severity == 'CRITICAL'
@@ -39,6 +63,10 @@ def classify_review(content: str, changed_files: list[str]) -> dict:
         status = 'PIPELINE_NG'
         merge = 'マージNG'
         reason = '差分ファイルを検出できませんでした。diff 生成または実装処理を確認してください。'
+    elif spec_issue and docs_only and not (has_critical or has_high):
+        status = 'SPEC_OK'
+        merge = 'マージOK'
+        reason = '仕様整理 / docs-only Issue と判定され、重大な指摘もありません。'
     elif not implementation_files or meta_only:
         status = 'IMPLEMENTATION_NG'
         merge = 'マージNG'
@@ -59,6 +87,8 @@ def classify_review(content: str, changed_files: list[str]) -> dict:
         'implementation_present': bool(implementation_files),
         'implementation_files': implementation_files,
         'meta_only': meta_only,
+        'docs_only': docs_only,
+        'issue_type': 'spec' if spec_issue else 'implementation',
         'has_high_or_critical': has_critical or has_high,
         'top_severity': severity,
     }
@@ -69,6 +99,15 @@ def build_retry_issue(issue_title: str, review_content: str, changed_files: list
     if len(changed_files) > 5:
         changed_files_text += f' (+{len(changed_files) - 5} more)'
 
+    completion_lines = [
+        '- HIGH / CRITICAL 指摘が解消されること',
+        '- 再レビューでマージOK相当になること',
+    ]
+    if classification['issue_type'] == 'spec':
+        completion_lines.insert(1, '- 仕様ドキュメント差分が存在すること')
+    else:
+        completion_lines.insert(1, '- 実装ファイル差分が存在すること')
+
     lines = [
         f"re: {issue_title or '(no title)'}",
         '',
@@ -77,21 +116,20 @@ def build_retry_issue(issue_title: str, review_content: str, changed_files: list
         '',
         '## 前回の結果',
         f"- NG種別: {classification['status']}",
+        f"- Issue種別: {'仕様整理' if classification['issue_type'] == 'spec' else '実装'}",
         f"- 実装判定: {'実装あり' if classification['implementation_present'] else '実装なし'}",
         f"- 変更ファイル: {changed_files_text}",
         '',
         '## 対応してほしいこと',
         '- レビュー指摘を解消する',
-        '- 実装ファイルに実コード差分を入れる',
+        '- Issue種別に合った差分を入れる',
         '- md/json のみの変更で終わらせない',
         '',
         '## レビュー詳細',
         review_content.strip(),
         '',
         '## 完了条件',
-        '- HIGH / CRITICAL 指摘が解消されること',
-        '- 実装ファイル差分が存在すること',
-        '- 再レビューでマージOK相当になること',
+        *completion_lines,
     ]
     return '\n'.join(lines) + '\n'
 
@@ -101,14 +139,16 @@ def main() -> None:
     content = review_data['choices'][0]['message']['content'].strip()
     diff_text = pathlib.Path(os.environ['DIFF_PATH']).read_text(encoding='utf-8')
     issue_title = os.environ.get('ISSUE_TITLE', '').strip()
+    issue_body_path = pathlib.Path('issue_body.md')
+    issue_body = issue_body_path.read_text(encoding='utf-8') if issue_body_path.exists() else ''
 
     changed_files = extract_changed_files(diff_text)
     changed_files_text = ', '.join(changed_files[:5]) if changed_files else '(none)'
     if len(changed_files) > 5:
         changed_files_text += f' (+{len(changed_files) - 5} more)'
 
-    classification = classify_review(content, changed_files)
-    retry_needed = classification['status'] != 'OK'
+    classification = classify_review(content, changed_files, issue_title, issue_body)
+    retry_needed = classification['status'] not in {'OK', 'SPEC_OK'}
 
     status_payload = {
         'issue_title': issue_title,
@@ -127,6 +167,9 @@ def main() -> None:
         '',
         'Issue',
         issue_title or '(no title)',
+        '',
+        'Issue種別',
+        '仕様整理' if classification['issue_type'] == 'spec' else '実装',
         '',
         '変更ファイル',
         changed_files_text,
@@ -156,4 +199,3 @@ def main() -> None:
 
 if __name__ == '__main__':
     main()
-
