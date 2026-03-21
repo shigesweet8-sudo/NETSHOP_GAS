@@ -1191,8 +1191,12 @@
 
       function syncListControlsToState() {
         var keywordInput = document.getElementById("keyword-search");
+        var statusSelect = document.getElementById("status-filter");
         if (keywordInput) {
           state.keyword = keywordInput.value || "";
+        }
+        if (statusSelect) {
+          state.statusFilter = statusSelect.value || "";
         }
       }
 
