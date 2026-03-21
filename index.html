@@ -414,7 +414,10 @@
       <section id="detail-section" class="card screen-hidden" aria-live="polite">
         <div class="detail-header">
           <h2 class="card-title">商品詳細</h2>
-          <button id="back-to-list" class="btn btn-secondary" type="button">一覧へ戻る</button>
+          <div class="page-actions">
+            <button id="open-edit-item" class="btn btn-primary" type="button">編集</button>
+            <button id="back-to-list" class="btn btn-secondary" type="button">一覧へ戻る</button>
+          </div>
         </div>
         <div id="detail-status" class="status-line">詳細を読み込みます。</div>
         <div id="detail-content" class="muted">対象商品を選択してください。</div>
@@ -468,6 +471,56 @@
           <button id="create-reset-form" class="btn btn-secondary" type="button">入力をクリア</button>
         </div>
         <div id="create-message" class="inline-message" aria-live="polite"></div>
+      </section>
+
+      <section id="edit-section" class="card screen-hidden" aria-live="polite">
+        <div class="detail-header">
+          <h2 class="card-title">商品編集</h2>
+          <button id="edit-back-to-detail" class="btn btn-secondary" type="button">詳細へ戻る</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="edit-status">ステータス</label>
+            <select id="edit-status" class="control-select">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="edit-shop">ショップ</label>
+            <select id="edit-shop" class="control-select">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="edit-item-name">商品名</label>
+            <input id="edit-item-name" class="control-input" type="text" placeholder="商品名">
+          </div>
+          <div class="form-field">
+            <label for="edit-cost">仕入れ値</label>
+            <input id="edit-cost" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="edit-price-final">決済金額</label>
+            <input id="edit-price-final" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="edit-fee">サイト利用料</label>
+            <input id="edit-fee" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="edit-shipping">配送料</label>
+            <input id="edit-shipping" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="edit-memo">備考</label>
+            <textarea id="edit-memo" class="control-input form-textarea" placeholder="備考"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button id="edit-save-item" class="btn btn-primary" type="button">保存</button>
+          <button id="edit-reset-form" class="btn btn-secondary" type="button">初期値へ戻す</button>
+        </div>
+        <div id="edit-message" class="inline-message" aria-live="polite"></div>
       </section>
     </div>
 
@@ -639,8 +692,14 @@
         detailLoading: false,
         detailItem: null,
         detailErrorMessage: "",
+        editItemId: "",
+        editInitialValues: null,
+        editLoading: false,
+        editSubmitting: false,
         createSubmitting: false,
-        mastersLoaded: false
+        mastersLoaded: false,
+        masterStatusOptions: [],
+        masterShopOptions: []
       };
 
       function getCurrentHeaders(items) {
@@ -766,8 +825,9 @@
           (action === "updateStatus" && !statusSelected);
       }
 
-      function setInlineMessage(kind, message) {
-        var el = document.getElementById("create-message");
+      function setInlineMessageById(elementId, kind, message) {
+        var el = document.getElementById(elementId);
+        if (!el) return;
         el.className = "inline-message";
         if (!message) {
           el.textContent = "";
@@ -778,11 +838,36 @@
         el.textContent = message;
       }
 
+      function setInlineMessage(kind, message) {
+        setInlineMessageById("create-message", kind, message);
+      }
+
+      function setEditInlineMessage(kind, message) {
+        setInlineMessageById("edit-message", kind, message);
+      }
+
       function setCreateSubmitting(flag) {
         state.createSubmitting = !!flag;
         document.getElementById("create-save-item").disabled = !!flag;
         document.getElementById("create-reset-form").disabled = !!flag;
         document.getElementById("create-back-to-list").disabled = !!flag;
+      }
+
+      function refreshEditButtons() {
+        var disabled = !!state.editLoading || !!state.editSubmitting;
+        document.getElementById("edit-save-item").disabled = disabled;
+        document.getElementById("edit-reset-form").disabled = disabled;
+        document.getElementById("edit-back-to-detail").disabled = !!state.editSubmitting;
+      }
+
+      function setEditLoading(flag) {
+        state.editLoading = !!flag;
+        refreshEditButtons();
+      }
+
+      function setEditSubmitting(flag) {
+        state.editSubmitting = !!flag;
+        refreshEditButtons();
       }
 
       function resetCreateForm() {
@@ -804,25 +889,54 @@
         select.value = list.some(function(option) { return option.value === previousValue; }) ? previousValue : "";
       }
 
-      function loadCreateMastersIfNeeded(forceReload) {
+      function ensureSelectHasValue(selectId, value, fallbackLabel) {
+        var select = document.getElementById(selectId);
+        if (!select) return;
+        var text = String(value == null ? "" : value).trim();
+        if (!text) {
+          select.value = "";
+          return;
+        }
+        var hasOption = Array.prototype.some.call(select.options, function(option) {
+          return String(option.value) === text;
+        });
+        if (!hasOption) {
+          var option = document.createElement("option");
+          option.value = text;
+          option.textContent = fallbackLabel || text;
+          select.appendChild(option);
+        }
+        select.value = text;
+      }
+
+      function applyMasterOptionsToForms(statusOptions, shopOptions) {
+        state.masterStatusOptions = toOptionObjects(statusOptions);
+        state.masterShopOptions = toOptionObjects(shopOptions);
+        populateCreateSelect("create-status", state.masterStatusOptions, "ステータスを選択");
+        populateCreateSelect("create-shop", state.masterShopOptions, "ショップを選択");
+        populateCreateSelect("edit-status", state.masterStatusOptions, "ステータスを選択");
+        populateCreateSelect("edit-shop", state.masterShopOptions, "ショップを選択");
+      }
+
+      function loadCreateMastersIfNeeded(forceReload, messageElementId) {
+        var messageId = messageElementId || "create-message";
         if (state.mastersLoaded && !forceReload) {
+          applyMasterOptionsToForms(state.masterStatusOptions, state.masterShopOptions);
           return Promise.resolve();
         }
 
-        setInlineMessage("info", "候補を取得しています...");
+        setInlineMessageById(messageId, "info", "候補を取得しています...");
         return callWrappedApi("api_getMasters", [{
           masterTypes: ["statuses", "shops"]
         }]).then(function(response) {
           var statusOptions = extractMasterOptions(response, ["statuses", "status", "ステータス"]);
           var shopOptions = extractMasterOptions(response, ["shops", "shop", "ショップ"]);
-          populateCreateSelect("create-status", statusOptions, "ステータスを選択");
-          populateCreateSelect("create-shop", shopOptions, "ショップを選択");
+          applyMasterOptionsToForms(statusOptions, shopOptions);
           state.mastersLoaded = true;
-          setInlineMessage("", "");
+          setInlineMessageById(messageId, "", "");
         }).catch(function(err) {
-          populateCreateSelect("create-status", [], "ステータスを選択");
-          populateCreateSelect("create-shop", [], "ショップを選択");
-          setInlineMessage("error", "候補取得に失敗しました: " + resolveErrorMessage(err));
+          applyMasterOptionsToForms([], []);
+          setInlineMessageById(messageId, "error", "候補取得に失敗しました: " + resolveErrorMessage(err));
           throw err;
         });
       }
@@ -864,12 +978,14 @@
       function openCreateScreen() {
         setInlineMessage("", "");
         switchScreen("create");
-        loadCreateMastersIfNeeded(false).catch(function() {});
+        loadCreateMastersIfNeeded(false, "create-message").catch(function() {});
       }
 
       function switchScreen(mode) {
         if (mode === "detail") {
           state.viewMode = "detail";
+        } else if (mode === "edit") {
+          state.viewMode = "edit";
         } else if (mode === "create") {
           state.viewMode = "create";
         } else {
@@ -878,9 +994,11 @@
         var listSection = document.getElementById("list-section");
         var detailSection = document.getElementById("detail-section");
         var createSection = document.getElementById("create-section");
+        var editSection = document.getElementById("edit-section");
         listSection.classList.toggle("screen-hidden", state.viewMode !== "list");
         detailSection.classList.toggle("screen-hidden", state.viewMode !== "detail");
         createSection.classList.toggle("screen-hidden", state.viewMode !== "create");
+        editSection.classList.toggle("screen-hidden", state.viewMode !== "edit");
       }
 
       function findFirstValue(item, keys) {
@@ -917,6 +1035,7 @@
       function renderDetailContent() {
         var statusEl = document.getElementById("detail-status");
         var contentEl = document.getElementById("detail-content");
+        document.getElementById("open-edit-item").disabled = state.detailLoading || !state.detailItemId;
 
         if (state.detailLoading) {
           statusEl.textContent = "詳細を読み込み中...";
@@ -960,11 +1079,125 @@
         contentEl.innerHTML = html;
       }
 
-      function openDetailById(itemId) {
+      function getItemFieldText(item, keys) {
+        var value = findFirstValue(item, keys);
+        if (value == null) return "";
+        return String(value);
+      }
+
+      function setEditFormValues(item) {
+        var safeItem = item && typeof item === "object" ? item : {};
+        var values = {
+          status: getItemFieldText(safeItem, ["status", "ステータス"]),
+          shop: getItemFieldText(safeItem, ["shop", "ショップ"]),
+          itemName: getItemFieldText(safeItem, ["itemName", "商品名"]),
+          cost: getItemFieldText(safeItem, ["cost", "仕入れ値"]),
+          priceFinal: getItemFieldText(safeItem, ["priceFinal", "決済金額"]),
+          fee: getItemFieldText(safeItem, ["fee", "サイト利用料"]),
+          shipping: getItemFieldText(safeItem, ["shipping", "配送料"]),
+          memo: getItemFieldText(safeItem, ["memo", "備考"])
+        };
+        state.editInitialValues = values;
+        ensureSelectHasValue("edit-status", values.status);
+        ensureSelectHasValue("edit-shop", values.shop);
+        document.getElementById("edit-item-name").value = values.itemName;
+        document.getElementById("edit-cost").value = values.cost;
+        document.getElementById("edit-price-final").value = values.priceFinal;
+        document.getElementById("edit-fee").value = values.fee;
+        document.getElementById("edit-shipping").value = values.shipping;
+        document.getElementById("edit-memo").value = values.memo;
+      }
+
+      function resetEditFormToInitial() {
+        if (!state.editInitialValues) return;
+        ensureSelectHasValue("edit-status", state.editInitialValues.status);
+        ensureSelectHasValue("edit-shop", state.editInitialValues.shop);
+        document.getElementById("edit-item-name").value = state.editInitialValues.itemName || "";
+        document.getElementById("edit-cost").value = state.editInitialValues.cost || "";
+        document.getElementById("edit-price-final").value = state.editInitialValues.priceFinal || "";
+        document.getElementById("edit-fee").value = state.editInitialValues.fee || "";
+        document.getElementById("edit-shipping").value = state.editInitialValues.shipping || "";
+        document.getElementById("edit-memo").value = state.editInitialValues.memo || "";
+      }
+
+      function collectEditPayload() {
+        return {
+          status: String(document.getElementById("edit-status").value || "").trim(),
+          shop: String(document.getElementById("edit-shop").value || "").trim(),
+          itemName: String(document.getElementById("edit-item-name").value || "").trim(),
+          cost: String(document.getElementById("edit-cost").value || "").trim(),
+          priceFinal: String(document.getElementById("edit-price-final").value || "").trim(),
+          fee: String(document.getElementById("edit-fee").value || "").trim(),
+          shipping: String(document.getElementById("edit-shipping").value || "").trim(),
+          memo: String(document.getElementById("edit-memo").value || "").trim()
+        };
+      }
+
+      function openEditScreen(itemId) {
+        var normalizedId = String(itemId || state.detailItemId || "").trim();
+        if (!normalizedId) {
+          setBanner("error", "管理IDを特定できないため編集画面を開けません。");
+          return;
+        }
+
+        state.editItemId = normalizedId;
+        state.editInitialValues = null;
+        setEditInlineMessage("", "");
+        switchScreen("edit");
+        setEditLoading(true);
+        setEditInlineMessage("info", "編集データを取得しています...");
+
+        var mastersPromise = loadCreateMastersIfNeeded(false, "edit-message").catch(function() {
+          return null;
+        });
+        var detailPromise = callWrappedApi("getItem", [normalizedId]).then(function(response) {
+          var item = response && response.data ? response.data : null;
+          if (!item) {
+            throw new Error("編集対象データが見つかりません。");
+          }
+          setEditFormValues(item);
+        });
+
+        Promise.all([mastersPromise, detailPromise]).then(function() {
+          resetEditFormToInitial();
+        }).catch(function(err) {
+          setEditInlineMessage("error", "編集データの取得に失敗しました: " + resolveErrorMessage(err));
+          setBanner("error", "編集画面の初期化に失敗しました。");
+        }).finally(function() {
+          setEditLoading(false);
+        });
+      }
+
+      function saveEditedItem() {
+        if (state.editSubmitting || state.editLoading) return;
+        var itemId = String(state.editItemId || "").trim();
+        if (!itemId) {
+          setEditInlineMessage("error", "管理IDが取得できないため保存できません。");
+          return;
+        }
+
+        setEditSubmitting(true);
+        setEditInlineMessage("info", "保存しています...");
+        var payload = collectEditPayload();
+
+        callWrappedApi("api_updateItem", [itemId, payload]).then(function() {
+          setEditInlineMessage("success", "保存に成功しました。");
+          setBanner("success", "商品を更新しました。");
+          openDetailById(itemId, { silentSuccessBanner: true });
+        }).catch(function(err) {
+          setEditInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
+          setBanner("error", "商品の更新に失敗しました。");
+        }).finally(function() {
+          setEditSubmitting(false);
+        });
+      }
+
+      function openDetailById(itemId, options) {
+        var opts = options && typeof options === "object" ? options : {};
         var normalizedId = String(itemId || "").trim();
         if (!normalizedId) {
           setBanner("error", "管理IDを特定できないため詳細を開けません。");
-          return;
+          return Promise.resolve();
         }
 
         state.detailItemId = normalizedId;
@@ -974,10 +1207,12 @@
         switchScreen("detail");
         renderDetailContent();
 
-        callWrappedApi("getItem", [normalizedId]).then(function(response) {
+        return callWrappedApi("getItem", [normalizedId]).then(function(response) {
           state.detailItem = response && response.data ? response.data : null;
           state.detailErrorMessage = "";
-          setBanner("info", "商品詳細を表示しました。");
+          if (!opts.silentSuccessBanner) {
+            setBanner("info", "商品詳細を表示しました。");
+          }
         }).catch(function(err) {
           state.detailItem = null;
           state.detailErrorMessage = resolveErrorMessage(err);
@@ -1178,6 +1413,10 @@
         switchScreen("list");
       });
 
+      document.getElementById("open-edit-item").addEventListener("click", function() {
+        openEditScreen(state.detailItemId);
+      });
+
       document.getElementById("create-back-to-list").addEventListener("click", function() {
         switchScreen("list");
       });
@@ -1189,6 +1428,23 @@
       document.getElementById("create-reset-form").addEventListener("click", function() {
         resetCreateForm();
         setInlineMessage("", "");
+      });
+
+      document.getElementById("edit-back-to-detail").addEventListener("click", function() {
+        if (!state.editItemId) {
+          switchScreen("list");
+          return;
+        }
+        openDetailById(state.editItemId, { silentSuccessBanner: true });
+      });
+
+      document.getElementById("edit-save-item").addEventListener("click", function() {
+        saveEditedItem();
+      });
+
+      document.getElementById("edit-reset-form").addEventListener("click", function() {
+        resetEditFormToInitial();
+        setEditInlineMessage("", "");
       });
 
       document.getElementById("content").addEventListener("change", function(event) {
