@@ -28,6 +28,35 @@ SPEC_KEYWORDS = (
 )
 
 
+UNCERTAINTY_MARKERS = (
+    "???",
+    "???",
+    "?????",
+    "???????",
+    "??",
+    "????",
+    "??",
+    "??",
+    "??",
+    "??????",
+)
+
+
+def extract_findings_by_severity(content: str, severity: str) -> list[str]:
+    pattern = re.compile(
+        r"^- \[" + re.escape(severity) + r"\]\s.*?(?=^\- \[(?:SAFE|WARNING|HIGH|CRITICAL)\]|^OPEN QUESTIONS:|^SUMMARY:|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    return [m.group(0).strip() for m in pattern.finditer(content)]
+
+
+def findings_are_only_uncertain(findings: list[str]) -> bool:
+    if not findings:
+        return False
+    normalized = [f.lower() for f in findings]
+    return all(any(marker in f for marker in UNCERTAINTY_MARKERS) for f in normalized)
+
+
 def extract_changed_files(diff_text: str) -> list[str]:
     changed_files = []
     for line in diff_text.splitlines():
@@ -56,8 +85,11 @@ def classify_review(content: str, changed_files: list[str], issue_title: str, is
     docs_only = bool(non_meta_files) and all(p.startswith(DOC_PATH_PREFIXES) for p in non_meta_files)
     severity_match = re.search(r'^SEVERITY:\s*(SAFE|WARNING|HIGH|CRITICAL)\s*$', content, re.MULTILINE | re.IGNORECASE)
     severity = severity_match.group(1).upper() if severity_match else ''
-    has_critical = severity == 'CRITICAL'
-    has_high = severity == 'HIGH'
+    high_findings = extract_findings_by_severity(content, 'HIGH')
+    critical_findings = extract_findings_by_severity(content, 'CRITICAL')
+    uncertain_high_or_critical = findings_are_only_uncertain(high_findings + critical_findings)
+    has_critical = severity == 'CRITICAL' and not uncertain_high_or_critical
+    has_high = severity == 'HIGH' and not uncertain_high_or_critical
 
     if not changed_files:
         status = 'PIPELINE_NG'
@@ -91,6 +123,7 @@ def classify_review(content: str, changed_files: list[str], issue_title: str, is
         'issue_type': 'spec' if spec_issue else 'implementation',
         'has_high_or_critical': has_critical or has_high,
         'top_severity': severity,
+        'uncertain_high_or_critical': uncertain_high_or_critical,
     }
 
 
