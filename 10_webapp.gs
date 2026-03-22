@@ -7,6 +7,11 @@
  */
 function doGet(e) {
   return HtmlService
-    .createHtmlOutputFromFile('index')
+    .createTemplateFromFile('index')
+    .evaluate()
     .setTitle('WAVE');
+}
+
+function includeHtml_(fileName) {
+  return HtmlService.createHtmlOutputFromFile(fileName).getContent();
 }
