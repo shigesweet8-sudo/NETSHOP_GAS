@@ -1127,7 +1127,7 @@
         html += "<th class=\"select-cell\"><input id=\"select-all-rows\" type=\"checkbox\" aria-label=\"全選択\"></th>";
         html += "<th class=\"action-cell\">詳細</th>";
         headers.forEach(function(header) {
-          html += "<th>" + escapeHtml(header) + "</th>";
+          html += "<th>" + escapeHtml(getListHeaderLabel(header)) + "</th>";
         });
         html += "</tr></thead><tbody>";
 
