@@ -130,7 +130,7 @@
         return {
           ok: false,
           error: {
-            message: "Unexpected API response format",
+            message: "Unexpected API response format (" + summarizeRawResponseShape(raw) + ")",
             code: "UNEXPECTED_API_RESPONSE",
             details: raw
           },
@@ -156,6 +156,17 @@
         } catch (error) {
           return String(value);
         }
+      }
+
+      function summarizeRawResponseShape(value) {
+        if (value === undefined) return "type=undefined";
+        if (value === null) return "type=null";
+        if (Array.isArray(value)) return "type=array length=" + value.length;
+        if (typeof value === "object") {
+          var keys = Object.keys(value);
+          return "type=object keys=" + (keys.length ? keys.join(",") : "(none)");
+        }
+        return "type=" + typeof value + " value=" + String(value);
       }
 
       function buildApiDebugHtml(error) {
