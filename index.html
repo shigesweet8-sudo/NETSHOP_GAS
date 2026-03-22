@@ -819,6 +819,21 @@
           return raw;
         }
 
+        // Compatibility for older Apps Script responses that already wrap
+        // payloads in `data` but do not include the modern `ok/error` fields.
+        if (raw && typeof raw === "object" && !Array.isArray(raw) && Object.prototype.hasOwnProperty.call(raw, "data")) {
+          var normalized = {
+            ok: true,
+            error: null,
+            data: raw.data
+          };
+          Object.keys(raw).forEach(function(key) {
+            if (key === "ok" || key === "error" || key === "data") return;
+            normalized[key] = raw[key];
+          });
+          return normalized;
+        }
+
         // Backward compatibility for older deployed Apps Script versions
         // that still return plain arrays for list/summary style APIs.
         if (extractAllowedListArray(raw) !== null) {
