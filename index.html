@@ -2253,8 +2253,9 @@
 
       function applyAndRenderCurrentView() {
         syncListControlsToState();
-        pruneSelectionWithItems(state.allItems);
-        renderItemsTable(applyClientFilters(state.allItems));
+        var filteredItems = applyClientFilters(state.allItems);
+        pruneSelectionWithItems(filteredItems);
+        renderItemsTable(filteredItems);
       }
 
       function setLoading(flag, message) {
