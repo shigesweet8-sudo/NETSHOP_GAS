@@ -1810,6 +1810,10 @@
         return html;
       }
 
+      function hasActiveListFilters() {
+        return !!(String(state.keyword || "").trim() || String(state.statusFilter || "").trim());
+      }
+
       function formatKpiValue(key, value) {
         var text = formatStructuredValue(value);
         if (text === "") return "-";
@@ -2205,8 +2209,13 @@
       function renderItemsTable(items) {
         state.viewItems = items || [];
         if (!state.viewItems.length) {
-          document.getElementById("items-status").textContent = "データなし";
-          document.getElementById("content").innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+          var hasSourceItems = Array.isArray(state.allItems) && state.allItems.length > 0;
+          var emptyStatus = hasSourceItems && hasActiveListFilters() ? "該当データなし" : "データなし";
+          var emptyMessage = hasSourceItems && hasActiveListFilters()
+            ? "検索条件に一致するデータがありません。条件を変更して再度確認してください。"
+            : "表示できるデータがありません。";
+          document.getElementById("items-status").textContent = emptyStatus;
+          document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(emptyMessage) + "</span>";
           updateSelectedCount();
           updateBulkUiState();
           return;
