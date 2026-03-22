@@ -1,0 +1,292 @@
+      var NETSHOP_WEB_BUILD = "2026-03-22-split-ui-v1";
+      window.__NETSHOP_WEB_BUILD = NETSHOP_WEB_BUILD;
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function formatStructuredValue(value) {
+        if (value == null) return "";
+        if (typeof value === "object") {
+          try {
+            return JSON.stringify(value);
+          } catch (error) {
+            return "[object]";
+          }
+        }
+        return String(value);
+      }
+
+      function setBanner(kind, message) {
+        var el = document.getElementById("global-banner");
+        var bannerKind = kind === "error" ? "error" : kind === "success" ? "success" : "info";
+        el.className = "state-banner";
+        if (!message) {
+          el.textContent = "";
+          if (state) {
+            state.bannerState = null;
+          }
+          return;
+        }
+        el.classList.add("is-visible");
+        el.classList.add(bannerKind === "error" ? "is-error" : bannerKind === "success" ? "is-success" : "is-info");
+        el.textContent = message;
+        if (state) {
+          var bannerState = {
+            kind: bannerKind,
+            screenMode: state.viewMode || "list",
+            keepForImmediateSwitch: bannerKind === "success" || bannerKind === "error"
+          };
+          state.bannerState = bannerState;
+          if (bannerState.keepForImmediateSwitch) {
+            setTimeout(function() {
+              if (state.bannerState === bannerState) {
+                state.bannerState.keepForImmediateSwitch = false;
+              }
+            }, 0);
+          }
+        }
+      }
+
+      function clearStaleBannerOnScreenSwitch(previousMode, nextMode) {
+        if (!state || !state.bannerState) return;
+        var bannerState = state.bannerState;
+        if (bannerState.screenMode === nextMode) return;
+
+        var keepImmediate = bannerState.keepForImmediateSwitch &&
+          bannerState.screenMode === previousMode &&
+          (bannerState.kind === "success" || bannerState.kind === "error");
+        if (keepImmediate) return;
+
+        setBanner("", "");
+      }
+
+      function normalizeExecutionError(err) {
+        if (typeof err === "string") {
+          return {
+            type: "execution",
+            message: err,
+            raw: err
+          };
+        }
+        if (err && typeof err === "object") {
+          return {
+            type: "execution",
+            message: err.message || err.error || JSON.stringify(err),
+            raw: err
+          };
+        }
+        return {
+          type: "execution",
+          message: "Apps Script execution failed",
+          raw: err
+        };
+      }
+
+      function extractAllowedListArray(source) {
+        if (Array.isArray(source)) return source;
+        if (!source || typeof source !== "object") return null;
+        if (Array.isArray(source.items)) return source.items;
+        if (Array.isArray(source.list)) return source.list;
+        if (Array.isArray(source.rows)) return source.rows;
+        if (Array.isArray(source.monthly)) return source.monthly;
+        if (Array.isArray(source.platforms)) return source.platforms;
+        return null;
+      }
+
+      function normalizeApiEnvelope(raw) {
+        if (raw && typeof raw === "object" && typeof raw.ok === "boolean") {
+          return raw;
+        }
+
+        // Compatibility for older Apps Script responses that already wrap
+        // payloads in `data` but do not include the modern `ok/error` fields.
+        if (raw && typeof raw === "object" && !Array.isArray(raw) && Object.prototype.hasOwnProperty.call(raw, "data")) {
+          var normalized = {
+            ok: true,
+            error: null,
+            data: raw.data
+          };
+          Object.keys(raw).forEach(function(key) {
+            if (key === "ok" || key === "error" || key === "data") return;
+            normalized[key] = raw[key];
+          });
+          return normalized;
+        }
+
+        // Backward compatibility for older deployed Apps Script versions
+        // that still return plain arrays for list/summary style APIs.
+        if (extractAllowedListArray(raw) !== null) {
+          return {
+            ok: true,
+            error: null,
+            data: raw
+          };
+        }
+
+        return {
+          ok: false,
+          error: {
+            message: "Unexpected API response format (" + summarizeRawResponseShape(raw) + ")",
+            code: "UNEXPECTED_API_RESPONSE",
+            details: raw
+          },
+          data: null
+        };
+      }
+
+      function resolveErrorMessage(error) {
+        if (!error) return "不明なエラーです。";
+        if (typeof error === "string") return error;
+        if (error.message) return error.message;
+        if (error.error && typeof error.error === "string") return error.error;
+        if (error.error && error.error.message) return error.error.message;
+        return "不明なエラーです。";
+      }
+
+      function formatDebugValue(value) {
+        if (value === undefined) return "undefined";
+        if (value === null) return "null";
+        if (typeof value === "string") return value;
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch (error) {
+          return String(value);
+        }
+      }
+
+      function summarizeRawResponseShape(value) {
+        if (value === undefined) return "type=undefined";
+        if (value === null) return "type=null";
+        if (Array.isArray(value)) return "type=array length=" + value.length;
+        if (typeof value === "object") {
+          var keys = Object.keys(value);
+          return "type=object keys=" + (keys.length ? keys.join(",") : "(none)");
+        }
+        return "type=" + typeof value + " value=" + String(value);
+      }
+
+      function buildApiDebugHtml(error) {
+        if (!error || !error.response || !error.response.error) return "";
+        var details = error.response.error.details;
+        var lines = [
+          "message: " + resolveErrorMessage(error),
+          "type: " + String(error.type || ""),
+          "details:",
+          formatDebugValue(details)
+        ];
+        return "<div class=\"validation-result is-visible\"><p class=\"validation-title is-warning\">API debug</p><pre>" +
+          escapeHtml(lines.join("\n")) +
+          "</pre></div>";
+      }
+
+      function toOptionObjects(list) {
+        return (Array.isArray(list) ? list : []).map(function(entry) {
+          if (entry && typeof entry === "object") {
+            var value = entry.value != null ? String(entry.value) : "";
+            var label = entry.label != null ? String(entry.label) : value;
+            if (!value) return null;
+            return { value: value, label: label };
+          }
+          var text = String(entry == null ? "" : entry).trim();
+          if (!text) return null;
+          return { value: text, label: text };
+        }).filter(function(entry) {
+          return !!entry;
+        });
+      }
+
+      function extractMasterOptions(response, keys) {
+        var data = response && response.data ? response.data : response;
+        var masters = data && data.masters ? data.masters : (response && response.masters ? response.masters : {});
+        if (!masters || typeof masters !== "object") return [];
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i];
+          if (!Object.prototype.hasOwnProperty.call(masters, key)) continue;
+          var options = toOptionObjects(masters[key]);
+          if (options.length) return options;
+        }
+        return [];
+      }
+
+      function runGasApi(apiName, args) {
+        return new Promise(function(resolve, reject) {
+          var runner = google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(function(err) {
+              reject(normalizeExecutionError(err));
+            });
+
+          if (typeof runner[apiName] !== "function") {
+            reject({
+              type: "client",
+              message: "Unknown Apps Script function: " + apiName,
+              raw: apiName
+            });
+            return;
+          }
+
+          var callArgs = Array.isArray(args) ? args : [];
+          runner[apiName].apply(runner, callArgs);
+        });
+      }
+
+      function callWrappedApi(apiName, args) {
+        return runGasApi(apiName, args).then(function(raw) {
+          var response = normalizeApiEnvelope(raw);
+          if (!response.ok) {
+            throw {
+              type: "api",
+              message: resolveErrorMessage(response.error),
+              response: response
+            };
+          }
+          return response;
+        });
+      }
+
+      function extractListItemsFromResponse(response) {
+        var fromData = extractAllowedListArray(response && response.data);
+        if (fromData !== null) return fromData;
+        var fromResponse = extractAllowedListArray(response);
+        if (fromResponse !== null) return fromResponse;
+        return [];
+      }
+
+      var state = {
+        allItems: [],
+        viewItems: [],
+        selectedById: {},
+        sortKey: "",
+        sortOrder: "asc",
+        keyword: "",
+        statusFilter: "",
+        loading: false,
+        viewMode: "list",
+        detailItemId: "",
+        detailLoading: false,
+        detailItem: null,
+        detailErrorMessage: "",
+        editItemId: "",
+        editInitialValues: null,
+        editLoading: false,
+        editSubmitting: false,
+        createSubmitting: false,
+        dashboardLoading: false,
+        routeSyncLock: false,
+        mastersLoaded: false,
+        masterStatusOptions: [],
+        masterShopOptions: [],
+        bannerState: null
+      };
+
+      function renderRuntimeBuildBadge() {
+        var el = document.getElementById("runtime-build");
+        if (!el) return;
+        el.textContent = "build: " + NETSHOP_WEB_BUILD;
+      }

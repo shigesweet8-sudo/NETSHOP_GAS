@@ -1,0 +1,225 @@
+      var ROUTE_MODES = {
+        list: true,
+        detail: true,
+        create: true,
+        edit: true,
+        dashboard: true
+      };
+
+      function normalizeRouteMode(mode) {
+        var normalized = String(mode || "").trim().toLowerCase();
+        return ROUTE_MODES[normalized] ? normalized : "list";
+      }
+
+      function normalizeRouteId(id) {
+        return String(id == null ? "" : id).trim();
+      }
+
+      function parseRouteFromParams(params) {
+        var mode = normalizeRouteMode(
+          params.get("v") ||
+          params.get("view") ||
+          params.get("mode")
+        );
+        var id = normalizeRouteId(
+          params.get("id") ||
+          params.get("itemId")
+        );
+        if ((mode === "detail" || mode === "edit") && !id) {
+          mode = "list";
+        }
+        return { mode: mode, id: id };
+      }
+
+      function parseRouteFromHash(hash) {
+        var raw = String(hash || "").replace(/^#/, "").trim();
+        if (!raw) return null;
+        if (raw.charAt(0) === "/") raw = raw.slice(1);
+
+        var pathMatch = raw.match(/^([a-zA-Z]+)\/(.+)$/);
+        if (pathMatch) {
+          var pathMode = normalizeRouteMode(pathMatch[1]);
+          var pathId = normalizeRouteId(pathMatch[2]);
+          if ((pathMode === "detail" || pathMode === "edit") && !pathId) pathMode = "list";
+          return { mode: pathMode, id: pathId };
+        }
+
+        if (raw.indexOf("=") === -1) {
+          var modeOnly = normalizeRouteMode(raw.split(":")[0]);
+          var simpleId = normalizeRouteId(raw.split(":")[1] || "");
+          if ((modeOnly === "detail" || modeOnly === "edit") && !simpleId) modeOnly = "list";
+          return { mode: modeOnly, id: simpleId };
+        }
+
+        return parseRouteFromParams(new URLSearchParams(raw));
+      }
+
+      function parseRouteFromSearch(search) {
+        var raw = String(search || "").replace(/^\?/, "").trim();
+        if (!raw) return null;
+        return parseRouteFromParams(new URLSearchParams(raw));
+      }
+
+      function resolveRouteFromUrl() {
+        var fromHash = parseRouteFromHash(window.location.hash);
+        if (fromHash) return fromHash;
+        var fromSearch = parseRouteFromSearch(window.location.search);
+        if (fromSearch) return fromSearch;
+        return { mode: "list", id: "" };
+      }
+
+      function getCurrentRouteState() {
+        var mode = normalizeRouteMode(state.viewMode || "list");
+        var id = "";
+        if (mode === "detail") {
+          id = normalizeRouteId(state.detailItemId);
+        } else if (mode === "edit") {
+          id = normalizeRouteId(state.editItemId || state.detailItemId);
+        }
+        return { mode: mode, id: id };
+      }
+
+      function buildHashFromRoute(route) {
+        var normalizedMode = normalizeRouteMode(route && route.mode);
+        var normalizedId = normalizeRouteId(route && route.id);
+        var params = new URLSearchParams();
+        params.set("v", normalizedMode);
+        if ((normalizedMode === "detail" || normalizedMode === "edit") && normalizedId) {
+          params.set("id", normalizedId);
+        }
+        return "#" + params.toString();
+      }
+
+      function isSameRoute(routeA, routeB) {
+        var a = routeA || {};
+        var b = routeB || {};
+        return normalizeRouteMode(a.mode) === normalizeRouteMode(b.mode) &&
+          normalizeRouteId(a.id) === normalizeRouteId(b.id);
+      }
+
+      function syncUrlWithState(options) {
+        var opts = options && typeof options === "object" ? options : {};
+        var targetHash = buildHashFromRoute(getCurrentRouteState());
+        if (window.location.hash === targetHash) return;
+
+        if (opts.replace) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search + targetHash);
+          return;
+        }
+
+        state.routeSyncLock = true;
+        window.location.hash = targetHash;
+      }
+
+      function restoreRoute(route, options) {
+        var opts = options && typeof options === "object" ? options : {};
+        var resolved = route && typeof route === "object" ? route : { mode: "list", id: "" };
+        var targetMode = normalizeRouteMode(resolved.mode);
+        var targetId = normalizeRouteId(resolved.id);
+
+        if (!opts.skipConfirm && !confirmNavigationIfNeeded(targetMode)) {
+          syncUrlWithState({ replace: true });
+          return;
+        }
+
+        if (targetMode === "detail") {
+          openDetailById(targetId, { silentSuccessBanner: true, fromRouteRestore: true });
+          return;
+        }
+        if (targetMode === "edit") {
+          openEditScreen(targetId, { fromRouteRestore: true });
+          return;
+        }
+        if (targetMode === "create") {
+          openCreateScreen({ skipConfirm: true, ignoreBusy: true });
+          return;
+        }
+        if (targetMode === "dashboard") {
+          openDashboardScreen({ skipConfirm: true, ignoreBusy: true });
+          return;
+        }
+        switchScreen("list");
+      }
+
+      function getViewModeLabel(mode) {
+        if (mode === "detail") return "商品詳細";
+        if (mode === "edit") return "商品編集";
+        if (mode === "create") return "新規商品登録";
+        if (mode === "dashboard") return "ダッシュボード";
+        return "商品一覧";
+      }
+
+      function updateDocumentTitle(mode, contextId) {
+        var modeLabel = getViewModeLabel(mode);
+        var idSuffix = (mode === "detail" || mode === "edit") && contextId ? " | " + contextId : "";
+        document.title = "WAVE | NETSHOP管理 | " + modeLabel + idSuffix;
+      }
+
+      function updateScreenContext() {
+        var mode = state.viewMode || "list";
+        var contextId = mode === "edit" ? state.editItemId : state.detailItemId;
+        var idText = (mode === "detail" || mode === "edit") && contextId ? " / 管理ID: " + contextId : "";
+        var modeLabel = getViewModeLabel(mode);
+        var routeText = mode === "list"
+          ? "主要導線: 詳細 / ダッシュボード / 新規登録"
+          : mode === "detail"
+            ? "主要導線: 一覧へ戻る / 編集へ"
+            : mode === "edit"
+              ? "主要導線: 詳細へ戻る / 一覧へ"
+              : mode === "create"
+                ? "主要導線: 一覧へ戻る / 保存"
+                : "主要導線: 一覧へ戻る / 再取得";
+        updateDocumentTitle(mode, contextId);
+        document.getElementById("screen-context").textContent = "現在: " + modeLabel + idText + " | " + routeText;
+      }
+
+      function isAnyBusy() {
+        return !!(
+          state.loading ||
+          state.detailLoading ||
+          state.createSubmitting ||
+          state.editLoading ||
+          state.editSubmitting ||
+          state.dashboardLoading
+        );
+      }
+
+      function hasCreateFormChanges() {
+        var payload = collectCreatePayload();
+        return Object.keys(payload).some(function(key) {
+          return String(payload[key] || "").trim() !== "";
+        });
+      }
+
+      function hasEditUnsavedChanges() {
+        if (!state.editInitialValues) return false;
+        var current = collectEditPayload();
+        var initial = state.editInitialValues;
+        return Object.keys(current).some(function(key) {
+          return String(current[key] || "").trim() !== String(initial[key] || "").trim();
+        });
+      }
+
+      function confirmAction(message) {
+        return window.confirm(String(message || "").trim());
+      }
+
+      function confirmNavigationIfNeeded(targetMode) {
+        if (state.createSubmitting || state.editSubmitting || state.editLoading) return false;
+
+        if (state.viewMode === "create" && targetMode !== "create" && hasCreateFormChanges()) {
+          return confirmAction("新規登録フォームの入力内容を破棄して移動します。よろしいですか？");
+        }
+        if (state.viewMode === "edit" && targetMode !== "edit" && hasEditUnsavedChanges()) {
+          return confirmAction("編集内容が保存されていません。破棄して移動します。よろしいですか？");
+        }
+        return true;
+      }
+
+      function refreshGlobalActionState() {
+        var busy = isAnyBusy();
+        document.getElementById("open-list").disabled = busy || state.viewMode === "list";
+        document.getElementById("open-dashboard").disabled = busy;
+        document.getElementById("open-create-item").disabled = busy;
+        document.getElementById("reload-items").disabled = busy || state.viewMode !== "list";
+      }

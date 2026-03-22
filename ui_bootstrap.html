@@ -1,0 +1,184 @@
+      renderRuntimeBuildBadge();
+
+      document.getElementById("reload-items").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        setBanner("info", "商品一覧を再取得しています。");
+        loadItemsWithCurrentSort({ forceBaseLoad: true });
+      });
+
+      document.getElementById("open-list").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        if (!confirmNavigationIfNeeded("list")) return;
+        switchScreen("list");
+      });
+
+      document.getElementById("open-create-item").addEventListener("click", function() {
+        openCreateScreen();
+      });
+
+      document.getElementById("open-dashboard").addEventListener("click", function() {
+        openDashboardScreen();
+      });
+
+      document.getElementById("dashboard-back-to-list").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        if (!confirmNavigationIfNeeded("list")) return;
+        switchScreen("list");
+      });
+
+      document.getElementById("dashboard-reload").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        loadDashboard();
+      });
+
+      document.getElementById("keyword-search").addEventListener("input", function(event) {
+        state.keyword = event.target.value || "";
+        applyAndRenderCurrentView();
+      });
+
+      document.getElementById("status-filter").addEventListener("change", function(event) {
+        state.statusFilter = event.target.value || "";
+        applyAndRenderCurrentView();
+      });
+
+      document.getElementById("sort-key").addEventListener("change", function(event) {
+        state.sortKey = event.target.value || "";
+        if (!state.sortKey) {
+          applyAndRenderCurrentView();
+          return;
+        }
+        setBanner("info", "並び替えで再取得しています。");
+        loadItemsWithCurrentSort({ forceBaseLoad: false });
+      });
+
+      document.getElementById("sort-order-toggle").addEventListener("click", function() {
+        state.sortOrder = state.sortOrder === "asc" ? "desc" : "asc";
+        this.textContent = state.sortOrder === "asc" ? "昇順" : "降順";
+        if (!state.sortKey) return;
+        setBanner("info", "並び順を変更して再取得しています。");
+        loadItemsWithCurrentSort({ forceBaseLoad: false });
+      });
+
+      document.getElementById("bulk-action").addEventListener("change", function() {
+        updateBulkUiState();
+      });
+
+      document.getElementById("bulk-execute").addEventListener("click", function() {
+        executeBulkAction();
+      });
+
+      document.getElementById("back-to-list").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        switchScreen("list");
+      });
+
+      document.getElementById("open-edit-item").addEventListener("click", function() {
+        openEditScreen(state.detailItemId);
+      });
+
+      document.getElementById("create-back-to-list").addEventListener("click", function() {
+        if (isAnyBusy()) return;
+        if (!confirmNavigationIfNeeded("list")) return;
+        switchScreen("list");
+      });
+
+      document.getElementById("create-save-item").addEventListener("click", function() {
+        saveNewItem();
+      });
+
+      document.getElementById("create-validate-item").addEventListener("click", function() {
+        runSavePreValidation("create");
+      });
+
+      document.getElementById("create-lookup-zip").addEventListener("click", function() {
+        lookupZipForForm("create");
+      });
+
+      document.getElementById("create-reset-form").addEventListener("click", function() {
+        if (state.createSubmitting) return;
+        if (hasCreateFormChanges() && !confirmAction("入力内容をクリアします。よろしいですか？")) return;
+        resetCreateForm();
+        setInlineMessage("", "");
+      });
+
+      document.getElementById("edit-back-to-detail").addEventListener("click", function() {
+        if (state.editSubmitting || state.editLoading) return;
+        if (hasEditUnsavedChanges() && !confirmAction("編集内容を破棄して詳細へ戻ります。よろしいですか？")) return;
+        if (!state.editItemId) {
+          switchScreen("list");
+          return;
+        }
+        openDetailById(state.editItemId, { silentSuccessBanner: true });
+      });
+
+      document.getElementById("edit-save-item").addEventListener("click", function() {
+        saveEditedItem();
+      });
+
+      document.getElementById("edit-validate-item").addEventListener("click", function() {
+        runSavePreValidation("edit");
+      });
+
+      document.getElementById("edit-lookup-zip").addEventListener("click", function() {
+        lookupZipForForm("edit");
+      });
+
+      document.getElementById("edit-reset-form").addEventListener("click", function() {
+        if (state.editSubmitting || state.editLoading) return;
+        if (hasEditUnsavedChanges() && !confirmAction("編集内容を初期値に戻します。よろしいですか？")) return;
+        resetEditFormToInitial();
+        setEditInlineMessage("", "");
+      });
+
+      document.getElementById("content").addEventListener("change", function(event) {
+        if (state.loading) return;
+        var target = event.target;
+        if (!target) return;
+
+        if (target.id === "select-all-rows") {
+          var checked = !!target.checked;
+          state.viewItems.forEach(function(item) {
+            var itemId = resolveItemId(item);
+            if (!itemId) return;
+            state.selectedById[itemId] = checked;
+          });
+          renderItemsTable(state.viewItems);
+          return;
+        }
+
+        if (target.classList.contains("row-select")) {
+          var itemId = target.getAttribute("data-item-id");
+          if (itemId) {
+            state.selectedById[itemId] = !!target.checked;
+          }
+          updateSelectAllState();
+          updateSelectedCount();
+          updateBulkUiState();
+        }
+      });
+
+      document.getElementById("content").addEventListener("click", function(event) {
+        if (state.loading) return;
+        var target = event.target;
+        if (!target) return;
+        if (target.classList.contains("row-detail-open")) {
+          var itemId = target.getAttribute("data-item-id");
+          openDetailById(itemId);
+        }
+      });
+
+      window.addEventListener("hashchange", function() {
+        if (state.routeSyncLock) {
+          state.routeSyncLock = false;
+          return;
+        }
+
+        var targetRoute = resolveRouteFromUrl();
+        var currentRoute = getCurrentRouteState();
+        if (isSameRoute(targetRoute, currentRoute)) return;
+
+        restoreRoute(targetRoute, { skipConfirm: false });
+      });
+
+      updateBulkUiState();
+      restoreRoute(resolveRouteFromUrl(), { skipConfirm: true });
