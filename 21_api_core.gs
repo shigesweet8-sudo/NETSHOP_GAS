@@ -245,6 +245,15 @@ function findRowIndexById_(rows, headers, itemId) {
   return -1;
 }
 
+function normalizePublicApiValue_(value) {
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    if (isNaN(value.getTime())) return '';
+    var timeZone = Session.getScriptTimeZone() || 'Asia/Tokyo';
+    return Utilities.formatDate(value, timeZone, 'yyyy-MM-dd');
+  }
+  return value;
+}
+
 function buildPublicItemFromRow_(headers, row) {
   var source = {};
   headers.forEach(function(header, index) {
@@ -252,7 +261,7 @@ function buildPublicItemFromRow_(headers, row) {
     if (!field) return;
     if (!Object.prototype.hasOwnProperty.call(ITEM_FIELD_TO_HEADER, field)) return;
     if (Object.prototype.hasOwnProperty.call(PERSONAL_INFO_FIELDS, field)) return;
-    source[field] = row[index];
+    source[field] = normalizePublicApiValue_(row[index]);
   });
   return source;
 }
