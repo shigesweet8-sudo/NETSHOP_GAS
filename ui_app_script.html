@@ -147,6 +147,31 @@
         return "不明なエラーです。";
       }
 
+      function formatDebugValue(value) {
+        if (value === undefined) return "undefined";
+        if (value === null) return "null";
+        if (typeof value === "string") return value;
+        try {
+          return JSON.stringify(value, null, 2);
+        } catch (error) {
+          return String(value);
+        }
+      }
+
+      function buildApiDebugHtml(error) {
+        if (!error || !error.response || !error.response.error) return "";
+        var details = error.response.error.details;
+        var lines = [
+          "message: " + resolveErrorMessage(error),
+          "type: " + String(error.type || ""),
+          "details:",
+          formatDebugValue(details)
+        ];
+        return "<div class=\"validation-result is-visible\"><p class=\"validation-title is-warning\">API debug</p><pre>" +
+          escapeHtml(lines.join("\n")) +
+          "</pre></div>";
+      }
+
       function toOptionObjects(list) {
         return (Array.isArray(list) ? list : []).map(function(entry) {
           if (entry && typeof entry === "object") {
@@ -1600,7 +1625,9 @@
           updateToolbarOptions([]);
           updateSelectedCount();
           document.getElementById("items-status").textContent = "エラー";
-          document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(err)) + "</span>";
+          document.getElementById("content").innerHTML =
+            "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(err)) + "</span>" +
+            buildApiDebugHtml(err);
           setBanner("error", "商品一覧の取得に失敗しました。");
         }).finally(function() {
           setLoading(false);
