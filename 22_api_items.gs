@@ -253,6 +253,25 @@ function api_debugContext() {
   };
 }
 
+function debug_listItemsResponse() {
+  var response = api_listItems();
+  var data = response && response.data;
+  var summary = {
+    responseType: response === null ? 'null' : Array.isArray(response) ? 'array' : typeof response,
+    responseKeys: response && typeof response === 'object' ? Object.keys(response) : [],
+    ok: response && response.ok,
+    errorMessage: response && response.error && response.error.message ? response.error.message : '',
+    dataType: data === null ? 'null' : Array.isArray(data) ? 'array' : typeof data,
+    dataLength: Array.isArray(data) ? data.length : '',
+    itemKeys: Array.isArray(data) && data.length && data[0] && typeof data[0] === 'object' ? Object.keys(data[0]) : []
+  };
+  Logger.log('debug_listItemsResponse summary: ' + JSON.stringify(summary));
+  if (Array.isArray(data) && data.length) {
+    Logger.log('debug_listItemsResponse firstItem: ' + JSON.stringify(data[0]));
+  }
+  return response;
+}
+
 /**
  * 指定IDの商品を取得する（個人情報列は除外）。
  * @param {string} itemId
