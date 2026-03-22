@@ -1,4 +1,68 @@
     <script>
+      var LIST_HEADER_ORDER = [
+        "status",
+        "id",
+        "staff",
+        "date",
+        "productRegDate",
+        "shop",
+        "itemName",
+        "cost",
+        "storage",
+        "qty",
+        "listPrice",
+        "negotiatedPrice",
+        "priceFinal",
+        "fee",
+        "shipping",
+        "shipFrom",
+        "profit",
+        "memo",
+        "customer",
+        "carrier",
+        "tracking",
+        "zip",
+        "pref",
+        "addr2",
+        "addr3",
+        "phone"
+      ];
+
+      var LIST_HEADER_LABELS = {
+        status: "ステータス",
+        id: "管理ID",
+        staff: "商品担当者",
+        date: "日にち",
+        productRegDate: "商品登録日",
+        shop: "ショップ",
+        itemName: "商品名",
+        cost: "仕入れ値",
+        storage: "保管場所",
+        qty: "個数",
+        listPrice: "出品金額",
+        negotiatedPrice: "交渉金額",
+        priceFinal: "決済金額",
+        fee: "サイト利用料",
+        shipping: "配送料",
+        shipFrom: "配送元",
+        profit: "粗利(原価引)",
+        memo: "備考",
+        customer: "購入者名",
+        carrier: "配送業者",
+        tracking: "追跡番号",
+        zip: "郵便番号",
+        pref: "都道府県",
+        addr2: "住所2(地番)",
+        addr3: "住所3(建物名)",
+        phone: "電話番号"
+      };
+
+      function getListHeaderLabel(header) {
+        return Object.prototype.hasOwnProperty.call(LIST_HEADER_LABELS, header)
+          ? LIST_HEADER_LABELS[header]
+          : header;
+      }
+
       function getCurrentHeaders(items) {
         if (!items || !items.length) return [];
         var seen = {};
@@ -11,7 +75,13 @@
             headers.push(key);
           });
         });
-        return headers;
+        return headers.sort(function(a, b) {
+          var indexA = LIST_HEADER_ORDER.indexOf(a);
+          var indexB = LIST_HEADER_ORDER.indexOf(b);
+          var rankA = indexA === -1 ? LIST_HEADER_ORDER.length + headers.indexOf(a) : indexA;
+          var rankB = indexB === -1 ? LIST_HEADER_ORDER.length + headers.indexOf(b) : indexB;
+          return rankA - rankB;
+        });
       }
 
       function resolveItemId(item) {
@@ -114,10 +184,17 @@
         bulkStatusSelect.value = statuses.indexOf(previousBulkStatus) !== -1 ? previousBulkStatus : "";
 
         sortKeySelect.innerHTML = "<option value=\"\">並び替えなし</option>" + headers.map(function(header) {
-          return "<option value=\"" + escapeHtml(header) + "\">" + escapeHtml(header) + "</option>";
+          return "<option value=\"" + escapeHtml(header) + "\">" + escapeHtml(getListHeaderLabel(header)) + "</option>";
         }).join("");
         sortKeySelect.value = headers.indexOf(previousSortKey) !== -1 ? previousSortKey : "";
         state.sortKey = sortKeySelect.value;
+        if (sortKeySelect.options.length) {
+          sortKeySelect.options[0].textContent = "並び替えなし";
+        }
+        Array.prototype.forEach.call(sortKeySelect.options, function(option, index) {
+          if (index === 0) return;
+          option.textContent = getListHeaderLabel(option.value);
+        });
       }
 
       function updateSelectAllState() {
@@ -615,7 +692,7 @@
         var headers = getTableHeaders(list);
         var html = "<div class=\"table-wrap\"><table><thead><tr>";
         headers.forEach(function(header) {
-          html += "<th>" + escapeHtml(header) + "</th>";
+          html += "<th>" + escapeHtml(getListHeaderLabel(header)) + "</th>";
         });
         html += "</tr></thead><tbody>";
 
