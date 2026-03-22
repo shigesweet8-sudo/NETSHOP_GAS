@@ -1635,11 +1635,12 @@
           state.selectedById = {};
           updateToolbarOptions([]);
           updateSelectedCount();
+          var errorMessage = resolveErrorMessage(err);
           document.getElementById("items-status").textContent = "エラー";
           document.getElementById("content").innerHTML =
-            "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(err)) + "</span>" +
+            "<span class=\"muted\">" + escapeHtml(errorMessage) + "</span>" +
             buildApiDebugHtml(err);
-          setBanner("error", "商品一覧の取得に失敗しました。");
+          setBanner("error", "商品一覧の取得に失敗しました: " + errorMessage);
         }).finally(function() {
           setLoading(false);
         });
