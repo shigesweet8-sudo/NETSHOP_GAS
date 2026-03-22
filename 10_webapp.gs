@@ -13,5 +13,9 @@ function doGet(e) {
 }
 
 function includeHtml_(fileName) {
+  return HtmlService.createHtmlOutputFromFile(fileName).getContent();
+}
+
+function includeTemplateHtml_(fileName) {
   return HtmlService.createTemplateFromFile(fileName).evaluate().getContent();
 }
