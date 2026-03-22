@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>WAVE</title>
+    <title>WAVE | NETSHOP管理</title>
     <style>
       :root {
         color-scheme: light;
@@ -486,7 +486,7 @@
       <header class="page-header">
         <div>
           <h1 class="page-title">WAVE</h1>
-          <p class="page-subtitle">商品一覧画面の正式実装に向けた UI 土台画面です。</p>
+          <p class="page-subtitle">NETSHOPの商品管理と進捗確認を行う運用画面です。</p>
         </div>
         <div class="page-actions">
           <button id="open-list" class="btn btn-secondary" type="button">一覧へ</button>
@@ -1100,6 +1100,12 @@
         return "商品一覧";
       }
 
+      function updateDocumentTitle(mode, contextId) {
+        var modeLabel = getViewModeLabel(mode);
+        var idSuffix = (mode === "detail" || mode === "edit") && contextId ? " | " + contextId : "";
+        document.title = "WAVE | NETSHOP管理 | " + modeLabel + idSuffix;
+      }
+
       function updateScreenContext() {
         var mode = state.viewMode || "list";
         var contextId = mode === "edit" ? state.editItemId : state.detailItemId;
@@ -1114,6 +1120,7 @@
               : mode === "create"
                 ? "主要導線: 一覧へ戻る / 保存"
                 : "主要導線: 一覧へ戻る / 再取得";
+        updateDocumentTitle(mode, contextId);
         document.getElementById("screen-context").textContent = "現在: " + modeLabel + idText + " | " + routeText;
       }
 
