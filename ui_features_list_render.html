@@ -1,0 +1,157 @@
+    <script>
+      function renderItemsTable(items) {
+        state.viewItems = items || [];
+        if (!state.viewItems.length) {
+          var hasSourceItems = Array.isArray(state.allItems) && state.allItems.length > 0;
+          var emptyStatus = hasSourceItems && hasActiveListFilters() ? "該当データなし" : "データなし";
+          var emptyMessage = hasSourceItems && hasActiveListFilters()
+            ? "検索条件に一致するデータがありません。条件を変更して再度確認してください。"
+            : "表示できるデータがありません。";
+          document.getElementById("items-status").textContent = emptyStatus;
+          document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(emptyMessage) + "</span>";
+          updateSelectedCount();
+          updateBulkUiState();
+          return;
+        }
+
+        var headers = getCurrentHeaders(state.viewItems);
+        var html = "<div class=\"table-wrap\"><table><thead><tr>";
+        html += "<th class=\"select-cell\"><input id=\"select-all-rows\" type=\"checkbox\" aria-label=\"全選択\"></th>";
+        html += "<th class=\"action-cell\">詳細</th>";
+        headers.forEach(function(header) {
+          html += "<th>" + escapeHtml(getListHeaderLabel(header)) + "</th>";
+        });
+        html += "</tr></thead><tbody>";
+
+        state.viewItems.forEach(function(item) {
+          var itemId = resolveItemId(item);
+          var checked = itemId && state.selectedById[itemId] ? " checked" : "";
+          var disabled = itemId && !state.loading ? "" : " disabled";
+          html += "<tr>";
+          html += "<td class=\"select-cell\"><input class=\"row-select\" type=\"checkbox\" data-item-id=\"" + escapeHtml(itemId) + "\"" + checked + disabled + " aria-label=\"行選択\"></td>";
+          html += "<td class=\"action-cell\"><button class=\"btn btn-secondary btn-small row-detail-open\" type=\"button\" data-item-id=\"" + escapeHtml(itemId) + "\"" + disabled + ">詳細</button></td>";
+          headers.forEach(function(header) {
+            html += "<td>" + escapeHtml(formatStructuredValue(item[header])) + "</td>";
+          });
+          html += "</tr>";
+        });
+
+        html += "</tbody></table></div>";
+        document.getElementById("items-status").textContent = "読み込み完了 " + state.viewItems.length + " 件";
+        document.getElementById("content").innerHTML = html;
+        updateSelectAllState();
+        updateSelectedCount();
+        updateBulkUiState();
+      }
+
+      function applyAndRenderCurrentView() {
+        syncListControlsToState();
+        var filteredItems = applyClientFilters(state.allItems);
+        pruneSelectionWithItems(filteredItems);
+        renderItemsTable(filteredItems);
+      }
+
+      function setLoading(flag, message) {
+        state.loading = !!flag;
+        document.getElementById("reload-items").disabled = !!flag;
+        document.getElementById("open-dashboard").disabled = !!flag;
+        document.getElementById("open-create-item").disabled = !!flag;
+        document.getElementById("open-list").disabled = !!flag || state.viewMode === "list";
+        document.getElementById("sort-order-toggle").disabled = !!flag;
+        document.getElementById("keyword-search").disabled = !!flag;
+        document.getElementById("status-filter").disabled = !!flag;
+        document.getElementById("sort-key").disabled = !!flag;
+        if (message) {
+          document.getElementById("items-status").textContent = message;
+        }
+        updateBulkUiState();
+        refreshGlobalActionState();
+      }
+
+      function loadItemsWithCurrentSort(options) {
+        var opts = options || {};
+        var useSort = !opts.forceBaseLoad && !!state.sortKey;
+        setLoading(true, "読み込み中...");
+        var promise;
+        if (useSort) {
+          promise = callWrappedApi("api_listItemsSorted", [{
+            sortKey: state.sortKey,
+            order: state.sortOrder
+          }]);
+        } else {
+          promise = callWrappedApi("api_listItems");
+        }
+
+        return promise.then(function(response) {
+          state.allItems = extractListItemsFromResponse(response);
+          state.selectedById = {};
+          updateToolbarOptions(state.allItems);
+          applyAndRenderCurrentView();
+          setBanner("success", "商品一覧を取得しました。");
+        }).catch(function(err) {
+          state.allItems = [];
+          state.viewItems = [];
+          state.selectedById = {};
+          updateToolbarOptions([]);
+          updateSelectedCount();
+          var errorMessage = resolveErrorMessage(err);
+          document.getElementById("items-status").textContent = "エラー";
+          document.getElementById("content").innerHTML =
+            "<span class=\"muted\">" + escapeHtml(errorMessage) + "</span>" +
+            buildApiDebugHtml(err);
+          setBanner("error", "商品一覧の取得に失敗しました: " + errorMessage);
+        }).finally(function() {
+          setLoading(false);
+        });
+      }
+
+      function executeBulkAction() {
+        if (state.loading) return;
+        var selectedIds = getSelectedIds();
+        var action = document.getElementById("bulk-action").value;
+        var statusValue = document.getElementById("bulk-status").value;
+
+        if (!selectedIds.length) {
+          setBanner("error", "一括操作する行を選択してください。");
+          updateBulkUiState();
+          return;
+        }
+        if (!action) {
+          setBanner("error", "一括操作を選択してください。");
+          return;
+        }
+        if (action === "updateStatus" && !statusValue) {
+          setBanner("error", "変更後ステータスを選択してください。");
+          return;
+        }
+
+        var confirmInfo = buildBulkConfirmMessage(action, selectedIds.length, statusValue);
+        if (!confirmAction(confirmInfo.message)) {
+          return;
+        }
+
+        setLoading(true, "一括処理中...");
+        setBanner("info", confirmInfo.label + "を実行しています。");
+
+        var apiName = "";
+        var payload = { itemIds: selectedIds };
+        if (action === "updateStatus") {
+          apiName = "api_bulkUpdateStatus";
+          payload.status = statusValue;
+        } else if (action === "recalculate") {
+          apiName = "api_bulkRecalculateProfit";
+        } else {
+          apiName = "api_bulkDisableNetshop";
+        }
+
+        callWrappedApi(apiName, [payload]).then(function() {
+          setBanner("success", confirmInfo.label + "が完了しました。");
+          return loadItemsWithCurrentSort({ forceBaseLoad: false });
+        }).catch(function(err) {
+          setBanner("error", confirmInfo.label + "に失敗しました: " + resolveErrorMessage(err));
+        }).finally(function() {
+          setLoading(false);
+          updateBulkUiState();
+        });
+      }
+    </script>
