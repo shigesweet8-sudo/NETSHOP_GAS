@@ -155,10 +155,6 @@ function parseMonthRange_(monthStr) {
   return { start, end };
 }
 
-function sum_(rows, key) {
-  return rows.reduce((total, r) => total + (Number(r[key]) || 0), 0);
-}
-
 function toNumber(v) {
   const n = Number(v);
   return isNaN(n) ? 0 : n;
