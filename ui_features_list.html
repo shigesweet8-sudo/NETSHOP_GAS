@@ -1,0 +1,264 @@
+    <script>
+      var LIST_HEADER_ORDER = [
+        "status",
+        "id",
+        "staff",
+        "date",
+        "productRegDate",
+        "shop",
+        "itemName",
+        "cost",
+        "storage",
+        "qty",
+        "listPrice",
+        "negotiatedPrice",
+        "priceFinal",
+        "fee",
+        "shipping",
+        "shipFrom",
+        "profit",
+        "memo",
+        "customer",
+        "carrier",
+        "tracking",
+        "zip",
+        "pref",
+        "addr2",
+        "addr3",
+        "phone"
+      ];
+
+      var LIST_HEADER_LABELS = {
+        status: "ステータス",
+        id: "管理ID",
+        staff: "商品担当者",
+        date: "日にち",
+        productRegDate: "商品登録日",
+        shop: "ショップ",
+        itemName: "商品名",
+        cost: "仕入れ値",
+        storage: "保管場所",
+        qty: "個数",
+        listPrice: "出品金額",
+        negotiatedPrice: "交渉金額",
+        priceFinal: "決済金額",
+        fee: "サイト利用料",
+        shipping: "配送料",
+        shipFrom: "配送元",
+        profit: "粗利(原価引)",
+        memo: "備考",
+        customer: "購入者名",
+        carrier: "配送業者",
+        tracking: "追跡番号",
+        zip: "郵便番号",
+        pref: "都道府県",
+        addr2: "住所2(地番)",
+        addr3: "住所3(建物名)",
+        phone: "電話番号"
+      };
+
+      function getListHeaderLabel(header) {
+        return Object.prototype.hasOwnProperty.call(LIST_HEADER_LABELS, header)
+          ? LIST_HEADER_LABELS[header]
+          : header;
+      }
+
+      function getCurrentHeaders(items) {
+        if (!items || !items.length) return [];
+        var seen = {};
+        var headers = [];
+        items.forEach(function(item) {
+          if (!item || typeof item !== "object" || Array.isArray(item)) return;
+          Object.keys(item).forEach(function(key) {
+            if (seen[key]) return;
+            seen[key] = true;
+            headers.push(key);
+          });
+        });
+        return headers.sort(function(a, b) {
+          var indexA = LIST_HEADER_ORDER.indexOf(a);
+          var indexB = LIST_HEADER_ORDER.indexOf(b);
+          var rankA = indexA === -1 ? LIST_HEADER_ORDER.length + headers.indexOf(a) : indexA;
+          var rankB = indexB === -1 ? LIST_HEADER_ORDER.length + headers.indexOf(b) : indexB;
+          return rankA - rankB;
+        });
+      }
+
+      function resolveItemId(item) {
+        if (!item || typeof item !== "object") return "";
+        if (item.id != null && String(item.id).trim() !== "") return String(item.id).trim();
+        if (item["管理ID"] != null && String(item["管理ID"]).trim() !== "") return String(item["管理ID"]).trim();
+        return "";
+      }
+
+      function resolveItemStatus(item) {
+        if (!item || typeof item !== "object") return "";
+        if (item.status != null && String(item.status).trim() !== "") return String(item.status).trim();
+        if (item["ステータス"] != null && String(item["ステータス"]).trim() !== "") return String(item["ステータス"]).trim();
+        return "";
+      }
+
+      function buildSearchText(item, headers) {
+        return (headers || []).map(function(header) {
+          return formatStructuredValue(item && item[header]);
+        }).join(" ").toLowerCase();
+      }
+
+      function applyClientFilters(items) {
+        var keyword = String(state.keyword || "").trim().toLowerCase();
+        var statusFilter = String(state.statusFilter || "").trim();
+        var statusFilteredItems = (items || []).filter(function(item) {
+          if (statusFilter) {
+            var itemStatus = resolveItemStatus(item);
+            if (itemStatus !== statusFilter) return false;
+          }
+          return true;
+        });
+
+        if (!keyword) return statusFilteredItems;
+
+        var searchableHeaders = getCurrentHeaders(statusFilteredItems);
+        return statusFilteredItems.filter(function(item) {
+          return buildSearchText(item, searchableHeaders).indexOf(keyword) !== -1;
+        });
+      }
+
+      function syncListControlsToState() {
+        var keywordInput = document.getElementById("keyword-search");
+        var statusSelect = document.getElementById("status-filter");
+        if (keywordInput) {
+          state.keyword = keywordInput.value || "";
+        }
+        if (statusSelect) {
+          state.statusFilter = statusSelect.value || "";
+        }
+      }
+
+      function pruneSelectionWithItems(items) {
+        var validIdMap = {};
+        (items || []).forEach(function(item) {
+          var id = resolveItemId(item);
+          if (id) validIdMap[id] = true;
+        });
+        Object.keys(state.selectedById).forEach(function(id) {
+          if (!validIdMap[id]) delete state.selectedById[id];
+        });
+      }
+
+      function getSelectedIds() {
+        return Object.keys(state.selectedById).filter(function(id) {
+          return !!state.selectedById[id];
+        });
+      }
+
+      function updateSelectedCount() {
+        document.getElementById("selected-count").textContent = "選択 " + getSelectedIds().length + " 件";
+      }
+
+      function updateToolbarOptions(items) {
+        var list = items || [];
+        var statusSelect = document.getElementById("status-filter");
+        var bulkStatusSelect = document.getElementById("bulk-status");
+        var sortKeySelect = document.getElementById("sort-key");
+        var previousStatus = state.statusFilter;
+        var previousBulkStatus = bulkStatusSelect.value;
+        var previousSortKey = state.sortKey;
+        var headers = getCurrentHeaders(list);
+        var statusMap = {};
+
+        list.forEach(function(item) {
+          var status = resolveItemStatus(item);
+          if (status) statusMap[status] = true;
+        });
+
+        var statuses = Object.keys(statusMap).sort();
+        statusSelect.innerHTML = "<option value=\"\">すべてのステータス</option>" + statuses.map(function(status) {
+          return "<option value=\"" + escapeHtml(status) + "\">" + escapeHtml(status) + "</option>";
+        }).join("");
+        statusSelect.value = statuses.indexOf(previousStatus) !== -1 ? previousStatus : "";
+        state.statusFilter = statusSelect.value;
+
+        bulkStatusSelect.innerHTML = "<option value=\"\">変更後ステータス</option>" + statuses.map(function(status) {
+          return "<option value=\"" + escapeHtml(status) + "\">" + escapeHtml(status) + "</option>";
+        }).join("");
+        bulkStatusSelect.value = statuses.indexOf(previousBulkStatus) !== -1 ? previousBulkStatus : "";
+
+        sortKeySelect.innerHTML = "<option value=\"\">並び替えなし</option>" + headers.map(function(header) {
+          return "<option value=\"" + escapeHtml(header) + "\">" + escapeHtml(getListHeaderLabel(header)) + "</option>";
+        }).join("");
+        sortKeySelect.value = headers.indexOf(previousSortKey) !== -1 ? previousSortKey : "";
+        state.sortKey = sortKeySelect.value;
+        if (sortKeySelect.options.length) {
+          sortKeySelect.options[0].textContent = "並び替えなし";
+        }
+        Array.prototype.forEach.call(sortKeySelect.options, function(option, index) {
+          if (index === 0) return;
+          option.textContent = getListHeaderLabel(option.value);
+        });
+      }
+
+      function updateSelectAllState() {
+        var selectAllEl = document.getElementById("select-all-rows");
+        if (!selectAllEl) return;
+
+        var selectableIds = state.viewItems.map(resolveItemId).filter(function(id) { return !!id; });
+        var selectedVisibleCount = selectableIds.filter(function(id) {
+          return !!state.selectedById[id];
+        }).length;
+
+        if (!selectableIds.length) {
+          selectAllEl.checked = false;
+          selectAllEl.indeterminate = false;
+          return;
+        }
+
+        selectAllEl.checked = selectedVisibleCount === selectableIds.length;
+        selectAllEl.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < selectableIds.length;
+      }
+
+      function updateBulkUiState() {
+        var action = document.getElementById("bulk-action").value;
+        var bulkAction = document.getElementById("bulk-action");
+        var bulkStatus = document.getElementById("bulk-status");
+        var executeBtn = document.getElementById("bulk-execute");
+        var selectedCount = getSelectedIds().length;
+        var statusSelected = String(bulkStatus.value || "").trim() !== "";
+        bulkStatus.style.display = action === "updateStatus" ? "" : "none";
+        bulkAction.disabled = state.loading;
+        bulkStatus.disabled = state.loading;
+        executeBtn.disabled = state.loading ||
+          selectedCount === 0 ||
+          !action ||
+          (action === "updateStatus" && !statusSelected);
+      }
+
+      function isHighImpactStatus(statusValue) {
+        var text = String(statusValue || "").trim();
+        if (!text) return false;
+        return /(キャンセル|取消|無効|停止|アーカイブ|削除)/.test(text);
+      }
+
+      function buildBulkConfirmMessage(action, selectedCount, statusValue) {
+        var actionLabel = action === "updateStatus"
+          ? "一括ステータス変更"
+          : action === "recalculate"
+            ? "一括再計算"
+            : "一括無効化";
+        var details = [actionLabel + "を " + selectedCount + " 件に実行します。"];
+
+        if (action === "updateStatus") {
+          details.push("変更後ステータス: " + String(statusValue || "").trim());
+          if (isHighImpactStatus(statusValue)) {
+            details.push("この操作は取り消しづらい可能性があります。");
+          }
+        }
+        if (action === "disable") {
+          details.push("無効化後の復旧には追加操作が必要になる場合があります。");
+        }
+        details.push("実行してよろしいですか？");
+        return {
+          label: actionLabel,
+          message: details.join("\n")
+        };
+      }
+    </script>

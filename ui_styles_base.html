@@ -1,0 +1,94 @@
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f9fc;
+        --surface: #ffffff;
+        --surface-soft: #f9fafb;
+        --border: #e5e7eb;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --primary: #2563eb;
+        --primary-soft: #dbeafe;
+        --success: #166534;
+        --success-soft: #dcfce7;
+        --warning: #9a3412;
+        --warning-soft: #ffedd5;
+        --danger: #b91c1c;
+        --danger-soft: #fee2e2;
+        --shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Noto Sans JP", sans-serif;
+        background: linear-gradient(180deg, #eff6ff 0%, var(--bg) 180px);
+        color: var(--text);
+      }
+
+      .layout-app {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+      }
+
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      .page-title {
+        margin: 0;
+        font-size: 32px;
+        line-height: 1.2;
+      }
+
+      .page-subtitle {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .page-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .screen-context {
+        margin-bottom: 12px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 10px;
+        background: var(--surface);
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .runtime-build {
+        margin-bottom: 16px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow);
+      }
+
+      .card-title {
+        margin: 0 0 12px;
+        font-size: 16px;
+        font-weight: 700;
+      }
+    </style>

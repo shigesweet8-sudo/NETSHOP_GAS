@@ -1,0 +1,243 @@
+    <script>
+      function switchScreen(mode) {
+        var previousMode = state.viewMode || "list";
+        if (mode === "detail") {
+          state.viewMode = "detail";
+        } else if (mode === "edit") {
+          state.viewMode = "edit";
+        } else if (mode === "create") {
+          state.viewMode = "create";
+        } else if (mode === "dashboard") {
+          state.viewMode = "dashboard";
+        } else {
+          state.viewMode = "list";
+        }
+        var listSection = document.getElementById("list-section");
+        var dashboardSection = document.getElementById("dashboard-section");
+        var detailSection = document.getElementById("detail-section");
+        var createSection = document.getElementById("create-section");
+        var editSection = document.getElementById("edit-section");
+        listSection.classList.toggle("screen-hidden", state.viewMode !== "list");
+        dashboardSection.classList.toggle("screen-hidden", state.viewMode !== "dashboard");
+        detailSection.classList.toggle("screen-hidden", state.viewMode !== "detail");
+        createSection.classList.toggle("screen-hidden", state.viewMode !== "create");
+        editSection.classList.toggle("screen-hidden", state.viewMode !== "edit");
+        clearStaleBannerOnScreenSwitch(previousMode, state.viewMode);
+        updateScreenContext();
+        refreshGlobalActionState();
+        syncUrlWithState();
+
+        if (state.viewMode === "list" && !state.loading && !state.allItems.length) {
+          loadItemsWithCurrentSort({ forceBaseLoad: true });
+        }
+      }
+
+      function findFirstValue(item, keys) {
+        if (!item || typeof item !== "object") return "";
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i];
+          if (!Object.prototype.hasOwnProperty.call(item, key)) continue;
+          var value = item[key];
+          if (value == null) continue;
+          if (typeof value === "string" && value.trim() === "") continue;
+          return value;
+        }
+        return "";
+      }
+
+      function toDisplayText(value) {
+        var text = formatStructuredValue(value);
+        return text === "" ? "-" : text;
+      }
+
+      function toDisplayMoney(value) {
+        var text = formatStructuredValue(value);
+        if (text === "") return "-";
+        var normalized = text.replace(/,/g, "").trim();
+        if (/^-?\d+(\.\d+)?$/.test(normalized)) {
+          var num = Number(normalized);
+          if (Number.isFinite(num)) {
+            return num.toLocaleString("ja-JP");
+          }
+        }
+        return text;
+      }
+
+      function extractArrayData(response, candidateKeys) {
+        if (!response || typeof response !== "object") return [];
+        var data = response.data != null ? response.data : response;
+        if (Array.isArray(data)) return data;
+        if (!data || typeof data !== "object") return [];
+
+        var keys = Array.isArray(candidateKeys) ? candidateKeys : [];
+        for (var i = 0; i < keys.length; i++) {
+          if (Array.isArray(data[keys[i]])) return data[keys[i]];
+        }
+        return [];
+      }
+
+      function getTableHeaders(rows) {
+        if (!Array.isArray(rows) || !rows.length) return [];
+        var firstRow = rows[0];
+        if (!firstRow || typeof firstRow !== "object" || Array.isArray(firstRow)) return ["値"];
+        return Object.keys(firstRow);
+      }
+
+      function buildSimpleTableHtml(rows) {
+        var list = Array.isArray(rows) ? rows : [];
+        if (!list.length) {
+          return "<span class=\"muted\">表示できるデータがありません。</span>";
+        }
+
+        var headers = getTableHeaders(list);
+        var html = "<div class=\"table-wrap\"><table><thead><tr>";
+        headers.forEach(function(header) {
+          html += "<th>" + escapeHtml(getListHeaderLabel(header)) + "</th>";
+        });
+        html += "</tr></thead><tbody>";
+
+        list.forEach(function(row) {
+          html += "<tr>";
+          if (!row || typeof row !== "object" || Array.isArray(row)) {
+            html += "<td>" + escapeHtml(formatStructuredValue(row)) + "</td>";
+          } else {
+            headers.forEach(function(header) {
+              html += "<td>" + escapeHtml(formatStructuredValue(row[header])) + "</td>";
+            });
+          }
+          html += "</tr>";
+        });
+        html += "</tbody></table></div>";
+        return html;
+      }
+
+      function hasActiveListFilters() {
+        return !!(String(state.keyword || "").trim() || String(state.statusFilter || "").trim());
+      }
+
+      function formatKpiValue(key, value) {
+        var text = formatStructuredValue(value);
+        if (text === "") return "-";
+
+        var normalized = text.replace(/,/g, "").trim();
+        if (/^-?\d+(\.\d+)?$/.test(normalized)) {
+          var num = Number(normalized);
+          if (Number.isFinite(num)) {
+            if (/rate|率/i.test(String(key || ""))) return num.toFixed(1) + "%";
+            return num.toLocaleString("ja-JP");
+          }
+        }
+        return text;
+      }
+
+      function renderDashboardKpi(kpi) {
+        var statusEl = document.getElementById("dashboard-kpi-status");
+        var contentEl = document.getElementById("dashboard-kpi-content");
+
+        if (!kpi || typeof kpi !== "object" || Array.isArray(kpi) || !Object.keys(kpi).length) {
+          statusEl.textContent = "データなし";
+          contentEl.innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+          return;
+        }
+
+        var html = "<div class=\"kpi-grid\">" + Object.keys(kpi).map(function(key) {
+          return "<div class=\"kpi-card\"><p class=\"kpi-label\">" + escapeHtml(key) + "</p><p class=\"kpi-value\">" + escapeHtml(formatKpiValue(key, kpi[key])) + "</p></div>";
+        }).join("") + "</div>";
+        statusEl.textContent = "読み込み完了 " + Object.keys(kpi).length + " 件";
+        contentEl.innerHTML = html;
+      }
+
+      function renderDashboardTable(statusId, contentId, rows) {
+        var statusEl = document.getElementById(statusId);
+        var contentEl = document.getElementById(contentId);
+        var list = Array.isArray(rows) ? rows : [];
+        if (!list.length) {
+          statusEl.textContent = "データなし";
+          contentEl.innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+          return;
+        }
+        statusEl.textContent = "読み込み完了 " + list.length + " 件";
+        contentEl.innerHTML = buildSimpleTableHtml(list);
+      }
+
+      function setDashboardLoading(flag) {
+        state.dashboardLoading = !!flag;
+        document.getElementById("dashboard-reload").disabled = !!flag;
+        document.getElementById("dashboard-back-to-list").disabled = !!flag;
+        refreshGlobalActionState();
+      }
+
+      function loadDashboard() {
+        setDashboardLoading(true);
+        setBanner("info", "ダッシュボードを取得しています。");
+        document.getElementById("dashboard-kpi-status").textContent = "読み込み中...";
+        document.getElementById("dashboard-monthly-status").textContent = "読み込み中...";
+        document.getElementById("dashboard-platform-status").textContent = "読み込み中...";
+        document.getElementById("dashboard-kpi-content").innerHTML = "<span class=\"muted\">データを取得しています。</span>";
+        document.getElementById("dashboard-monthly-content").innerHTML = "<span class=\"muted\">データを取得しています。</span>";
+        document.getElementById("dashboard-platform-content").innerHTML = "<span class=\"muted\">データを取得しています。</span>";
+
+        return Promise.allSettled([
+          callWrappedApi("api_uiDashboardKpi"),
+          callWrappedApi("api_getMonthlySummary"),
+          callWrappedApi("api_getPlatformSummary")
+        ]).then(function(results) {
+          var kpiResult = results[0];
+          var monthlyResult = results[1];
+          var platformResult = results[2];
+          var failedCount = 0;
+
+          if (kpiResult.status === "fulfilled") {
+            renderDashboardKpi(kpiResult.value && kpiResult.value.data ? kpiResult.value.data : null);
+          } else {
+            failedCount++;
+            document.getElementById("dashboard-kpi-status").textContent = "取得失敗";
+            document.getElementById("dashboard-kpi-content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(kpiResult.reason)) + "</span>";
+          }
+
+          if (monthlyResult.status === "fulfilled") {
+            renderDashboardTable(
+              "dashboard-monthly-status",
+              "dashboard-monthly-content",
+              extractArrayData(monthlyResult.value, ["monthly", "items"])
+            );
+          } else {
+            failedCount++;
+            document.getElementById("dashboard-monthly-status").textContent = "取得失敗";
+            document.getElementById("dashboard-monthly-content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(monthlyResult.reason)) + "</span>";
+          }
+
+          if (platformResult.status === "fulfilled") {
+            renderDashboardTable(
+              "dashboard-platform-status",
+              "dashboard-platform-content",
+              extractArrayData(platformResult.value, ["platforms", "items"])
+            );
+          } else {
+            failedCount++;
+            document.getElementById("dashboard-platform-status").textContent = "取得失敗";
+            document.getElementById("dashboard-platform-content").innerHTML = "<span class=\"muted\">" + escapeHtml(resolveErrorMessage(platformResult.reason)) + "</span>";
+          }
+
+          if (failedCount === 0) {
+            setBanner("success", "ダッシュボードを取得しました。");
+          } else if (failedCount < 3) {
+            setBanner("error", "ダッシュボードの一部取得に失敗しました。");
+          } else {
+            setBanner("error", "ダッシュボードの取得に失敗しました。");
+          }
+        }).catch(function(err) {
+          setBanner("error", "ダッシュボードの取得に失敗しました: " + resolveErrorMessage(err));
+        }).finally(function() {
+          setDashboardLoading(false);
+        });
+      }
+
+      function openDashboardScreen(options) {
+        var opts = options && typeof options === "object" ? options : {};
+        if (!opts.ignoreBusy && isAnyBusy()) return;
+        if (!opts.skipConfirm && !confirmNavigationIfNeeded("dashboard")) return;
+        switchScreen("dashboard");
+        loadDashboard();
+      }
+    </script>

@@ -1,0 +1,423 @@
+    <script>
+      function renderDetailContent() {
+        var statusEl = document.getElementById("detail-status");
+        var contentEl = document.getElementById("detail-content");
+        document.getElementById("open-edit-item").disabled = state.detailLoading || !state.detailItemId;
+        updateScreenContext();
+        refreshGlobalActionState();
+
+        if (state.detailLoading) {
+          statusEl.textContent = "詳細を読み込み中...";
+          contentEl.innerHTML = "<span class=\"muted\">データを取得しています。</span>";
+          return;
+        }
+
+        if (state.detailErrorMessage) {
+          statusEl.textContent = "詳細取得エラー";
+          contentEl.innerHTML = "<span class=\"muted\">" + escapeHtml(state.detailErrorMessage) + "</span>";
+          return;
+        }
+
+        if (!state.detailItem || typeof state.detailItem !== "object") {
+          statusEl.textContent = "詳細データなし";
+          contentEl.innerHTML = "<span class=\"muted\">表示できるデータがありません。</span>";
+          return;
+        }
+
+        var item = state.detailItem;
+        var fields = [
+          { label: "管理ID", value: toDisplayText(findFirstValue(item, ["id", "管理ID"]) || state.detailItemId) },
+          { label: "ステータス", value: toDisplayText(findFirstValue(item, ["status", "ステータス"])) },
+          { label: "ショップ", value: toDisplayText(findFirstValue(item, ["shop", "ショップ"])) },
+          { label: "商品名", value: toDisplayText(findFirstValue(item, ["itemName", "商品名"])) },
+          { label: "出品金額", value: toDisplayMoney(findFirstValue(item, ["listPrice", "出品金額"])) },
+          { label: "交渉金額", value: toDisplayMoney(findFirstValue(item, ["negotiatedPrice", "交渉金額"])) },
+          { label: "決済金額", value: toDisplayMoney(findFirstValue(item, ["priceFinal", "決済金額"])) },
+          { label: "仕入れ値", value: toDisplayMoney(findFirstValue(item, ["cost", "仕入れ値"])) },
+          { label: "配送料", value: toDisplayMoney(findFirstValue(item, ["shipping", "配送料"])) },
+          { label: "サイト利用料", value: toDisplayMoney(findFirstValue(item, ["fee", "サイト利用料"])) },
+          { label: "粗利", value: toDisplayMoney(findFirstValue(item, ["profit", "粗利(原価引)"])) },
+          { label: "備考", value: toDisplayText(findFirstValue(item, ["memo", "備考"])) }
+        ];
+
+        var html = "<div class=\"detail-grid\">" + fields.map(function(field) {
+          return "<div class=\"detail-item\"><div class=\"detail-label\">" + escapeHtml(field.label) + "</div><div class=\"detail-value\">" + escapeHtml(field.value) + "</div></div>";
+        }).join("") + "</div>";
+
+        statusEl.textContent = "管理ID: " + toDisplayText(findFirstValue(item, ["id", "管理ID"]) || state.detailItemId);
+        contentEl.innerHTML = html;
+      }
+
+      function getItemFieldText(item, keys) {
+        var value = findFirstValue(item, keys);
+        if (value == null) return "";
+        return String(value);
+      }
+
+      function setEditFormValues(item) {
+        var safeItem = item && typeof item === "object" ? item : {};
+        var values = {
+          status: getItemFieldText(safeItem, ["status", "ステータス"]),
+          shop: getItemFieldText(safeItem, ["shop", "ショップ"]),
+          itemName: getItemFieldText(safeItem, ["itemName", "商品名"]),
+          cost: getItemFieldText(safeItem, ["cost", "仕入れ値"]),
+          priceFinal: getItemFieldText(safeItem, ["priceFinal", "決済金額"]),
+          fee: getItemFieldText(safeItem, ["fee", "サイト利用料"]),
+          shipping: getItemFieldText(safeItem, ["shipping", "配送料"]),
+          zip: getItemFieldText(safeItem, ["zip", "郵便番号"]),
+          pref: getItemFieldText(safeItem, ["pref", "都道府県"]),
+          addr2: getItemFieldText(safeItem, ["addr2", "住所2(地番)"]),
+          addr3: getItemFieldText(safeItem, ["addr3", "住所3(建物名)"]),
+          memo: getItemFieldText(safeItem, ["memo", "備考"])
+        };
+        state.editInitialValues = values;
+        ensureSelectHasValue("edit-status", values.status);
+        ensureSelectHasValue("edit-shop", values.shop);
+        document.getElementById("edit-item-name").value = values.itemName;
+        document.getElementById("edit-cost").value = values.cost;
+        document.getElementById("edit-price-final").value = values.priceFinal;
+        document.getElementById("edit-fee").value = values.fee;
+        document.getElementById("edit-shipping").value = values.shipping;
+        document.getElementById("edit-zip").value = values.zip;
+        document.getElementById("edit-pref").value = values.pref;
+        document.getElementById("edit-addr2").value = values.addr2;
+        document.getElementById("edit-addr3").value = values.addr3;
+        document.getElementById("edit-memo").value = values.memo;
+      }
+
+      function buildEditUpdatePayload() {
+        var current = collectEditPayload();
+        var initial = state.editInitialValues || {};
+        var payload = {};
+        Object.keys(current).forEach(function(key) {
+          var currentValue = String(current[key] || "").trim();
+          var initialValue = String(initial[key] || "").trim();
+          if (currentValue !== initialValue) {
+            payload[key] = currentValue;
+          }
+        });
+        return payload;
+      }
+
+      function resetEditFormToInitial() {
+        if (!state.editInitialValues) return;
+        ensureSelectHasValue("edit-status", state.editInitialValues.status);
+        ensureSelectHasValue("edit-shop", state.editInitialValues.shop);
+        document.getElementById("edit-item-name").value = state.editInitialValues.itemName || "";
+        document.getElementById("edit-cost").value = state.editInitialValues.cost || "";
+        document.getElementById("edit-price-final").value = state.editInitialValues.priceFinal || "";
+        document.getElementById("edit-fee").value = state.editInitialValues.fee || "";
+        document.getElementById("edit-shipping").value = state.editInitialValues.shipping || "";
+        document.getElementById("edit-zip").value = state.editInitialValues.zip || "";
+        document.getElementById("edit-pref").value = state.editInitialValues.pref || "";
+        document.getElementById("edit-addr2").value = state.editInitialValues.addr2 || "";
+        document.getElementById("edit-addr3").value = state.editInitialValues.addr3 || "";
+        document.getElementById("edit-memo").value = state.editInitialValues.memo || "";
+        clearValidationResult("edit");
+      }
+
+      function collectEditPayload() {
+        return {
+          status: String(document.getElementById("edit-status").value || "").trim(),
+          shop: String(document.getElementById("edit-shop").value || "").trim(),
+          itemName: String(document.getElementById("edit-item-name").value || "").trim(),
+          cost: String(document.getElementById("edit-cost").value || "").trim(),
+          priceFinal: String(document.getElementById("edit-price-final").value || "").trim(),
+          fee: String(document.getElementById("edit-fee").value || "").trim(),
+          shipping: String(document.getElementById("edit-shipping").value || "").trim(),
+          zip: String(document.getElementById("edit-zip").value || "").trim(),
+          pref: String(document.getElementById("edit-pref").value || "").trim(),
+          addr2: String(document.getElementById("edit-addr2").value || "").trim(),
+          addr3: String(document.getElementById("edit-addr3").value || "").trim(),
+          memo: String(document.getElementById("edit-memo").value || "").trim()
+        };
+      }
+
+      function openEditScreen(itemId, options) {
+        var opts = options && typeof options === "object" ? options : {};
+        var normalizedId = String(itemId || state.detailItemId || "").trim();
+        if (!normalizedId) {
+          if (opts.fromRouteRestore) {
+            setBanner("error", "編集対象を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+          } else {
+            setBanner("error", "管理IDを特定できないため編集画面を開けません。");
+          }
+          return;
+        }
+
+        state.editItemId = normalizedId;
+        state.detailItemId = normalizedId;
+        state.editInitialValues = null;
+        setEditInlineMessage("", "");
+        clearValidationResult("edit");
+        switchScreen("edit");
+        setEditLoading(true);
+        setEditInlineMessage("info", "編集データを取得しています...");
+
+        var mastersPromise = loadCreateMastersIfNeeded(false, "edit-message").catch(function() {
+          return null;
+        });
+        var detailPromise = callWrappedApi("getItem", [normalizedId]).then(function(response) {
+          var item = response && response.data ? response.data : null;
+          if (!item) {
+            throw new Error("編集対象データが見つかりません。");
+          }
+          setEditFormValues(item);
+        });
+
+        Promise.all([mastersPromise, detailPromise]).then(function() {
+          resetEditFormToInitial();
+        }).catch(function(err) {
+          if (opts.fromRouteRestore) {
+            setBanner("error", "編集画面を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+          } else {
+            setEditInlineMessage("error", "編集データの取得に失敗しました: " + resolveErrorMessage(err));
+            setBanner("error", "編集画面の初期化に失敗しました。");
+          }
+        }).finally(function() {
+          setEditLoading(false);
+        });
+      }
+
+      function saveEditedItem() {
+        if (state.editSubmitting || state.editLoading) return;
+        var itemId = String(state.editItemId || "").trim();
+        if (!itemId) {
+          setEditInlineMessage("error", "管理IDが取得できないため保存できません。");
+          return;
+        }
+
+        if (!state.editInitialValues) {
+          setEditInlineMessage("error", "初期データが未取得のため保存できません。");
+          return;
+        }
+
+        setEditSubmitting(true);
+        setEditInlineMessage("info", "保存しています...");
+        var payload = buildEditUpdatePayload();
+        if (!Object.keys(payload).length) {
+          setEditInlineMessage("info", "変更がないため保存は不要です。");
+          setEditSubmitting(false);
+          return;
+        }
+
+        callWrappedApi("api_updateItem", [itemId, payload]).then(function() {
+          setEditInlineMessage("success", "保存に成功しました。");
+          setBanner("success", "商品を更新しました。");
+          openDetailById(itemId, { silentSuccessBanner: true });
+        }).catch(function(err) {
+          setEditInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
+          setBanner("error", "商品の更新に失敗しました。");
+        }).finally(function() {
+          setEditSubmitting(false);
+        });
+      }
+
+      function openDetailById(itemId, options) {
+        var opts = options && typeof options === "object" ? options : {};
+        var normalizedId = String(itemId || "").trim();
+        if (!normalizedId) {
+          if (opts.fromRouteRestore) {
+            setBanner("error", "詳細対象を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+          } else {
+            setBanner("error", "管理IDを特定できないため詳細を開けません。");
+          }
+          return Promise.resolve();
+        }
+
+        state.detailItemId = normalizedId;
+        state.detailLoading = true;
+        state.detailItem = null;
+        state.detailErrorMessage = "";
+        switchScreen("detail");
+        renderDetailContent();
+
+        return callWrappedApi("getItem", [normalizedId]).then(function(response) {
+          state.detailItem = response && response.data ? response.data : null;
+          state.detailErrorMessage = state.detailItem ? "" : "対象データが見つかりません。";
+          if (!state.detailItem && opts.fromRouteRestore) {
+            setBanner("error", "詳細対象を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+            return;
+          }
+          if (!opts.silentSuccessBanner) {
+            if (state.detailItem) {
+              setBanner("info", "商品詳細を表示しました。");
+            } else {
+              setBanner("error", "対象データが見つかりませんでした。");
+            }
+          }
+        }).catch(function(err) {
+          state.detailItem = null;
+          state.detailErrorMessage = resolveErrorMessage(err);
+          if (opts.fromRouteRestore) {
+            setBanner("error", "詳細画面を復元できないため一覧へ戻りました。");
+            switchScreen("list");
+          } else {
+            setBanner("error", "商品詳細の取得に失敗しました: " + resolveErrorMessage(err));
+          }
+        }).finally(function() {
+          state.detailLoading = false;
+          renderDetailContent();
+        });
+      }
+
+      function renderItemsTable(items) {
+        state.viewItems = items || [];
+        if (!state.viewItems.length) {
+          var hasSourceItems = Array.isArray(state.allItems) && state.allItems.length > 0;
+          var emptyStatus = hasSourceItems && hasActiveListFilters() ? "該当データなし" : "データなし";
+          var emptyMessage = hasSourceItems && hasActiveListFilters()
+            ? "検索条件に一致するデータがありません。条件を変更して再度確認してください。"
+            : "表示できるデータがありません。";
+          document.getElementById("items-status").textContent = emptyStatus;
+          document.getElementById("content").innerHTML = "<span class=\"muted\">" + escapeHtml(emptyMessage) + "</span>";
+          updateSelectedCount();
+          updateBulkUiState();
+          return;
+        }
+
+        var headers = getCurrentHeaders(state.viewItems);
+        var html = "<div class=\"table-wrap\"><table><thead><tr>";
+        html += "<th class=\"select-cell\"><input id=\"select-all-rows\" type=\"checkbox\" aria-label=\"全選択\"></th>";
+        html += "<th class=\"action-cell\">詳細</th>";
+        headers.forEach(function(header) {
+          html += "<th>" + escapeHtml(getListHeaderLabel(header)) + "</th>";
+        });
+        html += "</tr></thead><tbody>";
+
+        state.viewItems.forEach(function(item) {
+          var itemId = resolveItemId(item);
+          var checked = itemId && state.selectedById[itemId] ? " checked" : "";
+          var disabled = itemId && !state.loading ? "" : " disabled";
+          html += "<tr>";
+          html += "<td class=\"select-cell\"><input class=\"row-select\" type=\"checkbox\" data-item-id=\"" + escapeHtml(itemId) + "\"" + checked + disabled + " aria-label=\"行選択\"></td>";
+          html += "<td class=\"action-cell\"><button class=\"btn btn-secondary btn-small row-detail-open\" type=\"button\" data-item-id=\"" + escapeHtml(itemId) + "\"" + disabled + ">詳細</button></td>";
+          headers.forEach(function(header) {
+            html += "<td>" + escapeHtml(formatStructuredValue(item[header])) + "</td>";
+          });
+          html += "</tr>";
+        });
+
+        html += "</tbody></table></div>";
+        document.getElementById("items-status").textContent = "読み込み完了 " + state.viewItems.length + " 件";
+        document.getElementById("content").innerHTML = html;
+        updateSelectAllState();
+        updateSelectedCount();
+        updateBulkUiState();
+      }
+
+      function applyAndRenderCurrentView() {
+        syncListControlsToState();
+        var filteredItems = applyClientFilters(state.allItems);
+        pruneSelectionWithItems(filteredItems);
+        renderItemsTable(filteredItems);
+      }
+
+      function setLoading(flag, message) {
+        state.loading = !!flag;
+        document.getElementById("reload-items").disabled = !!flag;
+        document.getElementById("open-dashboard").disabled = !!flag;
+        document.getElementById("open-create-item").disabled = !!flag;
+        document.getElementById("open-list").disabled = !!flag || state.viewMode === "list";
+        document.getElementById("sort-order-toggle").disabled = !!flag;
+        document.getElementById("keyword-search").disabled = !!flag;
+        document.getElementById("status-filter").disabled = !!flag;
+        document.getElementById("sort-key").disabled = !!flag;
+        if (message) {
+          document.getElementById("items-status").textContent = message;
+        }
+        updateBulkUiState();
+        refreshGlobalActionState();
+      }
+
+      function loadItemsWithCurrentSort(options) {
+        var opts = options || {};
+        var useSort = !opts.forceBaseLoad && !!state.sortKey;
+        setLoading(true, "読み込み中...");
+        var promise;
+        if (useSort) {
+          promise = callWrappedApi("api_listItemsSorted", [{
+            sortKey: state.sortKey,
+            order: state.sortOrder
+          }]);
+        } else {
+          promise = callWrappedApi("api_listItems");
+        }
+
+        return promise.then(function(response) {
+          state.allItems = extractListItemsFromResponse(response);
+          state.selectedById = {};
+          updateToolbarOptions(state.allItems);
+          applyAndRenderCurrentView();
+          setBanner("success", "商品一覧を取得しました。");
+        }).catch(function(err) {
+          state.allItems = [];
+          state.viewItems = [];
+          state.selectedById = {};
+          updateToolbarOptions([]);
+          updateSelectedCount();
+          var errorMessage = resolveErrorMessage(err);
+          document.getElementById("items-status").textContent = "エラー";
+          document.getElementById("content").innerHTML =
+            "<span class=\"muted\">" + escapeHtml(errorMessage) + "</span>" +
+            buildApiDebugHtml(err);
+          setBanner("error", "商品一覧の取得に失敗しました: " + errorMessage);
+        }).finally(function() {
+          setLoading(false);
+        });
+      }
+
+      function executeBulkAction() {
+        if (state.loading) return;
+        var selectedIds = getSelectedIds();
+        var action = document.getElementById("bulk-action").value;
+        var statusValue = document.getElementById("bulk-status").value;
+
+        if (!selectedIds.length) {
+          setBanner("error", "一括操作する行を選択してください。");
+          updateBulkUiState();
+          return;
+        }
+        if (!action) {
+          setBanner("error", "一括操作を選択してください。");
+          return;
+        }
+        if (action === "updateStatus" && !statusValue) {
+          setBanner("error", "変更後ステータスを選択してください。");
+          return;
+        }
+
+        var confirmInfo = buildBulkConfirmMessage(action, selectedIds.length, statusValue);
+        if (!confirmAction(confirmInfo.message)) {
+          return;
+        }
+
+        setLoading(true, "一括処理中...");
+        setBanner("info", confirmInfo.label + "を実行しています。");
+
+        var apiName = "";
+        var payload = { itemIds: selectedIds };
+        if (action === "updateStatus") {
+          apiName = "api_bulkUpdateStatus";
+          payload.status = statusValue;
+        } else if (action === "recalculate") {
+          apiName = "api_bulkRecalculateProfit";
+        } else {
+          apiName = "api_bulkDisableNetshop";
+        }
+
+        callWrappedApi(apiName, [payload]).then(function() {
+          setBanner("success", confirmInfo.label + "が完了しました。");
+          return loadItemsWithCurrentSort({ forceBaseLoad: false });
+        }).catch(function(err) {
+          setBanner("error", confirmInfo.label + "に失敗しました: " + resolveErrorMessage(err));
+        }).finally(function() {
+          setLoading(false);
+          updateBulkUiState();
+        });
+      }
+    </script>

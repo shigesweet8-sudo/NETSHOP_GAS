@@ -1,0 +1,338 @@
+    <script>
+      function setInlineMessageById(elementId, kind, message) {
+        var el = document.getElementById(elementId);
+        if (!el) return;
+        el.className = "inline-message";
+        if (!message) {
+          el.textContent = "";
+          return;
+        }
+        el.classList.add("is-visible");
+        el.classList.add(kind === "error" ? "is-error" : kind === "success" ? "is-success" : "is-info");
+        el.textContent = message;
+      }
+
+      function setInlineMessage(kind, message) {
+        setInlineMessageById("create-message", kind, message);
+      }
+
+      function setEditInlineMessage(kind, message) {
+        setInlineMessageById("edit-message", kind, message);
+      }
+
+      function getValidationResultElementId(formType) {
+        return formType === "edit" ? "edit-validation-result" : "create-validation-result";
+      }
+
+      function clearValidationResult(formType) {
+        var el = document.getElementById(getValidationResultElementId(formType));
+        if (!el) return;
+        el.className = "validation-result";
+        el.innerHTML = "";
+      }
+
+      function normalizeValidationIssues(list) {
+        return (Array.isArray(list) ? list : []).map(function(entry, index) {
+          if (entry && typeof entry === "object") {
+            var code = entry.code != null ? String(entry.code).trim() : "";
+            var field = entry.field != null ? String(entry.field).trim() : "";
+            var message = entry.message != null ? String(entry.message).trim() : "";
+            var text = message;
+            if (!text) text = formatStructuredValue(entry);
+            if (!text) text = "Issue " + (index + 1);
+            return { code: code, field: field, message: text };
+          }
+          var raw = String(entry == null ? "" : entry).trim();
+          return { code: "", field: "", message: raw || ("Issue " + (index + 1)) };
+        });
+      }
+
+      function extractValidationResult(response) {
+        var source = null;
+        if (response && response.data && typeof response.data === "object") {
+          source = response.data;
+        } else if (response && response.error && response.error.details && typeof response.error.details === "object") {
+          source = response.error.details;
+        } else if (response && typeof response === "object") {
+          source = response;
+        }
+
+        var errors = normalizeValidationIssues(source && source.errors);
+        var warnings = normalizeValidationIssues(source && source.warnings);
+        return {
+          errors: errors,
+          warnings: warnings
+        };
+      }
+
+      function renderValidationResult(formType, result) {
+        var el = document.getElementById(getValidationResultElementId(formType));
+        if (!el) return;
+
+        var errors = result && Array.isArray(result.errors) ? result.errors : [];
+        var warnings = result && Array.isArray(result.warnings) ? result.warnings : [];
+        el.className = "validation-result is-visible";
+
+        if (!errors.length && !warnings.length) {
+          el.innerHTML = "<p class=\"validation-empty\">エラー・警告はありません。</p>";
+          return;
+        }
+
+        var html = "";
+        if (errors.length) {
+          html += "<div class=\"validation-section\"><p class=\"validation-title is-error\">Errors (" + errors.length + ")</p><ul class=\"validation-list\">";
+          errors.forEach(function(issue) {
+            var parts = [];
+            if (issue.code) parts.push("[" + issue.code + "]");
+            if (issue.field) parts.push(issue.field + ":");
+            parts.push(issue.message || "");
+            html += "<li>" + escapeHtml(parts.join(" ").trim()) + "</li>";
+          });
+          html += "</ul></div>";
+        }
+        if (warnings.length) {
+          html += "<div class=\"validation-section\"><p class=\"validation-title is-warning\">Warnings (" + warnings.length + ")</p><ul class=\"validation-list\">";
+          warnings.forEach(function(issue) {
+            var parts = [];
+            if (issue.code) parts.push("[" + issue.code + "]");
+            if (issue.field) parts.push(issue.field + ":");
+            parts.push(issue.message || "");
+            html += "<li>" + escapeHtml(parts.join(" ").trim()) + "</li>";
+          });
+          html += "</ul></div>";
+        }
+        el.innerHTML = html;
+      }
+
+      function runVariationValidation(payload) {
+        return runGasApi("api_validateVariation", [payload]).then(function(raw) {
+          return normalizeApiEnvelope(raw);
+        });
+      }
+
+      function runSavePreValidation(formType) {
+        var isEdit = formType === "edit";
+        if (isEdit && (state.editLoading || state.editSubmitting)) return;
+        if (!isEdit && state.createSubmitting) return;
+
+        var messageSetter = isEdit ? setEditInlineMessage : setInlineMessage;
+        var itemPayload = isEdit ? collectEditPayload() : collectCreatePayload();
+        var requestPayload = {
+          mode: isEdit ? "update" : "create",
+          item: itemPayload
+        };
+        if (isEdit) {
+          requestPayload.item.id = String(state.editItemId || "").trim();
+        }
+
+        messageSetter("info", "保存前バリデーションを実行しています...");
+        clearValidationResult(formType);
+
+        runVariationValidation(requestPayload).then(function(response) {
+          var parsed = extractValidationResult(response);
+          renderValidationResult(formType, parsed);
+
+          if (parsed.errors.length) {
+            messageSetter("error", "Errors が見つかりました。内容を修正してから保存してください。");
+          } else if (parsed.warnings.length) {
+            messageSetter("info", "Warnings のみです。内容を確認したうえで保存できます。");
+          } else {
+            messageSetter("success", "保存前バリデーションで問題は見つかりませんでした。");
+          }
+        }).catch(function(err) {
+          messageSetter("error", "保存前バリデーションに失敗しました: " + resolveErrorMessage(err));
+        });
+      }
+
+      function lookupZipForForm(formType) {
+        var isEdit = formType === "edit";
+        if (isEdit && (state.editLoading || state.editSubmitting)) return;
+        if (!isEdit && state.createSubmitting) return;
+
+        var prefix = isEdit ? "edit" : "create";
+        var zip = String(document.getElementById(prefix + "-zip").value || "").trim();
+        var messageSetter = isEdit ? setEditInlineMessage : setInlineMessage;
+
+        if (!zip) {
+          messageSetter("error", "郵便番号を入力してください。");
+          return;
+        }
+
+        messageSetter("info", "郵便番号から住所を補完しています...");
+        callWrappedApi("api_uiLookupZip", [{ zip: zip }]).then(function(response) {
+          var data = response && response.data ? response.data : {};
+          var pref = String(data.prefecture || "").trim();
+          var addressLine = String(data.addressLine || "").trim();
+          if (!addressLine) {
+            addressLine = String((data.city || "") + (data.town || "")).trim();
+          }
+          var normalizedZip = String(data.zip || "").trim();
+
+          if (!pref && !addressLine) {
+            messageSetter("error", "住所候補が見つかりませんでした。");
+            return;
+          }
+
+          if (normalizedZip) document.getElementById(prefix + "-zip").value = normalizedZip;
+          if (pref) document.getElementById(prefix + "-pref").value = pref;
+          if (addressLine) document.getElementById(prefix + "-addr2").value = addressLine;
+          messageSetter("success", "住所を補完しました。");
+        }).catch(function(err) {
+          messageSetter("error", "住所補完に失敗しました: " + resolveErrorMessage(err));
+        });
+      }
+
+      function setCreateSubmitting(flag) {
+        state.createSubmitting = !!flag;
+        document.getElementById("create-save-item").disabled = !!flag;
+        document.getElementById("create-validate-item").disabled = !!flag;
+        document.getElementById("create-lookup-zip").disabled = !!flag;
+        document.getElementById("create-reset-form").disabled = !!flag;
+        document.getElementById("create-back-to-list").disabled = !!flag;
+        refreshGlobalActionState();
+      }
+
+      function refreshEditButtons() {
+        var disabled = !!state.editLoading || !!state.editSubmitting;
+        document.getElementById("edit-save-item").disabled = disabled;
+        document.getElementById("edit-validate-item").disabled = disabled;
+        document.getElementById("edit-lookup-zip").disabled = disabled;
+        document.getElementById("edit-reset-form").disabled = disabled;
+        document.getElementById("edit-back-to-detail").disabled = !!state.editSubmitting;
+        refreshGlobalActionState();
+      }
+
+      function setEditLoading(flag) {
+        state.editLoading = !!flag;
+        refreshEditButtons();
+      }
+
+      function setEditSubmitting(flag) {
+        state.editSubmitting = !!flag;
+        refreshEditButtons();
+      }
+
+      function resetCreateForm() {
+        document.getElementById("create-item-name").value = "";
+        document.getElementById("create-cost").value = "";
+        document.getElementById("create-price-final").value = "";
+        document.getElementById("create-fee").value = "";
+        document.getElementById("create-shipping").value = "";
+        document.getElementById("create-zip").value = "";
+        document.getElementById("create-pref").value = "";
+        document.getElementById("create-addr2").value = "";
+        document.getElementById("create-addr3").value = "";
+        document.getElementById("create-memo").value = "";
+        clearValidationResult("create");
+      }
+
+      function populateCreateSelect(selectId, options, placeholder) {
+        var select = document.getElementById(selectId);
+        var previousValue = select.value || "";
+        var list = toOptionObjects(options);
+        select.innerHTML = "<option value=\"\">" + escapeHtml(placeholder || "選択してください") + "</option>" + list.map(function(option) {
+          return "<option value=\"" + escapeHtml(option.value) + "\">" + escapeHtml(option.label) + "</option>";
+        }).join("");
+        select.value = list.some(function(option) { return option.value === previousValue; }) ? previousValue : "";
+      }
+
+      function ensureSelectHasValue(selectId, value, fallbackLabel) {
+        var select = document.getElementById(selectId);
+        if (!select) return;
+        var text = String(value == null ? "" : value).trim();
+        if (!text) {
+          select.value = "";
+          return;
+        }
+        var hasOption = Array.prototype.some.call(select.options, function(option) {
+          return String(option.value) === text;
+        });
+        if (!hasOption) {
+          var option = document.createElement("option");
+          option.value = text;
+          option.textContent = fallbackLabel || text;
+          select.appendChild(option);
+        }
+        select.value = text;
+      }
+
+      function applyMasterOptionsToForms(statusOptions, shopOptions) {
+        state.masterStatusOptions = toOptionObjects(statusOptions);
+        state.masterShopOptions = toOptionObjects(shopOptions);
+        populateCreateSelect("create-status", state.masterStatusOptions, "ステータスを選択");
+        populateCreateSelect("create-shop", state.masterShopOptions, "ショップを選択");
+        populateCreateSelect("edit-status", state.masterStatusOptions, "ステータスを選択");
+        populateCreateSelect("edit-shop", state.masterShopOptions, "ショップを選択");
+      }
+
+      function loadCreateMastersIfNeeded(forceReload, messageElementId) {
+        var messageId = messageElementId || "create-message";
+        if (state.mastersLoaded && !forceReload) {
+          applyMasterOptionsToForms(state.masterStatusOptions, state.masterShopOptions);
+          return Promise.resolve();
+        }
+
+        setInlineMessageById(messageId, "info", "候補を取得しています...");
+        return callWrappedApi("api_getMasters", [{
+          masterTypes: ["statuses", "shops"]
+        }]).then(function(response) {
+          var statusOptions = extractMasterOptions(response, ["statuses", "status", "ステータス"]);
+          var shopOptions = extractMasterOptions(response, ["shops", "shop", "ショップ"]);
+          applyMasterOptionsToForms(statusOptions, shopOptions);
+          state.mastersLoaded = true;
+          setInlineMessageById(messageId, "", "");
+        }).catch(function(err) {
+          applyMasterOptionsToForms([], []);
+          setInlineMessageById(messageId, "error", "候補取得に失敗しました: " + resolveErrorMessage(err));
+          throw err;
+        });
+      }
+
+      function collectCreatePayload() {
+        return {
+          status: String(document.getElementById("create-status").value || "").trim(),
+          shop: String(document.getElementById("create-shop").value || "").trim(),
+          itemName: String(document.getElementById("create-item-name").value || "").trim(),
+          cost: String(document.getElementById("create-cost").value || "").trim(),
+          priceFinal: String(document.getElementById("create-price-final").value || "").trim(),
+          fee: String(document.getElementById("create-fee").value || "").trim(),
+          shipping: String(document.getElementById("create-shipping").value || "").trim(),
+          zip: String(document.getElementById("create-zip").value || "").trim(),
+          pref: String(document.getElementById("create-pref").value || "").trim(),
+          addr2: String(document.getElementById("create-addr2").value || "").trim(),
+          addr3: String(document.getElementById("create-addr3").value || "").trim(),
+          memo: String(document.getElementById("create-memo").value || "").trim()
+        };
+      }
+
+      function saveNewItem() {
+        if (state.createSubmitting) return;
+        setCreateSubmitting(true);
+        setInlineMessage("info", "保存しています...");
+        var payload = collectCreatePayload();
+
+        callWrappedApi("api_createItem", [payload]).then(function(response) {
+          var createdId = response && response.data && response.data.id ? String(response.data.id) : "";
+          setInlineMessage("success", "保存に成功しました" + (createdId ? " (管理ID: " + createdId + ")" : "") + "。");
+          setBanner("success", "新規商品を登録しました。");
+          resetCreateForm();
+          switchScreen("list");
+          loadItemsWithCurrentSort({ forceBaseLoad: true });
+        }).catch(function(err) {
+          setInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
+          setBanner("error", "新規商品の保存に失敗しました。");
+        }).finally(function() {
+          setCreateSubmitting(false);
+        });
+      }
+
+      function openCreateScreen(options) {
+        var opts = options && typeof options === "object" ? options : {};
+        if (!opts.ignoreBusy && isAnyBusy()) return;
+        if (!opts.skipConfirm && !confirmNavigationIfNeeded("create")) return;
+        setInlineMessage("", "");
+        clearValidationResult("create");
+        switchScreen("create");
+        loadCreateMastersIfNeeded(false, "create-message").catch(function() {});
+      }
+    </script>
