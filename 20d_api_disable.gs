@@ -335,9 +335,3 @@ function api_archiveItem(payload) {
   }
 }
 
-/**
- * 指定IDの商品ステータスを更新し、更新後データ（個人情報除外）を返却する。
- * @param {string} itemId
- * @param {string} status
- * @param {string=} memo
- * @returns {Object|null}
