@@ -83,6 +83,7 @@
         document.getElementById("edit-addr2").value = values.addr2;
         document.getElementById("edit-addr3").value = values.addr3;
         document.getElementById("edit-memo").value = values.memo;
+        applyStatusPlanToForm("edit");
       }
 
       function buildEditUpdatePayload() {
@@ -114,6 +115,7 @@
         document.getElementById("edit-addr3").value = state.editInitialValues.addr3 || "";
         document.getElementById("edit-memo").value = state.editInitialValues.memo || "";
         clearValidationResult("edit");
+        applyStatusPlanToForm("edit");
       }
 
       function collectEditPayload() {
@@ -210,6 +212,34 @@
         }).catch(function(err) {
           setEditInlineMessage("error", "保存に失敗しました: " + resolveErrorMessage(err));
           setBanner("error", "商品の更新に失敗しました。");
+        }).finally(function() {
+          setEditSubmitting(false);
+        });
+      }
+
+      function deleteEditedItem() {
+        if (state.editSubmitting || state.editLoading) return;
+        var itemId = String(state.editItemId || "").trim();
+        if (!itemId) {
+          setEditInlineMessage("error", "管理IDが取得できないため削除できません。");
+          return;
+        }
+        if (!confirmAction("この商品を削除します。運用上は保管扱いとして一覧から除外する想定です。よろしいですか？")) {
+          return;
+        }
+
+        setEditSubmitting(true);
+        setEditInlineMessage("info", "削除しています...");
+        callWrappedApi("api_archiveItem", [{
+          itemId: itemId,
+          memo: "[UI削除] 編集画面から削除"
+        }]).then(function() {
+          setBanner("success", "商品を削除しました。");
+          switchScreen("list");
+          return loadItemsWithCurrentSort({ forceBaseLoad: true });
+        }).catch(function(err) {
+          setEditInlineMessage("error", "削除に失敗しました: " + resolveErrorMessage(err));
+          setBanner("error", "商品の削除に失敗しました。");
         }).finally(function() {
           setEditSubmitting(false);
         });

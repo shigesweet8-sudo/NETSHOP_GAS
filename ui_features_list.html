@@ -172,6 +172,13 @@
         });
 
         var statuses = Object.keys(statusMap).sort();
+        if (Array.isArray(state.masterStatusOptions) && state.masterStatusOptions.length) {
+          statuses = state.masterStatusOptions.map(function(option) {
+            return String(option.value || "").trim();
+          }).filter(function(status) {
+            return !!status;
+          });
+        }
         statusSelect.innerHTML = "<option value=\"\">すべてのステータス</option>" + statuses.map(function(status) {
           return "<option value=\"" + escapeHtml(status) + "\">" + escapeHtml(status) + "</option>";
         }).join("");
@@ -221,6 +228,7 @@
         var bulkAction = document.getElementById("bulk-action");
         var bulkStatus = document.getElementById("bulk-status");
         var executeBtn = document.getElementById("bulk-execute");
+        var helpEl = document.getElementById("bulk-help");
         var selectedCount = getSelectedIds().length;
         var statusSelected = String(bulkStatus.value || "").trim() !== "";
         bulkStatus.style.display = action === "updateStatus" ? "" : "none";
@@ -230,6 +238,25 @@
           selectedCount === 0 ||
           !action ||
           (action === "updateStatus" && !statusSelected);
+        if (helpEl) {
+          helpEl.textContent = getBulkActionHelpText(action, bulkStatus.value, selectedCount);
+        }
+      }
+
+      function getBulkActionHelpText(action, statusValue, selectedCount) {
+        var countText = selectedCount ? (selectedCount + " 件選択中") : "未選択";
+        if (action === "updateStatus") {
+          return statusValue
+            ? countText + " / 選択行のステータスを「" + String(statusValue).trim() + "」へ変更します。"
+            : countText + " / 一括ステータス変更では変更後ステータスの指定が必要です。";
+        }
+        if (action === "recalculate") {
+          return countText + " / 決済金額・手数料・送料・仕入れ値から粗利を再計算します。";
+        }
+        if (action === "disable") {
+          return countText + " / 選択行を運用上の無効データとして扱います。";
+        }
+        return "一括操作を選択すると、ここに処理内容を表示します。";
       }
 
       function isHighImpactStatus(statusValue) {

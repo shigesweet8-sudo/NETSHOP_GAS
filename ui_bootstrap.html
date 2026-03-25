@@ -64,6 +64,10 @@
         updateBulkUiState();
       });
 
+      document.getElementById("bulk-status").addEventListener("change", function() {
+        updateBulkUiState();
+      });
+
       document.getElementById("bulk-execute").addEventListener("click", function() {
         executeBulkAction();
       });
@@ -95,6 +99,10 @@
         lookupZipForForm("create");
       });
 
+      document.getElementById("create-status").addEventListener("change", function() {
+        applyStatusPlanToForm("create");
+      });
+
       document.getElementById("create-reset-form").addEventListener("click", function() {
         if (state.createSubmitting) return;
         if (hasCreateFormChanges() && !confirmAction("入力内容をクリアします。よろしいですか？")) return;
@@ -122,6 +130,14 @@
 
       document.getElementById("edit-lookup-zip").addEventListener("click", function() {
         lookupZipForForm("edit");
+      });
+
+      document.getElementById("edit-status").addEventListener("change", function() {
+        applyStatusPlanToForm("edit");
+      });
+
+      document.getElementById("edit-delete-item").addEventListener("click", function() {
+        deleteEditedItem();
       });
 
       document.getElementById("edit-reset-form").addEventListener("click", function() {

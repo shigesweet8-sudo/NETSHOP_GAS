@@ -92,7 +92,7 @@
         var headers = getTableHeaders(list);
         var html = "<div class=\"table-wrap\"><table><thead><tr>";
         headers.forEach(function(header) {
-          html += "<th>" + escapeHtml(getListHeaderLabel(header)) + "</th>";
+          html += "<th>" + escapeHtml(getDashboardLabel(header)) + "</th>";
         });
         html += "</tr></thead><tbody>";
 
@@ -130,6 +130,30 @@
         return text;
       }
 
+      var DASHBOARD_LABELS = {
+        totalCount: "総件数",
+        totalSales: "総売上",
+        totalFee: "総手数料",
+        totalShipping: "総送料",
+        totalCost: "総仕入れ",
+        totalProfit: "総粗利",
+        profitRate: "利益率",
+        month: "年月",
+        count: "件数",
+        sales: "売上",
+        fee: "手数料",
+        shipping: "送料",
+        cost: "仕入れ",
+        profit: "利益",
+        shop: "ショップ"
+      };
+
+      function getDashboardLabel(key) {
+        return Object.prototype.hasOwnProperty.call(DASHBOARD_LABELS, key)
+          ? DASHBOARD_LABELS[key]
+          : getListHeaderLabel(key);
+      }
+
       function renderDashboardKpi(kpi) {
         var statusEl = document.getElementById("dashboard-kpi-status");
         var contentEl = document.getElementById("dashboard-kpi-content");
@@ -141,7 +165,7 @@
         }
 
         var html = "<div class=\"kpi-grid\">" + Object.keys(kpi).map(function(key) {
-          return "<div class=\"kpi-card\"><p class=\"kpi-label\">" + escapeHtml(key) + "</p><p class=\"kpi-value\">" + escapeHtml(formatKpiValue(key, kpi[key])) + "</p></div>";
+          return "<div class=\"kpi-card\"><p class=\"kpi-label\">" + escapeHtml(getDashboardLabel(key)) + "</p><p class=\"kpi-value\">" + escapeHtml(formatKpiValue(key, kpi[key])) + "</p></div>";
         }).join("") + "</div>";
         statusEl.textContent = "読み込み完了 " + Object.keys(kpi).length + " 件";
         contentEl.innerHTML = html;

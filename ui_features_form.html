@@ -197,6 +197,7 @@
         document.getElementById("edit-save-item").disabled = disabled;
         document.getElementById("edit-validate-item").disabled = disabled;
         document.getElementById("edit-lookup-zip").disabled = disabled;
+        document.getElementById("edit-delete-item").disabled = disabled;
         document.getElementById("edit-reset-form").disabled = disabled;
         document.getElementById("edit-back-to-detail").disabled = !!state.editSubmitting;
         refreshGlobalActionState();
@@ -223,7 +224,10 @@
         document.getElementById("create-addr2").value = "";
         document.getElementById("create-addr3").value = "";
         document.getElementById("create-memo").value = "";
+        document.getElementById("create-status").value = "";
+        document.getElementById("create-shop").value = "";
         clearValidationResult("create");
+        applyStatusPlanToForm("create");
       }
 
       function populateCreateSelect(selectId, options, placeholder) {
@@ -256,6 +260,147 @@
         select.value = text;
       }
 
+      var FORM_FIELD_LABELS = {
+        status: "ステータス",
+        shop: "ショップ",
+        itemName: "商品名",
+        cost: "仕入れ値",
+        priceFinal: "決済金額",
+        fee: "サイト利用料",
+        shipping: "配送料",
+        zip: "郵便番号",
+        pref: "都道府県",
+        addr2: "住所2(地番)",
+        addr3: "住所3(建物名)",
+        memo: "備考"
+      };
+
+      var STATUS_FIELD_PLANS = {
+        "商品登録": {
+          summary: "商品登録時点で必要な基本情報を入力します。",
+          required: ["status", "shop", "itemName", "cost"],
+          recommended: ["memo"]
+        },
+        "出品中": {
+          summary: "出品時の販売条件を確認できる状態にします。",
+          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee"],
+          recommended: ["shipping", "memo"]
+        },
+        "値段交渉中": {
+          summary: "交渉中でも金額と販売先が追えるようにします。",
+          required: ["status", "shop", "itemName", "cost", "priceFinal"],
+          recommended: ["fee", "memo"]
+        },
+        "決済完了": {
+          summary: "発送準備に必要な決済・配送情報を揃えます。",
+          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee", "shipping", "zip", "pref", "addr2"],
+          recommended: ["addr3", "memo"]
+        },
+        "発送準備中": {
+          summary: "発送直前として配送先の入力漏れを防ぎます。",
+          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee", "shipping", "zip", "pref", "addr2"],
+          recommended: ["addr3", "memo"]
+        },
+        "発送完了": {
+          summary: "発送完了時点で販売情報と配送情報が揃っている状態を保ちます。",
+          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee", "shipping", "zip", "pref", "addr2"],
+          recommended: ["addr3", "memo"]
+        },
+        "取引完了": {
+          summary: "完了記録として損益情報を確定できる状態にします。",
+          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee", "shipping"],
+          recommended: ["memo"]
+        },
+        "キャンセル": {
+          summary: "キャンセル理由が追えるよう、備考の記入を推奨します。",
+          required: ["status", "shop", "itemName", "memo"],
+          recommended: ["cost", "priceFinal"]
+        }
+      };
+
+      function getStatusPlanForValue(statusValue) {
+        var key = String(statusValue || "").trim();
+        return STATUS_FIELD_PLANS[key] || null;
+      }
+
+      function getFormInputId(formType, fieldKey) {
+        var prefix = formType === "edit" ? "edit" : "create";
+        var map = {
+          status: prefix + "-status",
+          shop: prefix + "-shop",
+          itemName: prefix + "-item-name",
+          cost: prefix + "-cost",
+          priceFinal: prefix + "-price-final",
+          fee: prefix + "-fee",
+          shipping: prefix + "-shipping",
+          zip: prefix + "-zip",
+          pref: prefix + "-pref",
+          addr2: prefix + "-addr2",
+          addr3: prefix + "-addr3",
+          memo: prefix + "-memo"
+        };
+        return map[fieldKey] || "";
+      }
+
+      function clearStatusPlanHighlights(formType) {
+        Object.keys(FORM_FIELD_LABELS).forEach(function(fieldKey) {
+          var input = document.getElementById(getFormInputId(formType, fieldKey));
+          if (!input || !input.closest) return;
+          var container = input.closest(".form-field");
+          if (!container) return;
+          container.classList.remove("is-highlighted", "is-required", "is-recommended");
+        });
+      }
+
+      function markStatusPlanField(formType, fieldKey, className) {
+        var input = document.getElementById(getFormInputId(formType, fieldKey));
+        if (!input || !input.closest) return;
+        var container = input.closest(".form-field");
+        if (!container) return;
+        container.classList.add("is-highlighted");
+        container.classList.add(className);
+      }
+
+      function renderStatusPlanGuide(formType, statusValue) {
+        var planEl = document.getElementById(formType === "edit" ? "edit-status-plan" : "create-status-plan");
+        if (!planEl) return;
+        var plan = getStatusPlanForValue(statusValue);
+        if (!plan) {
+          planEl.className = "status-plan is-visible";
+          planEl.innerHTML = "<p class=\"status-plan-text\">ステータスを選択すると、入力推奨項目を表示します。</p>";
+          return;
+        }
+
+        var chips = [];
+        (plan.required || []).forEach(function(fieldKey) {
+          chips.push("<span class=\"status-plan-chip is-required\">必須: " + escapeHtml(FORM_FIELD_LABELS[fieldKey] || fieldKey) + "</span>");
+        });
+        (plan.recommended || []).forEach(function(fieldKey) {
+          chips.push("<span class=\"status-plan-chip is-recommended\">推奨: " + escapeHtml(FORM_FIELD_LABELS[fieldKey] || fieldKey) + "</span>");
+        });
+
+        planEl.className = "status-plan is-visible";
+        planEl.innerHTML =
+          "<p class=\"status-plan-title\">入力計画: " + escapeHtml(String(statusValue).trim()) + "</p>" +
+          "<p class=\"status-plan-text\">" + escapeHtml(plan.summary || "") + "</p>" +
+          "<div class=\"status-plan-list\">" + chips.join("") + "</div>";
+      }
+
+      function applyStatusPlanToForm(formType) {
+        var select = document.getElementById(formType === "edit" ? "edit-status" : "create-status");
+        var statusValue = select ? select.value : "";
+        var plan = getStatusPlanForValue(statusValue);
+        clearStatusPlanHighlights(formType);
+        renderStatusPlanGuide(formType, statusValue);
+        if (!plan) return;
+        (plan.required || []).forEach(function(fieldKey) {
+          markStatusPlanField(formType, fieldKey, "is-required");
+        });
+        (plan.recommended || []).forEach(function(fieldKey) {
+          markStatusPlanField(formType, fieldKey, "is-recommended");
+        });
+      }
+
       function applyMasterOptionsToForms(statusOptions, shopOptions) {
         state.masterStatusOptions = toOptionObjects(statusOptions);
         state.masterShopOptions = toOptionObjects(shopOptions);
@@ -263,6 +408,8 @@
         populateCreateSelect("create-shop", state.masterShopOptions, "ショップを選択");
         populateCreateSelect("edit-status", state.masterStatusOptions, "ステータスを選択");
         populateCreateSelect("edit-shop", state.masterShopOptions, "ショップを選択");
+        applyStatusPlanToForm("create");
+        applyStatusPlanToForm("edit");
       }
 
       function loadCreateMastersIfNeeded(forceReload, messageElementId) {
@@ -333,6 +480,7 @@
         setInlineMessage("", "");
         clearValidationResult("create");
         switchScreen("create");
+        applyStatusPlanToForm("create");
         loadCreateMastersIfNeeded(false, "create-message").catch(function() {});
       }
     </script>
