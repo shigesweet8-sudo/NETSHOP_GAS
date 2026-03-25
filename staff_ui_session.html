@@ -1,0 +1,240 @@
+<script>
+  var STAFF_SESSION_KEY = 'netshop.selectedStaff';
+
+  function setStaffMessage(kind, message) {
+    setInlineMessageById('staff-add-message', kind, message);
+  }
+
+  function getStoredSelectedStaff_() {
+    try {
+      var raw = window.sessionStorage.getItem(STAFF_SESSION_KEY) || window.localStorage.getItem(STAFF_SESSION_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (!parsed.staffName) return null;
+      if (!parsed.staffId) parsed.staffId = parsed.staffName;
+      return parsed;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function persistSelectedStaff_(staff) {
+    var value = staff && typeof staff === 'object' ? JSON.stringify(staff) : '';
+    try {
+      if (value) {
+        window.sessionStorage.setItem(STAFF_SESSION_KEY, value);
+        window.localStorage.setItem(STAFF_SESSION_KEY, value);
+      } else {
+        window.sessionStorage.removeItem(STAFF_SESSION_KEY);
+        window.localStorage.removeItem(STAFF_SESSION_KEY);
+      }
+    } catch (error) {}
+  }
+
+  function getSelectedStaffDisplayText() {
+    if (!state.selectedStaff) return '';
+    return String(state.selectedStaff.displayName || state.selectedStaff.staffName || state.selectedStaff.staffId || '').trim();
+  }
+
+  function updateCurrentStaffUi() {
+    var display = getSelectedStaffDisplayText();
+    var banner = document.getElementById('staff-current-banner');
+    var homeCurrent = document.getElementById('staff-home-current');
+    var createPreview = document.getElementById('create-staff-preview');
+    if (banner) {
+      banner.textContent = display ? ('現在の担当者: ' + display) : '担当者を選択してください。';
+      banner.classList.toggle('is-visible', true);
+    }
+    if (homeCurrent) homeCurrent.textContent = display || '未選択';
+    if (createPreview) createPreview.value = display || '担当者ホームで担当者を選択';
+  }
+
+  function setSelectedStaff(staff) {
+    state.selectedStaff = staff || null;
+    persistSelectedStaff_(state.selectedStaff);
+    updateCurrentStaffUi();
+  }
+
+  function getSelectedStaffById(staffId) {
+    var list = Array.isArray(state.staffOptions) ? state.staffOptions : [];
+    for (var i = 0; i < list.length; i++) {
+      if (String(list[i].staffId || '').trim() === String(staffId || '').trim()) return list[i];
+    }
+    return null;
+  }
+
+  function renderStaffSelectList() {
+    var listEl = document.getElementById('staff-select-list');
+    var statusEl = document.getElementById('staff-select-status');
+    var staffs = Array.isArray(state.staffOptions) ? state.staffOptions : [];
+    if (!staffs.length) {
+      statusEl.textContent = '担当者が未登録です。';
+      listEl.innerHTML = '<p class="staff-inline-note">担当者追加から最初の担当者を登録してください。</p>';
+      return;
+    }
+    statusEl.textContent = '担当者を選択してください。';
+    listEl.innerHTML = staffs.map(function(staff) {
+      var disabled = staff.status && staff.status !== '\u6709\u52b9';
+      return '<article class="staff-card' + (disabled ? ' is-disabled' : '') + '">' +
+        '<p class="staff-card-label">担当者名</p>' +
+        '<h3 class="staff-card-title">' + escapeHtml(staff.staffName || '-') + '</h3>' +
+        '<p class="staff-card-text">' + escapeHtml(staff.displayName || staff.staffName || '-') + '</p>' +
+        '<div class="staff-card-actions">' +
+        '<button class="btn btn-primary staff-select-trigger" type="button" data-staff-id="' + escapeHtml(staff.staffId || '') + '"' + (disabled ? ' disabled' : '') + '>この担当者で開始</button>' +
+        '<button class="btn btn-secondary staff-edit-trigger" type="button" data-staff-id="' + escapeHtml(staff.staffId || '') + '"' + (disabled ? ' disabled' : '') + '>編集</button>' +
+        '<button class="btn btn-secondary staff-delete-trigger" type="button" data-staff-id="' + escapeHtml(staff.staffId || '') + '"' + (disabled ? ' disabled' : '') + '>削除</button>' +
+        '</div>' +
+      '</article>';
+    }).join('');
+  }
+
+  function loadStaffOptions(forceReload) {
+    if (state.staffsLoaded && !forceReload) {
+      renderStaffSelectList();
+      return Promise.resolve(state.staffOptions);
+    }
+    document.getElementById('staff-select-status').textContent = '担当者を読み込みます。';
+    return callWrappedApi('api_getStaffs', [{ includeInactive: false }]).then(function(response) {
+      var items = extractArrayData(response, ['staffs', 'items']);
+      state.staffOptions = Array.isArray(items) ? items : [];
+      state.staffsLoaded = true;
+      if (state.selectedStaff) {
+        var latest = getSelectedStaffById(state.selectedStaff.staffId);
+        setSelectedStaff(latest || null);
+      }
+      renderStaffSelectList();
+      return state.staffOptions;
+    }).catch(function(err) {
+      document.getElementById('staff-select-status').textContent = '担当者の取得に失敗しました。';
+      document.getElementById('staff-select-list').innerHTML = '<p class="staff-inline-note">' + escapeHtml(resolveErrorMessage(err)) + '</p>';
+      throw err;
+    });
+  }
+
+  function openStaffSelectScreen(options) {
+    var opts = options && typeof options === 'object' ? options : {};
+    if (!opts.ignoreBusy && isAnyBusy()) return;
+    if (!opts.skipConfirm && !confirmNavigationIfNeeded('staffselect')) return;
+    switchScreen('staffselect');
+    loadStaffOptions(false).catch(function() {});
+  }
+
+  function openStaffAddScreen(options) {
+    var opts = options && typeof options === 'object' ? options : {};
+    if (!opts.ignoreBusy && isAnyBusy()) return;
+    if (!opts.skipConfirm && !confirmNavigationIfNeeded('staffadd')) return;
+    document.getElementById('staff-add-count').value = '1';
+    renderStaffAddSlots();
+    resetStaffAddSlots();
+    refreshStaffAddProgress();
+    loadStaffIdPreview();
+    setStaffMessage('', '');
+    switchScreen('staffadd');
+  }
+
+  function openStaffHomeScreen(options) {
+    var opts = options && typeof options === 'object' ? options : {};
+    if (!opts.ignoreBusy && isAnyBusy()) return;
+    if (!opts.skipConfirm && !confirmNavigationIfNeeded('staffhome')) return;
+    if (!state.selectedStaff) {
+      openStaffSelectScreen({ skipConfirm: true, ignoreBusy: true });
+      return;
+    }
+    switchScreen('staffhome');
+    updateCurrentStaffUi();
+  }
+
+  function ensureSelectedStaffOrRedirect(message) {
+    if (state.selectedStaff) return true;
+    if (message) setBanner('error', message);
+    openStaffSelectScreen({ skipConfirm: true, ignoreBusy: true });
+    return false;
+  }
+
+  function saveStaffSelection(staffId) {
+    var staff = getSelectedStaffById(staffId);
+    if (!staff) {
+      setBanner('error', '担当者が見つかりませんでした。');
+      return;
+    }
+    setSelectedStaff(staff);
+    setBanner('success', '担当者を選択しました。');
+    openStaffHomeScreen({ skipConfirm: true, ignoreBusy: true });
+  }
+
+  function editStaffById(staffId) {
+    var staff = getSelectedStaffById(staffId);
+    if (!staff) {
+      setBanner('error', '担当者が見つかりませんでした。');
+      return;
+    }
+    var nextName = window.prompt('新しい担当者名を入力してください。', String(staff.staffName || '').trim());
+    if (nextName === null) return;
+    nextName = String(nextName || '').trim();
+    if (!nextName) {
+      setBanner('error', '担当者名を入力してください。');
+      return;
+    }
+    setBanner('info', '担当者名を更新しています。');
+    callWrappedApi('api_updateStaff', [{ staffId: staffId, staffName: nextName }]).then(function(response) {
+      var updated = response && response.data && (response.data.staff || response.data.item);
+      if (!updated) throw new Error('担当者の更新結果を取得できませんでした。');
+      mergeStaffOptions([updated]);
+      if (state.selectedStaff && String(state.selectedStaff.staffId || '').trim() === String(staffId || '').trim()) {
+        setSelectedStaff(updated);
+      } else {
+        updateCurrentStaffUi();
+      }
+      renderStaffSelectList();
+      setBanner('success', '担当者名を更新しました。');
+    }).catch(function(err) {
+      setBanner('error', '担当者名の更新に失敗しました: ' + resolveErrorMessage(err));
+    });
+  }
+
+  function deleteStaffById(staffId) {
+    var staff = getSelectedStaffById(staffId);
+    if (!staff) {
+      setBanner('error', '担当者が見つかりませんでした。');
+      return;
+    }
+    if (!window.confirm('担当者を削除しますか？\n削除後は担当者画面から非表示になります。')) return;
+    setBanner('info', '担当者を削除しています。');
+    callWrappedApi('api_deleteStaff', [{ staffId: staffId }]).then(function() {
+      state.staffOptions = (Array.isArray(state.staffOptions) ? state.staffOptions : []).filter(function(item) {
+        return String(item.staffId || '').trim() !== String(staffId || '').trim();
+      });
+      state.staffsLoaded = true;
+      if (state.selectedStaff && String(state.selectedStaff.staffId || '').trim() === String(staffId || '').trim()) {
+        setSelectedStaff(null);
+      } else {
+        updateCurrentStaffUi();
+      }
+      renderStaffSelectList();
+      setBanner('success', '担当者を削除しました。');
+      if (state.viewMode === 'staffhome' && !state.selectedStaff) {
+        openStaffSelectScreen({ skipConfirm: true, ignoreBusy: true });
+      }
+    }).catch(function(err) {
+      setBanner('error', '担当者削除に失敗しました: ' + resolveErrorMessage(err));
+    });
+  }
+
+  function mergeStaffOptions(createdStaffs) {
+    var merged = Array.isArray(state.staffOptions) ? state.staffOptions.slice() : [];
+    (Array.isArray(createdStaffs) ? createdStaffs : []).forEach(function(created) {
+      var replaced = false;
+      for (var i = 0; i < merged.length; i++) {
+        if (String(merged[i].staffId || '').trim() === String(created.staffId || '').trim()) {
+          merged[i] = created;
+          replaced = true;
+          break;
+        }
+      }
+      if (!replaced) merged.push(created);
+    });
+    state.staffOptions = merged;
+    state.staffsLoaded = true;
+  }
+</script>

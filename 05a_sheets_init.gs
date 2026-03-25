@@ -35,12 +35,9 @@ function createManagementSheet() {
       .setAllowInvalid(true)
       .build()
   );
-  sheet.getRange(2, col.STAFF, maxDataRows, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation()
-      .requireValueInList(['長谷川', '小園', '堀田', '柏原', '本田', '伊藤', '宮廻', '体験者'], true)
-      .setAllowInvalid(true)
-      .build()
-  );
+  updateStaffValidationList_(listStaffsRaw_({ includeInactive: false }).map(function(staff) {
+    return staff.staffName;
+  }));
   sheet.getRange(2, col.SHOP, maxDataRows, 1).setDataValidation(
     SpreadsheetApp.newDataValidation()
       .requireValueInList(['メルカリ(Cappa)', 'メルカリ(どすこい)', 'メルカリShops', 'ヤフオク(Cappa)', 'ヤフオク(海坊主)', 'Yahoo!Shop', 'Amazon'], true)

@@ -144,16 +144,6 @@ const CONFIG = Object.freeze({
       'Yahoo!Shop',
       'Amazon'
     ]),
-    ASSIGNEE: Object.freeze([
-      '長谷川',
-      '小園',
-      '堀田',
-      '柏原',
-      '本田',
-      '伊藤',
-      '宮廻',
-      '体験者'
-    ]),
     SHIPPING_FROM: Object.freeze([
       '自社',
       '外部依頼',

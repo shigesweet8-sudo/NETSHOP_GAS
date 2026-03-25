@@ -1,0 +1,107 @@
+<script>
+  function getStaffAddCount() {
+    var count = Number(document.getElementById('staff-add-count').value || 1);
+    if (!isFinite(count) || count < 1) return 1;
+    return Math.min(Math.floor(count), 10);
+  }
+
+  function renderStaffAddSlots() {
+    var container = document.getElementById('staff-add-slots');
+    if (!container || container.childElementCount) return;
+    var html = [];
+    for (var i = 1; i <= 10; i++) {
+      html.push(
+        '<div class="staff-add-slot" data-slot-index="' + i + '">' +
+          '<p class="staff-add-slot-no">No.' + i + '</p>' +
+          '<div class="form-field">' +
+            '<label for="staff-add-name-' + i + '">担当者名</label>' +
+            '<input id="staff-add-name-' + i + '" class="control-input staff-add-name-slot" type="text" data-slot-index="' + i + '" placeholder="担当者名を入力">' +
+          '</div>' +
+          '<div class="form-field">' +
+            '<label for="staff-add-id-preview-' + i + '">担当者ID</label>' +
+            '<input id="staff-add-id-preview-' + i + '" class="control-input staff-add-slot-id" type="text" readonly value="読み込み中">' +
+          '</div>' +
+        '</div>'
+      );
+    }
+    container.innerHTML = html.join('');
+  }
+
+  function updateStaffAddSlotVisibility() {
+    var count = getStaffAddCount();
+    var slots = document.querySelectorAll('#staff-add-slots .staff-add-slot');
+    Array.prototype.forEach.call(slots, function(slot, index) {
+      slot.classList.toggle('is-hidden', index >= count);
+    });
+  }
+
+  function resetStaffAddSlots() {
+    Array.prototype.forEach.call(document.querySelectorAll('.staff-add-name-slot'), function(input) {
+      input.value = '';
+    });
+  }
+
+  function getStaffAddNames() {
+    var names = [];
+    var count = getStaffAddCount();
+    for (var i = 1; i <= count; i++) {
+      var input = document.getElementById('staff-add-name-' + i);
+      var name = String(input && input.value || '').trim();
+      if (name) names.push(name);
+    }
+    return names;
+  }
+
+  function refreshStaffAddProgress() {
+    var count = getStaffAddCount();
+    var entered = getStaffAddNames().length;
+    document.getElementById('staff-add-progress').value = entered + ' / ' + count + '人入力';
+    updateStaffAddSlotVisibility();
+  }
+
+  function loadStaffIdPreview() {
+    var count = getStaffAddCount();
+    return callWrappedApi('api_getStaffIdPreview', [{ count: count }]).then(function(response) {
+      var ids = extractArrayData(response, ['ids']);
+      if (!Array.isArray(ids)) {
+        ids = response && response.data && Array.isArray(response.data.ids) ? response.data.ids : [];
+      }
+      for (var i = 1; i <= 10; i++) {
+        var input = document.getElementById('staff-add-id-preview-' + i);
+        if (!input) continue;
+        input.value = ids[i - 1] || '保存時に採番';
+      }
+    }).catch(function() {
+      for (var i = 1; i <= 10; i++) {
+        var input = document.getElementById('staff-add-id-preview-' + i);
+        if (!input) continue;
+        input.value = '保存時に採番';
+      }
+    });
+  }
+
+  function createStaffAndSelect() {
+    var names = getStaffAddNames();
+    if (!names.length) {
+      setStaffMessage('error', '担当者名を入力してください。');
+      return;
+    }
+    setStaffMessage('info', '担当者を保存しています。');
+    callWrappedApi('api_createStaffBatch', [{ staffNames: names }]).then(function(response) {
+      var createdStaffs = extractArrayData(response, ['staffs', 'items']);
+      createdStaffs = (Array.isArray(createdStaffs) ? createdStaffs : []).filter(function(staff) {
+        return !!staff;
+      });
+      if (!createdStaffs.length) throw new Error('担当者の保存結果を取得できませんでした。');
+
+      mergeStaffOptions(createdStaffs);
+      renderStaffSelectList();
+      setSelectedStaff(createdStaffs[0]);
+      setBanner('success', createdStaffs.length + '人の担当者を追加しました。');
+      setStaffMessage('success', createdStaffs.length + '人の担当者を保存しました。');
+      openStaffHomeScreen({ skipConfirm: true, ignoreBusy: true });
+    }).catch(function(err) {
+      setStaffMessage('error', '担当者追加に失敗しました: ' + resolveErrorMessage(err));
+    });
+  }
+</script>

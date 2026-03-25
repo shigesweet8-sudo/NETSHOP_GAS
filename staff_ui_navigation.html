@@ -1,0 +1,172 @@
+<script>
+  (function enhanceRoutingForStaff() {
+    ROUTE_MODES.staffhome = true;
+    ROUTE_MODES.staffselect = true;
+    ROUTE_MODES.staffadd = true;
+
+    switchScreen = function(mode) {
+      var previousMode = state.viewMode || 'list';
+      var nextMode = String(mode || '').toLowerCase();
+      var allowed = { detail: true, edit: true, create: true, dashboard: true, list: true, staffhome: true, staffselect: true, staffadd: true };
+      nextMode = allowed[nextMode] ? nextMode : 'list';
+      if (!state.selectedStaff && (nextMode === 'list' || nextMode === 'dashboard' || nextMode === 'create')) {
+        nextMode = Array.isArray(state.staffOptions) && state.staffOptions.length ? 'staffselect' : 'staffadd';
+      }
+      state.viewMode = nextMode;
+      var ids = ['list-section', 'dashboard-section', 'detail-section', 'create-section', 'edit-section', 'staff-home-section', 'staff-select-section', 'staff-add-section'];
+      ids.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        var modeMap = {
+          'list-section': 'list',
+          'dashboard-section': 'dashboard',
+          'detail-section': 'detail',
+          'create-section': 'create',
+          'edit-section': 'edit',
+          'staff-home-section': 'staffhome',
+          'staff-select-section': 'staffselect',
+          'staff-add-section': 'staffadd'
+        };
+        el.classList.toggle('screen-hidden', state.viewMode !== modeMap[id]);
+      });
+      clearStaleBannerOnScreenSwitch(previousMode, state.viewMode);
+      updateScreenContext();
+      refreshGlobalActionState();
+      syncUrlWithState();
+      if (state.viewMode === 'list' && !state.loading && !state.allItems.length) {
+        loadItemsWithCurrentSort({ forceBaseLoad: true });
+      }
+    };
+
+    var baseGetViewModeLabel = getViewModeLabel;
+    getViewModeLabel = function(mode) {
+      if (mode === 'staffhome') return '担当者ホーム';
+      if (mode === 'staffselect') return '担当者選択';
+      if (mode === 'staffadd') return '担当者追加';
+      return baseGetViewModeLabel(mode);
+    };
+
+    var baseUpdateScreenContext = updateScreenContext;
+    updateScreenContext = function() {
+      if (state.viewMode !== 'staffhome' && state.viewMode !== 'staffselect' && state.viewMode !== 'staffadd') {
+        return baseUpdateScreenContext();
+      }
+      var mode = state.viewMode || 'staffhome';
+      var modeLabel = getViewModeLabel(mode);
+      updateDocumentTitle(mode, '');
+      var routeText = mode === 'staffhome'
+        ? '主要操作: 商品一覧 / 新規商品登録 / ダッシュボード'
+        : mode === 'staffselect'
+          ? '主要操作: 担当者を選んで開始'
+          : '主要操作: 担当者名を入力して保存';
+      document.getElementById('screen-context').textContent = '現在: ' + modeLabel + ' | ' + routeText;
+    };
+
+    var baseRestoreRoute = restoreRoute;
+    restoreRoute = function(route, options) {
+      var resolved = route && typeof route === 'object' ? route : { mode: 'list', id: '' };
+      var mode = normalizeRouteMode(resolved.mode);
+      if (mode === 'staffhome') return openStaffHomeScreen({ skipConfirm: true, ignoreBusy: true });
+      if (mode === 'staffselect') return openStaffSelectScreen({ skipConfirm: true, ignoreBusy: true });
+      if (mode === 'staffadd') return openStaffAddScreen({ skipConfirm: true, ignoreBusy: true });
+      return baseRestoreRoute(route, options);
+    };
+
+    var baseRefreshGlobalActionState = refreshGlobalActionState;
+    refreshGlobalActionState = function() {
+      baseRefreshGlobalActionState();
+      var busy = isAnyBusy();
+      ['open-staff-home', 'open-staff-switch', 'open-staff-add', 'staff-home-switch', 'staff-home-add'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = busy;
+      });
+    };
+
+    var baseOpenCreateScreen = openCreateScreen;
+    openCreateScreen = function(options) {
+      if (!ensureSelectedStaffOrRedirect('担当者を選択してから新規登録してください。')) return;
+      return baseOpenCreateScreen(options);
+    };
+
+    var baseOpenDashboardScreen = openDashboardScreen;
+    openDashboardScreen = function(options) {
+      if (!ensureSelectedStaffOrRedirect('担当者を選択してからダッシュボードを開いてください。')) return;
+      return baseOpenDashboardScreen(options);
+    };
+  }());
+
+  function initializeStaffApp() {
+    state.selectedStaff = getStoredSelectedStaff_();
+    updateCurrentStaffUi();
+    return loadStaffOptions(false).finally(function() {
+      var currentRoute = resolveRouteFromUrl();
+      var hasExplicitRoute = !!String(window.location.hash || window.location.search || '').trim();
+      if (!state.selectedStaff) {
+        if (Array.isArray(state.staffOptions) && state.staffOptions.length) {
+          openStaffSelectScreen({ skipConfirm: true, ignoreBusy: true });
+        } else {
+          openStaffAddScreen({ skipConfirm: true, ignoreBusy: true });
+        }
+        return;
+      }
+      if (!hasExplicitRoute || currentRoute.mode === 'list') {
+        openStaffHomeScreen({ skipConfirm: true, ignoreBusy: true });
+        return;
+      }
+      restoreRoute(currentRoute, { skipConfirm: true });
+    });
+  }
+
+  function attachStaffEventHandlers() {
+    var bindings = [
+      ['open-staff-home', function() { openStaffHomeScreen(); }],
+      ['open-staff-switch', function() { openStaffSelectScreen(); }],
+      ['open-staff-add', function() { openStaffAddScreen(); }],
+      ['staff-home-switch', function() { openStaffSelectScreen(); }],
+      ['staff-home-add', function() { openStaffAddScreen(); }],
+      ['staff-select-add', function() { openStaffAddScreen(); }],
+      ['staff-add-back', function() { openStaffSelectScreen(); }],
+      ['staff-add-save', function() { createStaffAndSelect(); }],
+      ['staff-add-reset', function() {
+        resetStaffAddSlots();
+        refreshStaffAddProgress();
+        loadStaffIdPreview();
+        setStaffMessage('', '');
+      }],
+      ['staff-home-open-create', function() { openCreateScreen(); }],
+      ['staff-home-open-list', function() { switchScreen('list'); }],
+      ['staff-home-open-dashboard', function() { openDashboardScreen(); }]
+    ];
+
+    bindings.forEach(function(binding) {
+      var el = document.getElementById(binding[0]);
+      if (el) el.addEventListener('click', binding[1]);
+    });
+
+    document.getElementById('staff-select-list').addEventListener('click', function(event) {
+      var target = event.target;
+      if (!target) return;
+      if (target.classList.contains('staff-select-trigger')) {
+        saveStaffSelection(target.getAttribute('data-staff-id'));
+        return;
+      }
+      if (target.classList.contains('staff-edit-trigger')) {
+        editStaffById(target.getAttribute('data-staff-id'));
+        return;
+      }
+      if (target.classList.contains('staff-delete-trigger')) {
+        deleteStaffById(target.getAttribute('data-staff-id'));
+      }
+    });
+
+    document.getElementById('staff-add-count').addEventListener('change', function() {
+      refreshStaffAddProgress();
+      loadStaffIdPreview();
+    });
+
+    document.getElementById('staff-add-slots').addEventListener('input', function(event) {
+      if (!event.target || !event.target.classList.contains('staff-add-name-slot')) return;
+      refreshStaffAddProgress();
+    });
+  }
+</script>
