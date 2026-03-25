@@ -302,31 +302,31 @@
       var STATUS_FIELD_PLANS = {
         "商品登録": {
           summary: "商品登録時点で必要な基本情報を入力します。",
-          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "memo"],
+          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty"],
           required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty"],
           recommended: ["memo"]
         },
         "出品中": {
           summary: "商品登録の基本情報に加えて、出品金額(K) を入力します。",
-          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "memo"],
+          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice"],
           required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice"],
           recommended: ["memo"]
         },
         "値段交渉中": {
           summary: "交渉中として交渉金額(L) を追記します。",
-          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice", "memo"],
+          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice"],
           required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice"],
           recommended: ["memo"]
         },
         "決済完了": {
           summary: "決済完了として M:決済金額、N:サイト利用料、O:配送料 を入力します。",
-          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice", "priceFinal", "fee", "shipping", "memo"],
+          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice", "priceFinal", "fee", "shipping"],
           required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice", "priceFinal", "fee", "shipping"],
           recommended: ["memo"]
         },
         "発送準備中": {
           summary: "配送準備として配送元・購入者・配送情報・住所・電話番号を入力します。",
-          visible: ["status", "shipFrom", "customer", "carrier", "tracking", "zip", "pref", "addr2", "addr3", "phone", "memo"],
+          visible: ["status", "shipFrom", "customer", "carrier", "tracking", "zip", "pref", "addr2", "addr3", "phone"],
           required: ["status", "shipFrom", "customer", "carrier", "tracking", "zip", "pref", "addr2", "addr3", "phone"],
           recommended: ["memo"]
         },
@@ -417,7 +417,9 @@
           if (!input || !input.closest) return;
           var container = input.closest(".form-field");
           if (!container) return;
-          container.classList.toggle("is-hidden-by-status", !visibleMap[fieldKey]);
+          var shouldShow = !!visibleMap[fieldKey];
+          container.classList.toggle("is-hidden-by-status", !shouldShow);
+          container.hidden = !shouldShow;
         });
       }
 
