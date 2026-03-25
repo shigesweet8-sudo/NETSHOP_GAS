@@ -57,31 +57,55 @@
       function setEditFormValues(item) {
         var safeItem = item && typeof item === "object" ? item : {};
         var values = {
+          id: getItemFieldText(safeItem, ["id", "管理ID"]),
+          date: getItemFieldText(safeItem, ["date", "日にち"]),
+          productRegDate: getItemFieldText(safeItem, ["productRegDate", "商品登録日"]),
           status: getItemFieldText(safeItem, ["status", "ステータス"]),
           shop: getItemFieldText(safeItem, ["shop", "ショップ"]),
           itemName: getItemFieldText(safeItem, ["itemName", "商品名"]),
           cost: getItemFieldText(safeItem, ["cost", "仕入れ値"]),
+          storage: getItemFieldText(safeItem, ["storage", "保管場所"]),
+          qty: getItemFieldText(safeItem, ["qty", "個数"]),
+          listPrice: getItemFieldText(safeItem, ["listPrice", "出品金額"]),
+          negotiatedPrice: getItemFieldText(safeItem, ["negotiatedPrice", "交渉金額"]),
           priceFinal: getItemFieldText(safeItem, ["priceFinal", "決済金額"]),
           fee: getItemFieldText(safeItem, ["fee", "サイト利用料"]),
           shipping: getItemFieldText(safeItem, ["shipping", "配送料"]),
+          shipFrom: getItemFieldText(safeItem, ["shipFrom", "配送元"]),
+          customer: getItemFieldText(safeItem, ["customer", "購入者名"]),
+          carrier: getItemFieldText(safeItem, ["carrier", "配送業者"]),
+          tracking: getItemFieldText(safeItem, ["tracking", "追跡番号"]),
           zip: getItemFieldText(safeItem, ["zip", "郵便番号"]),
           pref: getItemFieldText(safeItem, ["pref", "都道府県"]),
           addr2: getItemFieldText(safeItem, ["addr2", "住所2(地番)"]),
           addr3: getItemFieldText(safeItem, ["addr3", "住所3(建物名)"]),
+          phone: getItemFieldText(safeItem, ["phone", "電話番号"]),
           memo: getItemFieldText(safeItem, ["memo", "備考"])
         };
         state.editInitialValues = values;
+        document.getElementById("edit-id-preview").value = values.id;
+        document.getElementById("edit-date").value = values.date;
+        document.getElementById("edit-product-reg-date").value = values.productRegDate;
         ensureSelectHasValue("edit-status", values.status);
         ensureSelectHasValue("edit-shop", values.shop);
         document.getElementById("edit-item-name").value = values.itemName;
         document.getElementById("edit-cost").value = values.cost;
+        document.getElementById("edit-storage").value = values.storage;
+        document.getElementById("edit-qty").value = values.qty;
+        document.getElementById("edit-list-price").value = values.listPrice;
+        document.getElementById("edit-negotiated-price").value = values.negotiatedPrice;
         document.getElementById("edit-price-final").value = values.priceFinal;
         document.getElementById("edit-fee").value = values.fee;
         document.getElementById("edit-shipping").value = values.shipping;
+        ensureSelectHasValue("edit-ship-from", values.shipFrom);
+        document.getElementById("edit-customer").value = values.customer;
+        ensureSelectHasValue("edit-carrier", values.carrier);
+        document.getElementById("edit-tracking").value = values.tracking;
         document.getElementById("edit-zip").value = values.zip;
         document.getElementById("edit-pref").value = values.pref;
         document.getElementById("edit-addr2").value = values.addr2;
         document.getElementById("edit-addr3").value = values.addr3;
+        document.getElementById("edit-phone").value = values.phone;
         document.getElementById("edit-memo").value = values.memo;
         applyStatusPlanToForm("edit");
       }
@@ -102,17 +126,29 @@
 
       function resetEditFormToInitial() {
         if (!state.editInitialValues) return;
+        document.getElementById("edit-id-preview").value = state.editInitialValues.id || "";
+        document.getElementById("edit-date").value = state.editInitialValues.date || "";
+        document.getElementById("edit-product-reg-date").value = state.editInitialValues.productRegDate || "";
         ensureSelectHasValue("edit-status", state.editInitialValues.status);
         ensureSelectHasValue("edit-shop", state.editInitialValues.shop);
         document.getElementById("edit-item-name").value = state.editInitialValues.itemName || "";
         document.getElementById("edit-cost").value = state.editInitialValues.cost || "";
+        document.getElementById("edit-storage").value = state.editInitialValues.storage || "";
+        document.getElementById("edit-qty").value = state.editInitialValues.qty || "";
+        document.getElementById("edit-list-price").value = state.editInitialValues.listPrice || "";
+        document.getElementById("edit-negotiated-price").value = state.editInitialValues.negotiatedPrice || "";
         document.getElementById("edit-price-final").value = state.editInitialValues.priceFinal || "";
         document.getElementById("edit-fee").value = state.editInitialValues.fee || "";
         document.getElementById("edit-shipping").value = state.editInitialValues.shipping || "";
+        ensureSelectHasValue("edit-ship-from", state.editInitialValues.shipFrom);
+        document.getElementById("edit-customer").value = state.editInitialValues.customer || "";
+        ensureSelectHasValue("edit-carrier", state.editInitialValues.carrier);
+        document.getElementById("edit-tracking").value = state.editInitialValues.tracking || "";
         document.getElementById("edit-zip").value = state.editInitialValues.zip || "";
         document.getElementById("edit-pref").value = state.editInitialValues.pref || "";
         document.getElementById("edit-addr2").value = state.editInitialValues.addr2 || "";
         document.getElementById("edit-addr3").value = state.editInitialValues.addr3 || "";
+        document.getElementById("edit-phone").value = state.editInitialValues.phone || "";
         document.getElementById("edit-memo").value = state.editInitialValues.memo || "";
         clearValidationResult("edit");
         applyStatusPlanToForm("edit");
@@ -120,17 +156,28 @@
 
       function collectEditPayload() {
         return {
+          date: String(document.getElementById("edit-date").value || "").trim(),
+          productRegDate: String(document.getElementById("edit-product-reg-date").value || "").trim(),
           status: String(document.getElementById("edit-status").value || "").trim(),
           shop: String(document.getElementById("edit-shop").value || "").trim(),
           itemName: String(document.getElementById("edit-item-name").value || "").trim(),
           cost: String(document.getElementById("edit-cost").value || "").trim(),
+          storage: String(document.getElementById("edit-storage").value || "").trim(),
+          qty: String(document.getElementById("edit-qty").value || "").trim(),
+          listPrice: String(document.getElementById("edit-list-price").value || "").trim(),
+          negotiatedPrice: String(document.getElementById("edit-negotiated-price").value || "").trim(),
           priceFinal: String(document.getElementById("edit-price-final").value || "").trim(),
           fee: String(document.getElementById("edit-fee").value || "").trim(),
           shipping: String(document.getElementById("edit-shipping").value || "").trim(),
+          shipFrom: String(document.getElementById("edit-ship-from").value || "").trim(),
+          customer: String(document.getElementById("edit-customer").value || "").trim(),
+          carrier: String(document.getElementById("edit-carrier").value || "").trim(),
+          tracking: String(document.getElementById("edit-tracking").value || "").trim(),
           zip: String(document.getElementById("edit-zip").value || "").trim(),
           pref: String(document.getElementById("edit-pref").value || "").trim(),
           addr2: String(document.getElementById("edit-addr2").value || "").trim(),
           addr3: String(document.getElementById("edit-addr3").value || "").trim(),
+          phone: String(document.getElementById("edit-phone").value || "").trim(),
           memo: String(document.getElementById("edit-memo").value || "").trim()
         };
       }

@@ -48,6 +48,20 @@ function normalizeNumberish_(value) {
   return isNaN(parsed) ? NaN : parsed;
 }
 
+function getStatusFieldPlanForValidation_(statusValue) {
+  var status = normalizeTextValue_(statusValue);
+  var plans = {};
+  plans[CONFIG.STATUS.LISTING] = ['date', 'productRegDate', 'shop', 'itemName', 'cost', 'storage', 'qty'];
+  plans[CONFIG.STATUS.ON_SALE] = ['date', 'productRegDate', 'shop', 'itemName', 'cost', 'storage', 'qty', 'listPrice'];
+  plans[CONFIG.STATUS.NEGOTIATING] = ['date', 'productRegDate', 'shop', 'itemName', 'cost', 'storage', 'qty', 'listPrice', 'negotiatedPrice'];
+  plans[CONFIG.STATUS.PAID] = ['date', 'productRegDate', 'shop', 'itemName', 'cost', 'storage', 'qty', 'listPrice', 'negotiatedPrice', 'priceFinal', 'fee', 'shipping'];
+  plans[CONFIG.STATUS.PREPARING] = ['shipFrom', 'customer', 'carrier', 'tracking', 'zip', 'pref', 'addr2', 'addr3', 'phone'];
+  plans[CONFIG.STATUS.SHIPPED] = ['tracking'];
+  plans[CONFIG.STATUS.COMPLETED] = [];
+  plans[CONFIG.STATUS.CANCEL] = [];
+  return plans[status] || null;
+}
+
 function validateVariationPayloadRaw_(payload) {
   var normalized = normalizeValidationPayload_(payload);
   var item = normalized.item && typeof normalized.item === 'object' ? normalized.item : {};
@@ -153,6 +167,21 @@ function validateVariationPayloadRaw_(payload) {
       item[field]
     );
   });
+
+  var planFields = getStatusFieldPlanForValidation_(item.status);
+  if (planFields && planFields.length) {
+    planFields.forEach(function(field) {
+      if (!isBlankValue_(item[field])) return;
+      addValidationIssue_(
+        issues,
+        'warning',
+        'STATUS_RECOMMENDED_INPUT',
+        field,
+        'status "' + normalizeTextValue_(item.status) + '" では ' + field + ' の入力を推奨します',
+        item[field]
+      );
+    });
+  }
 
   return convertValueKeysToApi_({
     ok: issues.errors.length === 0,

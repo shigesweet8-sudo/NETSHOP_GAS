@@ -62,6 +62,27 @@
         border-color: #facc15;
       }
 
+      .form-field.is-missing {
+        background: #fef2f2;
+        border-color: #ef4444;
+      }
+
+      .form-field.is-missing .control-input,
+      .form-field.is-missing .control-select {
+        border-color: #ef4444;
+        background: #fff5f5;
+      }
+
+      .form-field.is-complete-status {
+        background: #ecfdf5;
+        border-color: #34d399;
+      }
+
+      .form-field.is-closed-status {
+        background: #fff7ed;
+        border-color: #fb923c;
+      }
+
       .form-field.is-required label::after {
         content: " 必須";
         color: var(--danger);
@@ -86,6 +107,16 @@
 
       .status-plan.is-visible {
         display: block;
+      }
+
+      .status-plan.is-complete {
+        background: #ecfdf5;
+        border-color: #34d399;
+      }
+
+      .status-plan.is-closed {
+        background: #fff7ed;
+        border-color: #fb923c;
       }
 
       .status-plan-title {

@@ -103,6 +103,11 @@
         applyStatusPlanToForm("create");
       });
 
+      document.getElementById("create-shop").addEventListener("change", function() {
+        syncCreateAutoFields();
+        updateMissingFieldWarnings("create");
+      });
+
       document.getElementById("create-reset-form").addEventListener("click", function() {
         if (state.createSubmitting) return;
         if (hasCreateFormChanges() && !confirmAction("入力内容をクリアします。よろしいですか？")) return;
@@ -172,6 +177,24 @@
           updateSelectedCount();
           updateBulkUiState();
         }
+      });
+
+      document.getElementById("create-section").addEventListener("input", function() {
+        syncCreateAutoFields();
+        updateMissingFieldWarnings("create");
+      });
+
+      document.getElementById("create-section").addEventListener("change", function() {
+        syncCreateAutoFields();
+        updateMissingFieldWarnings("create");
+      });
+
+      document.getElementById("edit-section").addEventListener("input", function() {
+        updateMissingFieldWarnings("edit");
+      });
+
+      document.getElementById("edit-section").addEventListener("change", function() {
+        updateMissingFieldWarnings("edit");
       });
 
       document.getElementById("content").addEventListener("click", function(event) {

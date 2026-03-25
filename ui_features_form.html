@@ -214,15 +214,27 @@
       }
 
       function resetCreateForm() {
+        document.getElementById("create-id-preview").value = "";
+        document.getElementById("create-date").value = "";
+        document.getElementById("create-product-reg-date").value = "";
         document.getElementById("create-item-name").value = "";
         document.getElementById("create-cost").value = "";
+        document.getElementById("create-storage").value = "";
+        document.getElementById("create-qty").value = "";
+        document.getElementById("create-list-price").value = "";
+        document.getElementById("create-negotiated-price").value = "";
         document.getElementById("create-price-final").value = "";
         document.getElementById("create-fee").value = "";
         document.getElementById("create-shipping").value = "";
+        document.getElementById("create-ship-from").value = "";
+        document.getElementById("create-customer").value = "";
+        document.getElementById("create-carrier").value = "";
+        document.getElementById("create-tracking").value = "";
         document.getElementById("create-zip").value = "";
         document.getElementById("create-pref").value = "";
         document.getElementById("create-addr2").value = "";
         document.getElementById("create-addr3").value = "";
+        document.getElementById("create-phone").value = "";
         document.getElementById("create-memo").value = "";
         document.getElementById("create-status").value = "";
         document.getElementById("create-shop").value = "";
@@ -262,59 +274,71 @@
 
       var FORM_FIELD_LABELS = {
         status: "ステータス",
+        id: "管理ID",
+        date: "日にち",
+        productRegDate: "商品登録日",
         shop: "ショップ",
         itemName: "商品名",
         cost: "仕入れ値",
+        storage: "保管場所",
+        qty: "個数",
+        listPrice: "出品金額",
+        negotiatedPrice: "交渉金額",
         priceFinal: "決済金額",
         fee: "サイト利用料",
         shipping: "配送料",
+        shipFrom: "配送元",
+        customer: "購入者名",
+        carrier: "配送業者",
+        tracking: "追跡番号",
         zip: "郵便番号",
         pref: "都道府県",
         addr2: "住所2(地番)",
         addr3: "住所3(建物名)",
+        phone: "電話番号",
         memo: "備考"
       };
 
       var STATUS_FIELD_PLANS = {
         "商品登録": {
           summary: "商品登録時点で必要な基本情報を入力します。",
-          required: ["status", "shop", "itemName", "cost"],
+          required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty"],
           recommended: ["memo"]
         },
         "出品中": {
-          summary: "出品時の販売条件を確認できる状態にします。",
-          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee"],
-          recommended: ["shipping", "memo"]
+          summary: "商品登録の基本情報に加えて、出品金額(K) を入力します。",
+          required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice"],
+          recommended: ["memo"]
         },
         "値段交渉中": {
-          summary: "交渉中でも金額と販売先が追えるようにします。",
-          required: ["status", "shop", "itemName", "cost", "priceFinal"],
-          recommended: ["fee", "memo"]
+          summary: "交渉中として交渉金額(L) を追記します。",
+          required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice"],
+          recommended: ["memo"]
         },
         "決済完了": {
-          summary: "発送準備に必要な決済・配送情報を揃えます。",
-          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee", "shipping", "zip", "pref", "addr2"],
-          recommended: ["addr3", "memo"]
+          summary: "決済完了として M:決済金額、N:サイト利用料、O:配送料 を入力します。",
+          required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice", "priceFinal", "fee", "shipping"],
+          recommended: ["memo"]
         },
         "発送準備中": {
-          summary: "発送直前として配送先の入力漏れを防ぎます。",
-          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee", "shipping", "zip", "pref", "addr2"],
-          recommended: ["addr3", "memo"]
+          summary: "配送準備として配送元・購入者・配送情報・住所・電話番号を入力します。",
+          required: ["status", "shipFrom", "customer", "carrier", "tracking", "zip", "pref", "addr2", "addr3", "phone"],
+          recommended: ["memo"]
         },
         "発送完了": {
-          summary: "発送完了時点で販売情報と配送情報が揃っている状態を保ちます。",
-          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee", "shipping", "zip", "pref", "addr2"],
-          recommended: ["addr3", "memo"]
+          summary: "発送完了は完了系ステータスとして塗りつぶし表示します。",
+          required: ["status"],
+          recommended: ["tracking", "memo"]
         },
         "取引完了": {
-          summary: "完了記録として損益情報を確定できる状態にします。",
-          required: ["status", "shop", "itemName", "cost", "priceFinal", "fee", "shipping"],
+          summary: "取引完了は完了系ステータスとして塗りつぶし表示します。",
+          required: ["status"],
           recommended: ["memo"]
         },
         "キャンセル": {
-          summary: "キャンセル理由が追えるよう、備考の記入を推奨します。",
-          required: ["status", "shop", "itemName", "memo"],
-          recommended: ["cost", "priceFinal"]
+          summary: "キャンセルはクローズ系ステータスとして塗りつぶし表示します。",
+          required: ["status"],
+          recommended: ["memo"]
         }
       };
 
@@ -327,16 +351,28 @@
         var prefix = formType === "edit" ? "edit" : "create";
         var map = {
           status: prefix + "-status",
+          id: prefix + "-id-preview",
+          date: prefix + "-date",
+          productRegDate: prefix + "-product-reg-date",
           shop: prefix + "-shop",
           itemName: prefix + "-item-name",
           cost: prefix + "-cost",
+          storage: prefix + "-storage",
+          qty: prefix + "-qty",
+          listPrice: prefix + "-list-price",
+          negotiatedPrice: prefix + "-negotiated-price",
           priceFinal: prefix + "-price-final",
           fee: prefix + "-fee",
           shipping: prefix + "-shipping",
+          shipFrom: prefix + "-ship-from",
+          customer: prefix + "-customer",
+          carrier: prefix + "-carrier",
+          tracking: prefix + "-tracking",
           zip: prefix + "-zip",
           pref: prefix + "-pref",
           addr2: prefix + "-addr2",
           addr3: prefix + "-addr3",
+          phone: prefix + "-phone",
           memo: prefix + "-memo"
         };
         return map[fieldKey] || "";
@@ -348,7 +384,7 @@
           if (!input || !input.closest) return;
           var container = input.closest(".form-field");
           if (!container) return;
-          container.classList.remove("is-highlighted", "is-required", "is-recommended");
+          container.classList.remove("is-highlighted", "is-required", "is-recommended", "is-missing", "is-complete-status", "is-closed-status");
         });
       }
 
@@ -379,11 +415,80 @@
           chips.push("<span class=\"status-plan-chip is-recommended\">推奨: " + escapeHtml(FORM_FIELD_LABELS[fieldKey] || fieldKey) + "</span>");
         });
 
-        planEl.className = "status-plan is-visible";
+        var planClassName = "status-plan is-visible";
+        if (statusValue === "発送完了" || statusValue === "取引完了") {
+          planClassName += " is-complete";
+        } else if (statusValue === "キャンセル") {
+          planClassName += " is-closed";
+        }
+        planEl.className = planClassName;
         planEl.innerHTML =
           "<p class=\"status-plan-title\">入力計画: " + escapeHtml(String(statusValue).trim()) + "</p>" +
           "<p class=\"status-plan-text\">" + escapeHtml(plan.summary || "") + "</p>" +
           "<div class=\"status-plan-list\">" + chips.join("") + "</div>";
+      }
+
+      function isFieldBlankForWarning(fieldKey, value) {
+        if (fieldKey === "qty") {
+          return String(value == null ? "" : value).trim() === "";
+        }
+        return String(value == null ? "" : value).trim() === "";
+      }
+
+      function updateMissingFieldWarnings(formType) {
+        var plan = getStatusPlanForValue(
+          (document.getElementById(formType === "edit" ? "edit-status" : "create-status") || {}).value
+        );
+        clearStatusMissingWarnings(formType);
+        if (!plan || !Array.isArray(plan.required)) return;
+        var payload = formType === "edit" ? collectEditPayload() : collectCreatePayload();
+        plan.required.forEach(function(fieldKey) {
+          if (!isFieldBlankForWarning(fieldKey, payload[fieldKey])) return;
+          var input = document.getElementById(getFormInputId(formType, fieldKey));
+          if (!input || !input.closest) return;
+          var container = input.closest(".form-field");
+          if (!container) return;
+          container.classList.add("is-missing");
+        });
+      }
+
+      function clearStatusMissingWarnings(formType) {
+        Object.keys(FORM_FIELD_LABELS).forEach(function(fieldKey) {
+          var input = document.getElementById(getFormInputId(formType, fieldKey));
+          if (!input || !input.closest) return;
+          var container = input.closest(".form-field");
+          if (!container) return;
+          container.classList.remove("is-missing");
+        });
+      }
+
+      function getTodayInputDate_() {
+        var date = new Date();
+        var yyyy = date.getFullYear();
+        var mm = String(date.getMonth() + 1).padStart(2, "0");
+        var dd = String(date.getDate()).padStart(2, "0");
+        return yyyy + "-" + mm + "-" + dd;
+      }
+
+      function syncCreateAutoFields() {
+        var dateEl = document.getElementById("create-date");
+        var regDateEl = document.getElementById("create-product-reg-date");
+        var shopEl = document.getElementById("create-shop");
+        var idPreviewEl = document.getElementById("create-id-preview");
+        var statusValue = String((document.getElementById("create-status").value || "")).trim();
+        var today = getTodayInputDate_();
+        if (dateEl && !String(dateEl.value || "").trim()) {
+          dateEl.value = today;
+        }
+        if (regDateEl && (!String(regDateEl.value || "").trim() || statusValue === "商品登録")) {
+          regDateEl.value = today;
+        }
+        if (idPreviewEl) {
+          var shopText = String(shopEl && shopEl.value || "").trim();
+          idPreviewEl.value = shopText
+            ? "保存時に自動採番 (" + shopText + ")"
+            : "保存時に自動採番";
+        }
       }
 
       function applyStatusPlanToForm(formType) {
@@ -391,14 +496,26 @@
         var statusValue = select ? select.value : "";
         var plan = getStatusPlanForValue(statusValue);
         clearStatusPlanHighlights(formType);
+        if (statusValue === "発送完了" || statusValue === "取引完了") {
+          markStatusPlanField(formType, "status", "is-complete-status");
+        } else if (statusValue === "キャンセル") {
+          markStatusPlanField(formType, "status", "is-closed-status");
+        }
         renderStatusPlanGuide(formType, statusValue);
-        if (!plan) return;
+        if (formType === "create") {
+          syncCreateAutoFields();
+        }
+        if (!plan) {
+          updateMissingFieldWarnings(formType);
+          return;
+        }
         (plan.required || []).forEach(function(fieldKey) {
           markStatusPlanField(formType, fieldKey, "is-required");
         });
         (plan.recommended || []).forEach(function(fieldKey) {
           markStatusPlanField(formType, fieldKey, "is-recommended");
         });
+        updateMissingFieldWarnings(formType);
       }
 
       function applyMasterOptionsToForms(statusOptions, shopOptions) {
@@ -408,6 +525,10 @@
         populateCreateSelect("create-shop", state.masterShopOptions, "ショップを選択");
         populateCreateSelect("edit-status", state.masterStatusOptions, "ステータスを選択");
         populateCreateSelect("edit-shop", state.masterShopOptions, "ショップを選択");
+        populateCreateSelect("create-ship-from", state.masterShipFromOptions, "配送元を選択");
+        populateCreateSelect("create-carrier", state.masterCarrierOptions, "配送業者を選択");
+        populateCreateSelect("edit-ship-from", state.masterShipFromOptions, "配送元を選択");
+        populateCreateSelect("edit-carrier", state.masterCarrierOptions, "配送業者を選択");
         applyStatusPlanToForm("create");
         applyStatusPlanToForm("edit");
       }
@@ -421,14 +542,18 @@
 
         setInlineMessageById(messageId, "info", "候補を取得しています...");
         return callWrappedApi("api_getMasters", [{
-          masterTypes: ["statuses", "shops"]
+          masterTypes: ["statuses", "shops", "shipFroms", "carriers"]
         }]).then(function(response) {
           var statusOptions = extractMasterOptions(response, ["statuses", "status", "ステータス"]);
           var shopOptions = extractMasterOptions(response, ["shops", "shop", "ショップ"]);
+          state.masterShipFromOptions = extractMasterOptions(response, ["shipFroms", "shipFrom", "配送元"]);
+          state.masterCarrierOptions = extractMasterOptions(response, ["carriers", "carrier", "配送業者"]);
           applyMasterOptionsToForms(statusOptions, shopOptions);
           state.mastersLoaded = true;
           setInlineMessageById(messageId, "", "");
         }).catch(function(err) {
+          state.masterShipFromOptions = [];
+          state.masterCarrierOptions = [];
           applyMasterOptionsToForms([], []);
           setInlineMessageById(messageId, "error", "候補取得に失敗しました: " + resolveErrorMessage(err));
           throw err;
@@ -438,16 +563,27 @@
       function collectCreatePayload() {
         return {
           status: String(document.getElementById("create-status").value || "").trim(),
+          date: String(document.getElementById("create-date").value || "").trim(),
+          productRegDate: String(document.getElementById("create-product-reg-date").value || "").trim(),
           shop: String(document.getElementById("create-shop").value || "").trim(),
           itemName: String(document.getElementById("create-item-name").value || "").trim(),
           cost: String(document.getElementById("create-cost").value || "").trim(),
+          storage: String(document.getElementById("create-storage").value || "").trim(),
+          qty: String(document.getElementById("create-qty").value || "").trim(),
+          listPrice: String(document.getElementById("create-list-price").value || "").trim(),
+          negotiatedPrice: String(document.getElementById("create-negotiated-price").value || "").trim(),
           priceFinal: String(document.getElementById("create-price-final").value || "").trim(),
           fee: String(document.getElementById("create-fee").value || "").trim(),
           shipping: String(document.getElementById("create-shipping").value || "").trim(),
+          shipFrom: String(document.getElementById("create-ship-from").value || "").trim(),
+          customer: String(document.getElementById("create-customer").value || "").trim(),
+          carrier: String(document.getElementById("create-carrier").value || "").trim(),
+          tracking: String(document.getElementById("create-tracking").value || "").trim(),
           zip: String(document.getElementById("create-zip").value || "").trim(),
           pref: String(document.getElementById("create-pref").value || "").trim(),
           addr2: String(document.getElementById("create-addr2").value || "").trim(),
           addr3: String(document.getElementById("create-addr3").value || "").trim(),
+          phone: String(document.getElementById("create-phone").value || "").trim(),
           memo: String(document.getElementById("create-memo").value || "").trim()
         };
       }

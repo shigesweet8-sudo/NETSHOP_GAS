@@ -115,6 +115,18 @@
           </div>
           <div id="create-status-plan" class="status-plan form-field-full" aria-live="polite"></div>
           <div class="form-field">
+            <label for="create-id-preview">管理ID(B)</label>
+            <input id="create-id-preview" class="control-input" type="text" placeholder="保存時に自動採番" readonly>
+          </div>
+          <div class="form-field">
+            <label for="create-date">日にち(D)</label>
+            <input id="create-date" class="control-input" type="date">
+          </div>
+          <div class="form-field">
+            <label for="create-product-reg-date">商品登録日(E)</label>
+            <input id="create-product-reg-date" class="control-input" type="date">
+          </div>
+          <div class="form-field">
             <label for="create-shop">ショップ</label>
             <select id="create-shop" class="control-select">
               <option value="">選択してください</option>
@@ -129,6 +141,22 @@
             <input id="create-cost" class="control-input" type="text" inputmode="decimal" placeholder="0">
           </div>
           <div class="form-field">
+            <label for="create-storage">保管場所(I)</label>
+            <input id="create-storage" class="control-input" type="text" placeholder="保管場所">
+          </div>
+          <div class="form-field">
+            <label for="create-qty">個数(J)</label>
+            <input id="create-qty" class="control-input" type="text" inputmode="numeric" placeholder="1">
+          </div>
+          <div class="form-field">
+            <label for="create-list-price">出品金額(K)</label>
+            <input id="create-list-price" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="create-negotiated-price">交渉金額(L)</label>
+            <input id="create-negotiated-price" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
             <label for="create-price-final">決済金額</label>
             <input id="create-price-final" class="control-input" type="text" inputmode="decimal" placeholder="0">
           </div>
@@ -139,6 +167,26 @@
           <div class="form-field">
             <label for="create-shipping">配送料</label>
             <input id="create-shipping" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="create-ship-from">配送元(P)</label>
+            <select id="create-ship-from" class="control-select">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="create-customer">購入者名(S)</label>
+            <input id="create-customer" class="control-input" type="text" placeholder="購入者名">
+          </div>
+          <div class="form-field">
+            <label for="create-carrier">配送業者(T)</label>
+            <select id="create-carrier" class="control-select">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="create-tracking">追跡番号(U)</label>
+            <input id="create-tracking" class="control-input" type="text" placeholder="追跡番号">
           </div>
           <div class="form-field">
             <label for="create-zip">郵便番号</label>
@@ -158,6 +206,10 @@
           <div class="form-field">
             <label for="create-addr3">住所3(建物名)</label>
             <input id="create-addr3" class="control-input" type="text" placeholder="建物名など">
+          </div>
+          <div class="form-field">
+            <label for="create-phone">電話番号(Z)</label>
+            <input id="create-phone" class="control-input" type="text" inputmode="tel" placeholder="電話番号">
           </div>
           <div class="form-field">
             <label for="create-memo">備考</label>
@@ -187,6 +239,18 @@
           </div>
           <div id="edit-status-plan" class="status-plan form-field-full" aria-live="polite"></div>
           <div class="form-field">
+            <label for="edit-id-preview">管理ID(B)</label>
+            <input id="edit-id-preview" class="control-input" type="text" readonly>
+          </div>
+          <div class="form-field">
+            <label for="edit-date">日にち(D)</label>
+            <input id="edit-date" class="control-input" type="date">
+          </div>
+          <div class="form-field">
+            <label for="edit-product-reg-date">商品登録日(E)</label>
+            <input id="edit-product-reg-date" class="control-input" type="date">
+          </div>
+          <div class="form-field">
             <label for="edit-shop">ショップ</label>
             <select id="edit-shop" class="control-select">
               <option value="">選択してください</option>
@@ -201,6 +265,22 @@
             <input id="edit-cost" class="control-input" type="text" inputmode="decimal" placeholder="0">
           </div>
           <div class="form-field">
+            <label for="edit-storage">保管場所(I)</label>
+            <input id="edit-storage" class="control-input" type="text" placeholder="保管場所">
+          </div>
+          <div class="form-field">
+            <label for="edit-qty">個数(J)</label>
+            <input id="edit-qty" class="control-input" type="text" inputmode="numeric" placeholder="1">
+          </div>
+          <div class="form-field">
+            <label for="edit-list-price">出品金額(K)</label>
+            <input id="edit-list-price" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="edit-negotiated-price">交渉金額(L)</label>
+            <input id="edit-negotiated-price" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
             <label for="edit-price-final">決済金額</label>
             <input id="edit-price-final" class="control-input" type="text" inputmode="decimal" placeholder="0">
           </div>
@@ -211,6 +291,26 @@
           <div class="form-field">
             <label for="edit-shipping">配送料</label>
             <input id="edit-shipping" class="control-input" type="text" inputmode="decimal" placeholder="0">
+          </div>
+          <div class="form-field">
+            <label for="edit-ship-from">配送元(P)</label>
+            <select id="edit-ship-from" class="control-select">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="edit-customer">購入者名(S)</label>
+            <input id="edit-customer" class="control-input" type="text" placeholder="購入者名">
+          </div>
+          <div class="form-field">
+            <label for="edit-carrier">配送業者(T)</label>
+            <select id="edit-carrier" class="control-select">
+              <option value="">選択してください</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="edit-tracking">追跡番号(U)</label>
+            <input id="edit-tracking" class="control-input" type="text" placeholder="追跡番号">
           </div>
           <div class="form-field">
             <label for="edit-zip">郵便番号</label>
@@ -230,6 +330,10 @@
           <div class="form-field">
             <label for="edit-addr3">住所3(建物名)</label>
             <input id="edit-addr3" class="control-input" type="text" placeholder="建物名など">
+          </div>
+          <div class="form-field">
+            <label for="edit-phone">電話番号(Z)</label>
+            <input id="edit-phone" class="control-input" type="text" inputmode="tel" placeholder="電話番号">
           </div>
           <div class="form-field">
             <label for="edit-memo">備考</label>
