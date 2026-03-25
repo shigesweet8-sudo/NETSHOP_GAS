@@ -1,3 +1,5 @@
 backup/**
 .clasp_inspect/**
 .clasp_inspect2/**
+
+features/**

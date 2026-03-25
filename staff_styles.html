@@ -1,0 +1,43 @@
+    <style>
+      .staff-shell { margin-bottom: 16px; }
+      .staff-current-banner {
+        display: none;
+        padding: 12px 16px;
+        border: 1px solid #d7e3ff;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #f7fbff 0%, #eef4ff 100%);
+        color: #16325c;
+        font-weight: 600;
+      }
+      .staff-current-banner.is-visible { display: block; }
+      .staff-home-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+      .staff-home-card, .staff-card {
+        border: 1px solid #d9e7c5;
+        border-radius: 16px;
+        background: #fffef7;
+        padding: 20px;
+      }
+      .staff-home-label, .staff-card-label { margin: 0 0 8px; color: #5f6b3d; font-size: 12px; font-weight: 700; }
+      .staff-home-value, .staff-card-title { margin: 0 0 10px; font-size: 22px; font-weight: 700; color: #1f2a15; }
+      .staff-home-text, .staff-card-text { margin: 0; color: #4a5560; line-height: 1.7; }
+      .staff-home-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+      .staff-select-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+        margin-top: 16px;
+      }
+      .staff-card.is-disabled { opacity: 0.55; }
+      .staff-card-actions { margin-top: 14px; display: flex; gap: 10px; }
+      .staff-inline-note { margin: 0 0 16px; color: #51606d; }
+      .staff-form-note { margin: 0 0 14px; color: #51606d; }
+      .staff-current-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: #edf6e4;
+        color: #2f4c1d;
+        font-weight: 700;
+      }
+    </style>
