@@ -7,6 +7,7 @@
     <?!= includeHtml_("ui_styles_base"); ?>
     <?!= includeHtml_("ui_styles_components"); ?>
     <?!= includeHtml_("ui_styles_screens"); ?>
+    <?!= includeHtml_("features/staff/staff_styles"); ?>
   </head>
   <body>
     <div class="layout-app">
@@ -16,6 +17,9 @@
           <p class="page-subtitle">NETSHOPの商品管理と進捗確認を行う運用画面です。</p>
         </div>
         <div class="page-actions">
+          <button id="open-staff-home" class="btn btn-secondary" type="button">&#25285;&#24403;&#32773;&#12507;&#12540;&#12512;</button>
+          <button id="open-staff-switch" class="btn btn-secondary" type="button">&#25285;&#24403;&#32773;&#20999;&#26367;</button>
+          <button id="open-staff-add" class="btn btn-secondary" type="button">&#25285;&#24403;&#32773;&#36861;&#21152;</button>
           <button id="open-list" class="btn btn-secondary" type="button">一覧へ</button>
           <button id="open-dashboard" class="btn btn-secondary" type="button">ダッシュボード</button>
           <button id="open-create-item" class="btn btn-secondary" type="button">新規商品登録</button>
@@ -25,7 +29,9 @@
 
       <div id="global-banner" class="state-banner" aria-live="polite"></div>
       <div id="screen-context" class="screen-context" aria-live="polite"></div>
-      <div id="runtime-build" class="runtime-build" aria-live="polite">build: 2026-03-25-status-visibility-fix-v2</div>
+      <div id="runtime-build" class="runtime-build" aria-live="polite">build: 2026-03-25-staff-flow-v1</div>
+
+      <?!= includeHtml_("features/staff/staff_sections"); ?>
 
       <section id="list-section" class="card">
         <h2 class="card-title">商品一覧</h2>
@@ -114,6 +120,10 @@
             </select>
           </div>
           <div id="create-status-plan" class="status-plan form-field-full" aria-live="polite"></div>
+          <div class="form-field form-field-full">
+            <label for="create-staff-preview">&#20986;&#21697;&#25285;&#24403;&#32773;(C)</label>
+            <input id="create-staff-preview" class="control-input" type="text" readonly>
+          </div>
           <div class="form-field">
             <label for="create-id-preview">管理ID(B)</label>
             <input id="create-id-preview" class="control-input" type="text" placeholder="保存時に自動採番" readonly>

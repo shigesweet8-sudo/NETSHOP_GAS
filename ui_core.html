@@ -1,5 +1,5 @@
     <script>
-      var NETSHOP_WEB_BUILD = "2026-03-25-status-visibility-fix-v2";
+      var NETSHOP_WEB_BUILD = "2026-03-25-staff-flow-v1";
       window.__NETSHOP_WEB_BUILD = NETSHOP_WEB_BUILD;
 
       function escapeHtml(value) {
@@ -285,7 +285,10 @@
         masterShopOptions: [],
         masterShipFromOptions: [],
         masterCarrierOptions: [],
-        bannerState: null
+        bannerState: null,
+        staffsLoaded: false,
+        staffOptions: [],
+        selectedStaff: null
       };
 
       function renderRuntimeBuildBadge() {

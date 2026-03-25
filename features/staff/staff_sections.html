@@ -1,0 +1,65 @@
+      <div class="staff-shell">
+        <div id="staff-current-banner" class="staff-current-banner" aria-live="polite"></div>
+      </div>
+
+      <section id="staff-home-section" class="card screen-hidden" aria-live="polite">
+        <div class="detail-header">
+          <h2 class="card-title">&#25285;&#24403;&#32773;&#12507;&#12540;&#12512;</h2>
+          <div class="page-actions">
+            <button id="staff-home-switch" class="btn btn-secondary" type="button">&#25285;&#24403;&#32773;&#20999;&#26367;</button>
+            <button id="staff-home-add" class="btn btn-secondary" type="button">&#25285;&#24403;&#32773;&#36861;&#21152;</button>
+          </div>
+        </div>
+        <div class="staff-home-grid">
+          <div class="staff-home-card">
+            <p class="staff-home-label">&#29694;&#22312;&#12398;&#25285;&#24403;&#32773;</p>
+            <p id="staff-home-current" class="staff-home-value">&#26410;&#36984;&#25246;</p>
+            <p class="staff-home-text">&#12525;&#12464;&#12452;&#12531;&#24460;&#12399;&#25285;&#24403;&#32773;&#12434;&#36984;&#12406;&#12384;&#12369;&#12391;&#30331;&#37682;&#12391;&#12365;&#12414;&#12377;&#12290;</p>
+          </div>
+          <div class="staff-home-card">
+            <p class="staff-home-label">&#12463;&#12452;&#12483;&#12463;&#25805;&#20316;</p>
+            <div class="staff-home-actions">
+              <button id="staff-home-open-create" class="btn btn-primary" type="button">&#26032;&#35215;&#21830;&#21697;&#30331;&#37682;</button>
+              <button id="staff-home-open-list" class="btn btn-secondary" type="button">&#21830;&#21697;&#19968;&#35239;</button>
+              <button id="staff-home-open-dashboard" class="btn btn-secondary" type="button">&#12480;&#12483;&#12471;&#12517;&#12508;&#12540;&#12489;</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="staff-select-section" class="card screen-hidden" aria-live="polite">
+        <div class="detail-header">
+          <h2 class="card-title">&#25285;&#24403;&#32773;&#36984;&#25246;</h2>
+          <div class="page-actions">
+            <button id="staff-select-add" class="btn btn-secondary" type="button">&#25285;&#24403;&#32773;&#36861;&#21152;</button>
+          </div>
+        </div>
+        <div id="staff-select-status" class="status-line">&#25285;&#24403;&#32773;&#12434;&#35501;&#12415;&#36796;&#12415;&#12414;&#12377;&#12290;</div>
+        <div id="staff-select-list" class="staff-select-list"></div>
+      </section>
+
+      <section id="staff-add-section" class="card screen-hidden" aria-live="polite">
+        <div class="detail-header">
+          <h2 class="card-title">&#25285;&#24403;&#32773;&#36861;&#21152;</h2>
+          <button id="staff-add-back" class="btn btn-secondary" type="button">&#25285;&#24403;&#32773;&#36984;&#25246;&#12408;&#25147;&#12427;</button>
+        </div>
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="staff-add-name">&#25285;&#24403;&#32773;&#21517;</label>
+            <input id="staff-add-name" class="control-input" type="text" placeholder="&#25285;&#24403;&#32773;&#21517;&#12434;&#20837;&#21147;">
+          </div>
+          <div class="form-field">
+            <label for="staff-add-id-preview">&#25285;&#24403;&#32773;ID</label>
+            <input id="staff-add-id-preview" class="control-input" type="text" value="&#20445;&#23384;&#26178;&#12395;&#33258;&#21205;&#25505;&#30058;" readonly>
+          </div>
+          <div class="form-field form-field-full">
+            <label for="staff-add-memo">&#20633;&#32771;</label>
+            <textarea id="staff-add-memo" class="control-input form-textarea" placeholder="&#24517;&#35201;&#12394;&#12425;&#20633;&#32771;&#12434;&#35352;&#20837;"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button id="staff-add-save" class="btn btn-primary" type="button">&#20445;&#23384;</button>
+          <button id="staff-add-reset" class="btn btn-secondary" type="button">&#20837;&#21147;&#12434;&#12463;&#12522;&#12450;</button>
+        </div>
+        <div id="staff-add-message" class="inline-message" aria-live="polite"></div>
+      </section>

@@ -105,8 +105,7 @@ function getMasterValueListByType_(type) {
       if (Array.isArray(fixedMasters.SHOP)) return fixedMasters.SHOP.slice();
       return [];
     case 'staffs':
-      if (Array.isArray(fixedMasters.ASSIGNEE)) return fixedMasters.ASSIGNEE.slice();
-      return [];
+      return getStaffDisplayValues_();
     case 'shipFroms':
       if (Array.isArray(fixedMasters.SHIPPING_FROM)) return fixedMasters.SHIPPING_FROM.slice();
       return [];

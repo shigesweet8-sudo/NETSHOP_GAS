@@ -238,6 +238,7 @@
         document.getElementById("create-memo").value = "";
         document.getElementById("create-status").value = "";
         document.getElementById("create-shop").value = "";
+        document.getElementById("create-staff-preview").value = getSelectedStaffDisplayText() || "\u62c5\u5f53\u8005\u30db\u30fc\u30e0\u3067\u62c5\u5f53\u8005\u3092\u9078\u629e";
         clearValidationResult("create");
         applyStatusPlanToForm("create");
       }
@@ -622,7 +623,8 @@
           addr2: String(document.getElementById("create-addr2").value || "").trim(),
           addr3: String(document.getElementById("create-addr3").value || "").trim(),
           phone: String(document.getElementById("create-phone").value || "").trim(),
-          memo: String(document.getElementById("create-memo").value || "").trim()
+          memo: String(document.getElementById("create-memo").value || "").trim(),
+          staff: getSelectedStaffDisplayText()
         };
       }
 

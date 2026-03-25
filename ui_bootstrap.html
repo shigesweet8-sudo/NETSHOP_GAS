@@ -220,6 +220,7 @@
         restoreRoute(targetRoute, { skipConfirm: false });
       });
 
+      attachStaffEventHandlers();
       updateBulkUiState();
-      restoreRoute(resolveRouteFromUrl(), { skipConfirm: true });
+      initializeStaffApp();
     </script>
