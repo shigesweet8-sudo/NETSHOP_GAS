@@ -11,7 +11,8 @@
           if (!raw) return null;
           var parsed = JSON.parse(raw);
           if (!parsed || typeof parsed !== 'object') return null;
-          if (!parsed.staffId || !parsed.staffName) return null;
+          if (!parsed.staffName) return null;
+          if (!parsed.staffId) parsed.staffId = parsed.staffName;
           return parsed;
         } catch (error) {
           return null;
@@ -33,7 +34,7 @@
 
       function getSelectedStaffDisplayText() {
         if (!state.selectedStaff) return '';
-        return [String(state.selectedStaff.staffId || '').trim(), String(state.selectedStaff.staffName || '').trim()].join(' ').trim();
+        return String(state.selectedStaff.displayName || state.selectedStaff.staffName || state.selectedStaff.staffId || '').trim();
       }
 
       function updateCurrentStaffUi() {
@@ -76,9 +77,9 @@
         listEl.innerHTML = staffs.map(function(staff) {
           var disabled = staff.status && staff.status !== '\u6709\u52b9';
           return '<article class="staff-card' + (disabled ? ' is-disabled' : '') + '">' +
-            '<p class="staff-card-label">担当者ID</p>' +
-            '<h3 class="staff-card-title">' + escapeHtml(staff.staffId || '-') + '</h3>' +
-            '<p class="staff-card-text">' + escapeHtml(staff.staffName || '-') + '</p>' +
+            '<p class="staff-card-label">担当者名</p>' +
+            '<h3 class="staff-card-title">' + escapeHtml(staff.staffName || '-') + '</h3>' +
+            '<p class="staff-card-text">' + escapeHtml(staff.displayName || staff.staffName || '-') + '</p>' +
             '<div class="staff-card-actions">' +
             '<button class="btn btn-primary staff-select-trigger" type="button" data-staff-id="' + escapeHtml(staff.staffId || '') + '"' + (disabled ? ' disabled' : '') + '>この担当者で開始</button>' +
             '</div>' +
