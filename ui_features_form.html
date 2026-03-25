@@ -302,41 +302,49 @@
       var STATUS_FIELD_PLANS = {
         "商品登録": {
           summary: "商品登録時点で必要な基本情報を入力します。",
+          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "memo"],
           required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty"],
           recommended: ["memo"]
         },
         "出品中": {
           summary: "商品登録の基本情報に加えて、出品金額(K) を入力します。",
+          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "memo"],
           required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice"],
           recommended: ["memo"]
         },
         "値段交渉中": {
           summary: "交渉中として交渉金額(L) を追記します。",
+          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice", "memo"],
           required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice"],
           recommended: ["memo"]
         },
         "決済完了": {
           summary: "決済完了として M:決済金額、N:サイト利用料、O:配送料 を入力します。",
+          visible: ["status", "id", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice", "priceFinal", "fee", "shipping", "memo"],
           required: ["status", "date", "productRegDate", "shop", "itemName", "cost", "storage", "qty", "listPrice", "negotiatedPrice", "priceFinal", "fee", "shipping"],
           recommended: ["memo"]
         },
         "発送準備中": {
           summary: "配送準備として配送元・購入者・配送情報・住所・電話番号を入力します。",
+          visible: ["status", "shipFrom", "customer", "carrier", "tracking", "zip", "pref", "addr2", "addr3", "phone", "memo"],
           required: ["status", "shipFrom", "customer", "carrier", "tracking", "zip", "pref", "addr2", "addr3", "phone"],
           recommended: ["memo"]
         },
         "発送完了": {
           summary: "発送完了は完了系ステータスとして塗りつぶし表示します。",
+          visible: ["status", "tracking", "memo"],
           required: ["status"],
           recommended: ["tracking", "memo"]
         },
         "取引完了": {
           summary: "取引完了は完了系ステータスとして塗りつぶし表示します。",
+          visible: ["status", "memo"],
           required: ["status"],
           recommended: ["memo"]
         },
         "キャンセル": {
           summary: "キャンセルはクローズ系ステータスとして塗りつぶし表示します。",
+          visible: ["status", "memo"],
           required: ["status"],
           recommended: ["memo"]
         }
@@ -385,6 +393,31 @@
           var container = input.closest(".form-field");
           if (!container) return;
           container.classList.remove("is-highlighted", "is-required", "is-recommended", "is-missing", "is-complete-status", "is-closed-status");
+        });
+      }
+
+      function setCreateFieldsVisibleByStatus(statusValue) {
+        var plan = getStatusPlanForValue(statusValue);
+        var visibleMap = {};
+        var alwaysVisible = {
+          status: true
+        };
+
+        if (plan && Array.isArray(plan.visible)) {
+          plan.visible.forEach(function(fieldKey) {
+            visibleMap[fieldKey] = true;
+          });
+        }
+        Object.keys(alwaysVisible).forEach(function(fieldKey) {
+          visibleMap[fieldKey] = true;
+        });
+
+        Object.keys(FORM_FIELD_LABELS).forEach(function(fieldKey) {
+          var input = document.getElementById(getFormInputId("create", fieldKey));
+          if (!input || !input.closest) return;
+          var container = input.closest(".form-field");
+          if (!container) return;
+          container.classList.toggle("is-hidden-by-status", !visibleMap[fieldKey]);
         });
       }
 
@@ -496,6 +529,9 @@
         var statusValue = select ? select.value : "";
         var plan = getStatusPlanForValue(statusValue);
         clearStatusPlanHighlights(formType);
+        if (formType === "create") {
+          setCreateFieldsVisibleByStatus(statusValue);
+        }
         if (statusValue === "発送完了" || statusValue === "取引完了") {
           markStatusPlanField(formType, "status", "is-complete-status");
         } else if (statusValue === "キャンセル") {
