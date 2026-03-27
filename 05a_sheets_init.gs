@@ -81,8 +81,12 @@ function lockManagementHeaderRow() {
   var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
   if (!sheet) throw new Error(CONFIG.SHEET_NAME + ' シートが見つかりません');
 
-  protectManagementHeaderRow_(sheet);
+  restoreManagementHeaderIfNeeded_(sheet);
   showAlert_('完了', CONFIG.SHEET_NAME + ' のヘッダー行を保護しました。');
+}
+
+function hardenManagementSheetHeader() {
+  lockManagementHeaderRow();
 }
 
 function protectManagementHeaderRow_(sheet) {

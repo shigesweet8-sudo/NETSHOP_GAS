@@ -6,6 +6,7 @@
 // ==================== onOpen ====================
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
+  ensureManagementSheetHeaderIntegrity_();
 
   ui.createMenu('🛒 ネットショップ管理')
     .addItem('📊 ダッシュボードを更新', 'updateDashboard')
@@ -145,4 +146,112 @@ function deleteTriggerByFunctionName_(funcName) {
   ScriptApp.getProjectTriggers()
     .filter(function(t) { return t.getHandlerFunction() === funcName; })
     .forEach(function(t) { ScriptApp.deleteTrigger(t); });
+}
+
+// Header hardening overrides: keep row 1 frozen and restore it if edited.
+function onOpen() {
+  ensureManagementSheetHeaderIntegrity_();
+
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('🛒 ネットショップ管理')
+    .addItem('📊 ダッシュボードを更新', 'updateDashboard')
+    .addSeparator()
+    .addSubMenu(
+      ui.createMenu('🧮 再計算')
+        .addItem('全件 再計算', 'recalculateAll')
+        .addItem('選択行を再計算', 'recalculateSelected')
+    )
+    .addSeparator()
+    .addSubMenu(
+      ui.createMenu('📦 エクスポート')
+        .addItem('月次集計 CSV 出力', 'exportMonthlySummaryCsv')
+    )
+    .addSeparator()
+    .addSubMenu(
+      ui.createMenu('🧹 整理')
+        .addItem('日付で並び替え（新しい順）', 'sortByDateDesc')
+        .addSeparator()
+        .addItem('キャンセル行を削除', 'deleteCancelledRows')
+    )
+    .addSeparator()
+    .addItem('🏗️ シート初期化', 'createManagementSheet')
+    .addItem('🔒 ヘッダー固定を再適用', 'hardenManagementSheetHeader')
+    .addToUi();
+}
+
+function onEdit(e) {
+  handleManagementSheetEdit_(e, false);
+}
+
+function onEditInstallable(e) {
+  handleManagementSheetEdit_(e, true);
+}
+
+function handleManagementSheetEdit_(e, enableZipAutofill) {
+  var range = e.range;
+  var sheet = range.getSheet();
+  if (sheet.getName() !== CONFIG.SHEET_NAME) return;
+
+  if (range.getRow() === 1 || range.getLastRow() === 1) {
+    restoreManagementHeaderIfNeeded_(sheet);
+    return;
+  }
+
+  var row = range.getRow();
+  if (row <= 1) return;
+  if (range.getNumRows() > 1 || range.getNumColumns() > 1) return;
+
+  var col_ = CONFIG.COLS;
+  if (
+    range.getColumn() === col_.SHOP &&
+    !sheet.getRange(row, col_.ID).getValue()
+  ) {
+    sheet.getRange(row, col_.ID).setValue(generateId_(range.getValue()));
+  }
+  if (enableZipAutofill && range.getColumn() === col_.ZIP) {
+    autofillAddressFromZip_(sheet, row, range.getDisplayValue());
+  }
+
+  var watchCols = [col_.COST, col_.PRICE_FINAL, col_.FEE, col_.SHIPPING, col_.STATUS];
+  if (watchCols.indexOf(range.getColumn()) === -1) return;
+
+  if (range.getColumn() === col_.STATUS) {
+    var now = new Date();
+    sheet.getRange(row, col_.DATE).setValue(now);
+    if (
+      range.getValue() === CONFIG.STATUS.LISTING &&
+      !sheet.getRange(row, col_.PRODUCT_REG_DATE).getValue()
+    ) {
+      sheet.getRange(row, col_.PRODUCT_REG_DATE).setValue(now);
+    }
+  }
+
+  recalculateRow_(sheet, row);
+  applyManagementRowHighlight_(sheet, row);
+}
+
+function ensureManagementSheetHeaderIntegrity_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) return;
+
+  restoreManagementHeaderIfNeeded_(sheet);
+}
+
+function restoreManagementHeaderIfNeeded_(sheet) {
+  var expectedHeaders = CONFIG.HEADERS.slice();
+  var headerRange = sheet.getRange(1, 1, 1, expectedHeaders.length);
+  var currentHeaders = headerRange.getValues()[0];
+  var needsRestore = currentHeaders.length !== expectedHeaders.length ||
+    currentHeaders.some(function(value, index) {
+      return String(value || '') !== String(expectedHeaders[index] || '');
+    });
+
+  if (needsRestore) {
+    headerRange.clearContent();
+    headerRange.setValues([expectedHeaders]);
+  }
+
+  protectManagementHeaderRow_(sheet);
+  sheet.setFrozenRows(1);
 }
