@@ -26,6 +26,7 @@ function createManagementSheet() {
   }
 
   writeManagementHeader_(sheet);
+  protectManagementHeaderRow_(sheet);
   // applyManagementFormat_(sheet); // 書式処理は applyManagementRowStyle_ に統一
   redrawManagementSheet_(sheet);
   var maxDataRows = Math.max(sheet.getMaxRows() - 1, 1);
@@ -73,6 +74,39 @@ function createManagementSheet() {
 
 function writeManagementHeader_(sheet) {
   sheet.getRange(1, 1, 1, CONFIG.HEADERS.length).setValues([CONFIG.HEADERS.slice()]);
+}
+
+function lockManagementHeaderRow() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) throw new Error(CONFIG.SHEET_NAME + ' シートが見つかりません');
+
+  protectManagementHeaderRow_(sheet);
+  showAlert_('完了', CONFIG.SHEET_NAME + ' のヘッダー行を保護しました。');
+}
+
+function protectManagementHeaderRow_(sheet) {
+  var headerRange = sheet.getRange(1, 1, 1, CONFIG.HEADERS.length);
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
+  var description = 'NETSHOP_HEADER_LOCK';
+
+  protections.forEach(function(protection) {
+    if (protection.getDescription() === description) {
+      protection.remove();
+    }
+  });
+
+  var protection = headerRange.protect().setDescription(description);
+  var me = Session.getEffectiveUser();
+  var editors = protection.getEditors();
+
+  if (editors.length) {
+    protection.removeEditors(editors);
+  }
+  if (protection.canDomainEdit()) {
+    protection.setDomainEdit(false);
+  }
+  protection.addEditor(me);
 }
 
 function migrateIconStatusesToPlainText() {
