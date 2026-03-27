@@ -252,6 +252,7 @@ function restoreManagementHeaderIfNeeded_(sheet) {
     headerRange.setValues([expectedHeaders]);
   }
 
+  protectManagementSheetForAppOnly_(sheet);
   protectManagementHeaderRow_(sheet);
   sheet.setFrozenRows(1);
 }

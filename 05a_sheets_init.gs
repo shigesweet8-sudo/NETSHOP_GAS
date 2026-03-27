@@ -26,6 +26,7 @@ function createManagementSheet() {
   }
 
   writeManagementHeader_(sheet);
+  protectManagementSheetForAppOnly_(sheet);
   protectManagementHeaderRow_(sheet);
   // applyManagementFormat_(sheet); // 書式処理は applyManagementRowStyle_ に統一
   redrawManagementSheet_(sheet);
@@ -89,6 +90,16 @@ function hardenManagementSheetHeader() {
   lockManagementHeaderRow();
 }
 
+function lockManagementSheetForAppOnly() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) throw new Error(CONFIG.SHEET_NAME + ' シートが見つかりません');
+
+  protectManagementSheetForAppOnly_(sheet);
+  restoreManagementHeaderIfNeeded_(sheet);
+  showAlert_('完了', CONFIG.SHEET_NAME + ' をアプリ入力専用の保護にしました。');
+}
+
 function protectManagementHeaderRow_(sheet) {
   var headerRange = sheet.getRange(1, 1, 1, CONFIG.HEADERS.length);
   var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.RANGE);
@@ -104,6 +115,31 @@ function protectManagementHeaderRow_(sheet) {
   var me = Session.getEffectiveUser();
   var editors = protection.getEditors();
 
+  if (editors.length) {
+    protection.removeEditors(editors);
+  }
+  if (protection.canDomainEdit()) {
+    protection.setDomainEdit(false);
+  }
+  protection.addEditor(me);
+}
+
+function protectManagementSheetForAppOnly_(sheet) {
+  var protections = sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  var description = 'NETSHOP_APP_ONLY_SHEET_LOCK';
+
+  protections.forEach(function(protection) {
+    if (protection.getDescription() === description) {
+      protection.remove();
+    }
+  });
+
+  var protection = sheet.protect().setDescription(description);
+  var me = Session.getEffectiveUser();
+  var editors = protection.getEditors();
+
+  protection.setWarningOnly(false);
+  protection.setUnprotectedRanges([]);
   if (editors.length) {
     protection.removeEditors(editors);
   }
