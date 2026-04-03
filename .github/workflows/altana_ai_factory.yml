@@ -150,8 +150,7 @@ jobs:
           issue_no = os.environ.get('ISSUE_NUMBER', '')
           repo = os.environ.get('REPO', '')
           pr_url = os.environ.get('PR_URL', '').strip()
-          text = "
-".join([
+          text = "\n".join([
               'ALTANA FACTORY: PR created',
               f'Repository: {repo}',
               f'Issue: #{issue_no}',
