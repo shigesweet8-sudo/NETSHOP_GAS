@@ -1,4 +1,4 @@
-name: ALTANA AI FACTORY
+﻿name: ALTANA AI FACTORY
 
 on:
   issues:
@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   ai-dev:
+    if: >
+      startsWith(github.event.issue.title, '[実装]')
     runs-on: ubuntu-latest
 
     steps:
@@ -165,4 +167,5 @@ jobs:
           with urllib.request.urlopen(req):
               pass
           PY
+
 
